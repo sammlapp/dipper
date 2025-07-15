@@ -1,0 +1,173 @@
+# Bioacoustics Training GUI
+
+A cross-platform desktop application for bioacoustics machine learning with active learning capabilities. Built with Electron and React for the frontend, and Python for the ML backend.
+
+## Features
+
+- **Species Detection Inference**: Run pre-trained models from the bioacoustics model zoo
+- **Model Training**: Train custom models with your own data
+- **Data Exploration**: Visualize and explore detection results
+- **Active Learning**: Iteratively improve models with human feedback
+- **Cross-Platform**: Works on Mac, Windows, and Linux
+
+## Project Structure
+
+```
+training_gui/
+├── frontend/              # Electron + React desktop app
+│   ├── src/
+│   │   ├── components/    # React components
+│   │   ├── electron/      # Electron main process
+│   │   └── App.js         # Main React app
+│   ├── public/            # Static assets
+│   └── package.json       # Frontend dependencies
+├── backend/               # Python ML processing
+│   ├── scripts/           # Python scripts for ML operations
+│   └── requirements.txt   # Python dependencies
+├── configs/               # Configuration files
+├── models/                # Model storage
+├── environments/          # Bundled Python environments
+└── build/                 # Build outputs
+```
+
+## Development Setup
+
+### Prerequisites
+
+- Node.js (v16+)
+- Python (3.8+)
+- Git
+
+### Frontend Setup
+
+1. Navigate to the frontend directory:
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Start the development server:
+```bash
+npm run dev
+```
+
+### Backend Setup
+
+1. Navigate to the backend directory:
+```bash
+cd backend
+```
+
+2. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+### Running the Application
+
+1. Start the backend services (if needed)
+2. Start the frontend:
+```bash
+cd frontend
+npm run dev
+```
+
+The application will open in a new desktop window.
+
+## Building for Production
+
+### Frontend
+```bash
+cd frontend
+npm run build
+npm run electron-build
+```
+
+### Backend
+The Python environment will be bundled with the application during the build process.
+
+## Usage
+
+### Running Inference
+
+1. Open the "Inference" tab
+2. Select a model from the bioacoustics model zoo
+3. Choose audio files or folders to process
+4. Configure inference settings
+5. Run the model and view results
+
+### Training Models
+
+1. Open the "Training" tab
+2. Prepare your training data in the expected folder structure
+3. Configure training parameters
+4. Start training and monitor progress
+5. Save and use your trained model
+
+### Exploring Data
+
+1. Open the "Explore Data" tab
+2. Load inference results (CSV files)
+3. Filter detections by score range
+4. Visualize species distributions
+5. Listen to audio samples
+
+## Configuration
+
+Settings are stored in JSON configuration files that can be saved and loaded. The application supports:
+
+- Inference settings (batch size, overlap, etc.)
+- Training parameters (learning rate, epochs, etc.)
+- Data augmentation settings
+- Model-specific configurations
+
+## Models
+
+The application integrates with the [bioacoustics model zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/) and includes:
+
+- **BirdNET**: Global bird species classification
+- **Perch**: Global bird species classification
+- **HawkEars**: Canadian bird classification CNN
+- **RanaSierraeCNN**: Frog call detection
+
+## Dependencies
+
+### Frontend
+- Electron: Desktop app framework
+- React: UI framework
+- Material-UI: Component library
+- Plotly.js: Data visualization
+
+### Backend
+- PyTorch: Machine learning framework
+- OpenSoundscape: Bioacoustics processing
+- Bioacoustics Model Zoo: Pre-trained models
+- NumPy, Pandas: Data processing
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License.
+
+## Acknowledgments
+
+- [OpenSoundscape](https://github.com/kitzeslab/opensoundscape) for bioacoustics processing
+- [Bioacoustics Model Zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/) for pre-trained models
+- The bioacoustics research community for datasets and models

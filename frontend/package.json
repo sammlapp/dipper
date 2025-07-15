@@ -1,0 +1,64 @@
+{
+  "name": "bioacoustics-training-gui",
+  "version": "1.0.0",
+  "description": "Cross-platform desktop app for bioacoustics ML training and inference",
+  "main": "src/electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "npm run kill-electron && concurrently \"npm run react-dev\" \"npm run electron-dev\"",
+    "react-dev": "react-scripts start",
+    "electron-dev": "wait-on tcp:3000 && ELECTRON_IS_DEV=1 electron .",
+    "kill-electron": "pkill -f electron || true",
+    "electron-dev-simple": "wait-on tcp:3000 && ELECTRON_IS_DEV=1 electron .",
+    "build": "react-scripts build",
+    "electron-build": "electron-builder",
+    "build-all": "npm run build && npm run electron-build",
+    "build-python-env": "node build-scripts/build-python-env.js",
+    "package-app": "node build-scripts/package-app.js",
+    "build-complete": "npm run build-python-env && npm run package-app",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.0",
+    "@mui/material": "^5.15.0",
+    "electron": "^28.3.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-scripts": "^5.0.1",
+    "react-select": "^5.10.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "cross-env": "^7.0.3",
+    "electron-builder": "^24.9.0",
+    "wait-on": "^7.0.1"
+  },
+  "homepage": "./",
+  "build": {
+    "appId": "com.bioacoustics.traininggui",
+    "productName": "Bioacoustics Training GUI",
+    "directories": {
+      "output": "../build"
+    },
+    "files": [
+      "build/**/*",
+      "src/electron/**/*",
+      "node_modules/**/*"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
