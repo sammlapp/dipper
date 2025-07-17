@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import ExploreTab from './components/ExploreTab';
-import SettingsTab from './components/SettingsTab';
 import ReviewTab from './components/ReviewTab';
 
 function App() {
   const [activeTab, setActiveTab] = useState('inference');
-  
+
   // Inference state
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -15,7 +14,7 @@ function App() {
   const [logs, setLogs] = useState([]);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
-  
+
   // Configuration (matching streamlit_inference.py cfg structure)
   const [config, setConfig] = useState({
     inference: {
@@ -27,17 +26,17 @@ function App() {
 
   const tabs = [
     { id: 'inference', name: 'Inference' },
-    { id: 'training', name: 'Training' },
     { id: 'explore', name: 'Explore' },
-    { id: 'review', name: 'Review' },
-    { id: 'settings', name: 'Settings' }
+    { id: 'review', name: 'Review' }
   ];
 
   const models = {
-    'BirdNET': 'Global bird species classification (TensorFlow)',
-    'Perch': 'Global bird species classification (TensorFlow)', 
     'HawkEars': 'HawkEars Canadian bird classification CNN v0.1.0 (PyTorch)',
     'RanaSierraeCNN': 'CNN trained to detect Rana sierrae calls (PyTorch)',
+    'BirdNET': 'BirdNET Global species classifier v2.4 (TF Lite)',
+    // maybe exclude BirdNET for windows: ...(process.platform !== 'win32' && { 'BirdNET': 'BirdNET Global species classifier v2.4 (TF Lite)' }),
+    'BirdSetConvNeXT': 'BirdSet: ConvNext Global Bird Song Classification Model (PyTorch)',
+    'BirdSetBirdSetEfficientNetB1': 'BirdSet: EfficientNetB1 Global Bird Song Classification Model (PyTorch)',
   };
 
   // Set up Python output listener
@@ -45,7 +44,7 @@ function App() {
     if (window.electronAPI) {
       const handlePythonOutput = (event, data) => {
         setLogs(prev => [...prev, data.data]);
-        
+
         // Parse progress if available
         if (data.data.includes('Progress:')) {
           const match = data.data.match(/Progress:\s*(\d+)%/);
@@ -56,7 +55,7 @@ function App() {
       };
 
       window.electronAPI.onPythonOutput(handlePythonOutput);
-      
+
       return () => {
         window.electronAPI.removePythonOutputListener(handlePythonOutput);
       };
@@ -69,7 +68,7 @@ function App() {
         setError('Electron API not available - running in browser mode');
         return;
       }
-      
+
       const files = await window.electronAPI.selectFiles();
       setSelectedFiles(files);
       setError('');
@@ -84,19 +83,19 @@ function App() {
         setError('Electron API not available - running in browser mode');
         return;
       }
-      
+
       const folder = await window.electronAPI.selectFolder();
       if (folder) {
         setProgress('Scanning folder for audio files...');
         setLogs([]);
-        
+
         const processId = Date.now().toString();
         const result = await window.electronAPI.runPythonScript(
           'scan_folder.py',
           [folder],
           processId
         );
-        
+
         const data = JSON.parse(result.stdout);
         if (data.error) {
           setError(data.error);
@@ -117,7 +116,7 @@ function App() {
         setError('Electron API not available - running in browser mode');
         return;
       }
-      
+
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const defaultName = `${selectedModel}_predictions_${timestamp}.csv`;
       const file = await window.electronAPI.saveFile(defaultName);
@@ -134,12 +133,12 @@ function App() {
       setError('Please select a model');
       return;
     }
-    
+
     if (selectedFiles.length === 0) {
       setError('Please select audio files');
       return;
     }
-    
+
     if (!window.electronAPI) {
       setError('Electron API not available - running in browser mode');
       return;
@@ -152,7 +151,7 @@ function App() {
 
     try {
       const processId = Date.now().toString();
-      
+
       const args = [
         '--model', selectedModel,
         '--files', JSON.stringify(selectedFiles),
@@ -170,7 +169,7 @@ function App() {
       try {
         const outputLines = result.stdout.split('\n').filter(line => line.trim());
         let summary = null;
-        
+
         // Look for the JSON output (usually the last line)
         for (let i = outputLines.length - 1; i >= 0; i--) {
           try {
@@ -183,7 +182,7 @@ function App() {
             // Continue looking for valid JSON
           }
         }
-        
+
         if (summary && summary.status === 'success') {
           setProgress(`Inference completed! Processed ${summary.files_processed} files`);
           if (summary.species_detected && summary.species_detected.length > 0) {
@@ -201,7 +200,7 @@ function App() {
         console.log('JSON parse error, but inference may have succeeded:', parseError);
         setProgress('Inference completed! Check the output file for results.');
       }
-      
+
     } catch (err) {
       setError(`Inference failed: ${err.message}`);
     } finally {
@@ -221,14 +220,14 @@ function App() {
         setError('Electron API not available - running in browser mode');
         return;
       }
-      
+
       setProgress('Testing Python path...');
       const result = await window.electronAPI.testPythonPath();
       setProgress(`Python path: ${result.pythonPath} (exists: ${result.exists})`);
       setLogs(prev => [...prev, `Home directory: ${result.homeDir}`]);
       setLogs(prev => [...prev, `Python path: ${result.pythonPath}`]);
       setLogs(prev => [...prev, `Path exists: ${result.exists}`]);
-      
+
       if (!result.exists) {
         setError(`Python not found at ${result.pythonPath}. Please check your conda environment.`);
       } else {
@@ -244,7 +243,7 @@ function App() {
       <header className="App-header">
         <h1>Bioacoustics Training GUI</h1>
       </header>
-      
+
       <nav className="tab-nav">
         {tabs.map(tab => (
           <button
@@ -256,28 +255,28 @@ function App() {
           </button>
         ))}
       </nav>
-      
+
       <main className="main-content">
         {activeTab === 'inference' && (
           <div className="tab-content">
             <h2>Species Detection Inference</h2>
-            
+
             {error && (
               <div className="error-message">
                 <strong>Error:</strong> {error}
               </div>
             )}
-            
+
             {progress && (
               <div className="progress-message">
                 {progress}
               </div>
             )}
-            
+
             <div className="section">
               <h3>1. Select Model</h3>
-              <select 
-                value={selectedModel} 
+              <select
+                value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
                 disabled={isRunning}
               >
@@ -289,7 +288,7 @@ function App() {
                 ))}
               </select>
             </div>
-            
+
             <div className="section">
               <h3>2. Configure Settings</h3>
               <div className="config-grid">
@@ -334,7 +333,7 @@ function App() {
                 </label>
               </div>
             </div>
-            
+
             <div className="section">
               <h3>3. Select Audio Files</h3>
               <div className="button-group">
@@ -354,7 +353,7 @@ function App() {
                 )}
               </p>
             </div>
-            
+
             <div className="section">
               <h3>4. Output Location (Optional)</h3>
               <button onClick={handleSelectOutputFile} disabled={isRunning}>
@@ -364,11 +363,11 @@ function App() {
                 <p className="output-path">Output: {outputFile}</p>
               )}
             </div>
-            
+
             <div className="section">
               <h3>5. Run Inference</h3>
               <div className="button-group">
-                <button 
+                <button
                   className="primary-button"
                   onClick={handleRunInference}
                   disabled={isRunning || !selectedModel || selectedFiles.length === 0}
@@ -383,7 +382,7 @@ function App() {
                 </button>
               </div>
             </div>
-            
+
             {logs.length > 0 && (
               <div className="section">
                 <h3>Logs</h3>
@@ -398,24 +397,13 @@ function App() {
             )}
           </div>
         )}
-        
-        {activeTab === 'training' && (
-          <div className="tab-content">
-            <h2>Model Training</h2>
-            <p>Training interface will be implemented here.</p>
-          </div>
-        )}
-        
+
         {activeTab === 'explore' && (
           <ExploreTab />
         )}
-        
+
         {activeTab === 'review' && (
           <ReviewTab />
-        )}
-        
-        {activeTab === 'settings' && (
-          <SettingsTab />
         )}
       </main>
     </div>

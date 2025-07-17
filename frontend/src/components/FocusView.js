@@ -193,7 +193,8 @@ function FocusView({
   // Get current annotation value
   const getAnnotationValue = () => {
     if (reviewMode === 'binary') {
-      return annotation || 'unlabeled';
+      // Return the actual annotation value, or null if empty/unlabeled
+      return annotation || null;
     } else {
       const labelsToUse = labels || '';
       if (!labelsToUse || labelsToUse === '' || labelsToUse === 'nan') {
@@ -269,6 +270,12 @@ function FocusView({
       // Don't handle shortcuts if user is typing
       if (isTyping) return;
 
+      // Handle Escape key for focus/grid toggle - let it bubble up to parent
+      if (event.key === 'Escape') {
+        // Don't prevent default - let parent handle this
+        return;
+      }
+
       // Prevent default behavior for our shortcuts
       if (['a', 's', 'd', 'f', 'j', 'k', ' '].includes(event.key.toLowerCase())) {
         event.preventDefault();
@@ -322,19 +329,20 @@ function FocusView({
 
   return (
     <div className="focus-view">
-      {/* Hidden audio element */}
-      {audioUrl && (
-        <audio
-          ref={audioRef}
-          src={audioUrl}
-          onTimeUpdate={handleAudioTimeUpdate}
-          onLoadedMetadata={handleAudioLoadedMetadata}
-          onEnded={handleAudioEnded}
-          preload="metadata"
-        />
-      )}
+      <div className="focus-view-inner">
+        {/* Hidden audio element */}
+        {audioUrl && (
+          <audio
+            ref={audioRef}
+            src={audioUrl}
+            onTimeUpdate={handleAudioTimeUpdate}
+            onLoadedMetadata={handleAudioLoadedMetadata}
+            onEnded={handleAudioEnded}
+            preload="metadata"
+          />
+        )}
 
-      {/* Large spectrogram display */}
+        {/* Large spectrogram display */}
       <div className="focus-spectrogram-container">
         <div 
           className="focus-spectrogram"
@@ -349,7 +357,7 @@ function FocusView({
             />
           ) : (
             <div className="focus-spectrogram-placeholder">
-              <div className="placeholder-icon">🔊</div>
+              <img src="/icon.svg" alt="Loading" className="placeholder-icon app-icon" />
               <div className="placeholder-text">Loading spectrogram...</div>
             </div>
           )}
@@ -393,20 +401,31 @@ function FocusView({
         {/* Binary annotation controls */}
         {reviewMode === 'binary' && (
           <div className="focus-annotation-controls">
-            <div className="focus-binary-controls">
-              {binaryOptions.map(option => (
+            <div className="focus-binary-segmented-control">
+              {binaryOptions.map((option, index) => (
                 <button
                   key={option.value}
-                  className={`focus-annotation-button ${annotationValue === option.value ? 'active' : ''}`}
+                  className={`segmented-control-option ${
+                    (option.value === 'unlabeled' && annotationValue === null) || 
+                    (option.value !== 'unlabeled' && annotationValue === option.value) ? 'active' : ''
+                  } ${
+                    index === 0 ? 'first' : index === binaryOptions.length - 1 ? 'last' : 'middle'
+                  }`}
                   style={{
-                    backgroundColor: annotationValue === option.value ? option.color : 'transparent',
+                    backgroundColor: ((option.value === 'unlabeled' && annotationValue === null) || 
+                                    (option.value !== 'unlabeled' && annotationValue === option.value)) ? option.color : 'transparent',
                     borderColor: option.color,
-                    color: annotationValue === option.value ? 'white' : option.color
+                    color: ((option.value === 'unlabeled' && annotationValue === null) || 
+                           (option.value !== 'unlabeled' && annotationValue === option.value)) ? 'white' : option.color
                   }}
                   onClick={() => handleAnnotationChangeWithAdvance(option.value === 'unlabeled' ? '' : option.value)}
                 >
-                  <span className="button-key">({option.key})</span>
-                  <span className="button-label">{option.label}</span>
+                  <span className="segmented-key">({option.key})</span>
+                  {option.value === 'unlabeled' ? (
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>restart_alt</span>
+                  ) : (
+                    <span className="segmented-label">{option.label}</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -563,13 +582,14 @@ function FocusView({
         </div>
       </div>
 
-      {/* Keyboard shortcuts help */}
-      <div className="focus-shortcuts-help">
-        <small>
-          <strong>Shortcuts:</strong> 
-          {reviewMode === 'binary' && ' a=Yes, s=No, d=Unsure, f=Unlabeled |'} 
-          j=Previous, k=Next | Space=Play/Pause
-        </small>
+        {/* Keyboard shortcuts help */}
+        <div className="focus-shortcuts-help">
+          <small>
+            <strong>Shortcuts:</strong> 
+            {reviewMode === 'binary' && ' a=Yes, s=No, d=Unsure, f=Unlabeled |'} 
+            j=Previous, k=Next | Space=Play/Pause
+          </small>
+        </div>
       </div>
     </div>
   );

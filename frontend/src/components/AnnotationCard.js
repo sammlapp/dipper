@@ -24,7 +24,7 @@ const AnnotationCard = memo(function AnnotationCard({
   const audioRef = useRef(null);
 
   // Add render profiling
-  const renderProfiler = useRenderProfiler('AnnotationCard');
+  useRenderProfiler('AnnotationCard');
 
   const {
     file = '',
@@ -157,7 +157,7 @@ const AnnotationCard = memo(function AnnotationCard({
     { value: 'yes', label: 'Yes', symbol: 'check_circle', color: 'rgb(145, 180, 135)' },
     { value: 'no', label: 'No', symbol: 'cancel', color: 'rgb(207, 122, 107)' },
     { value: 'unsure', label: 'Unsure', symbol: 'question_mark', color: 'rgb(237, 223, 177)' },
-    { value: 'unlabeled', label: 'Unlabeled', symbol: 'radio_button_unchecked', color: 'rgb(223, 223, 223)' }
+    { value: 'unlabeled', label: 'Reset', symbol: 'restart_alt', color: 'rgb(223, 223, 223)' }
   ];
 
   // Multi-class options for react-select
@@ -311,11 +311,6 @@ const AnnotationCard = memo(function AnnotationCard({
     }
   };
 
-  const handleCardClick = () => {
-    if (!spectrogramUrl && !isLoading) {
-      loadSpectrogram();
-    }
-  };
 
   // Memoize spectrogram rendering to prevent re-renders when annotation changes
   const spectrogramMemo = useMemo(() => {
@@ -372,7 +367,7 @@ const AnnotationCard = memo(function AnnotationCard({
 
     return (
       <div className="spectrogram-placeholder">
-        <div className="placeholder-icon">🔊</div>
+        <img src="/icon.svg" alt="Loading" className="placeholder-icon app-icon" />
         <div className="placeholder-text">Loading spectrogram...</div>
       </div>
     );

@@ -272,24 +272,23 @@ function ReviewTab() {
 
   // Auto-save on page changes
   useEffect(() => {
-    if (annotationData.length > 0 && currentPage > 0) { // Don't auto-save on initial load
+    if (annotationData.length > 0 && autoSaveEnabled && hasUnsavedChanges) {
       performAutoSave();
     }
-  }, [currentPage]);
+  }, [currentPage, annotationData.length, autoSaveEnabled, hasUnsavedChanges]);
 
   // Auto-save on focus clip changes
   useEffect(() => {
-    if (isFocusMode && annotationData.length > 0 && focusClipIndex > 0) { // Don't auto-save on initial load
+    if (isFocusMode && annotationData.length > 0 && autoSaveEnabled && hasUnsavedChanges) {
       performAutoSave();
     }
-  }, [focusClipIndex]);
+  }, [focusClipIndex, isFocusMode, annotationData.length, autoSaveEnabled, hasUnsavedChanges]);
 
-  // Load auto-save location from localStorage on mount
+  // Clear auto-save location on app restart (mount)
   useEffect(() => {
-    const savedLocation = localStorage.getItem('review_autosave_location');
-    if (savedLocation) {
-      setAutoSaveLocation(savedLocation);
-    }
+    // Clear auto-save location on app restart
+    setAutoSaveLocation('');
+    localStorage.removeItem('review_autosave_location');
   }, []);
 
   // Separate effect to detect when NEW data is loaded (not just annotations changed)
@@ -346,6 +345,9 @@ function ReviewTab() {
       extractAvailableClasses(data);
       setCurrentPage(0);
       setHasUnsavedChanges(false);
+      // Clear auto-save location when new annotation file is loaded
+      setAutoSaveLocation('');
+      localStorage.removeItem('review_autosave_location');
     } catch (err) {
       setError('Failed to parse CSV file: ' + err.message);
     } finally {
@@ -390,6 +392,9 @@ function ReviewTab() {
         extractAvailableClasses(data.clips);
         setCurrentPage(0);
         setHasUnsavedChanges(false);
+        // Clear auto-save location when new annotation file is loaded
+        setAutoSaveLocation('');
+        localStorage.removeItem('review_autosave_location');
       }
     } catch (err) {
       setError('Failed to load annotation task: ' + err.message);
@@ -543,7 +548,9 @@ function ReviewTab() {
       return newArray;
     });
     setHasUnsavedChanges(true);
-  }, [settings.review_mode]);
+    
+    // Remove individual annotation auto-save - only auto-save on page/navigation changes
+  }, [settings.review_mode, isFocusMode, autoSaveEnabled, hasUnsavedChanges]);
 
   const handleCommentChange = useCallback((clipId, newComment) => {
     setAnnotationData(prev => {
@@ -688,9 +695,9 @@ function ReviewTab() {
     setHasUnsavedChanges(true);
   }, [currentPageData]);
 
-  // Keyboard shortcuts for grid view
+  // Keyboard shortcuts for both grid and focus view
   useEffect(() => {
-    if (!settings.keyboard_shortcuts_enabled || isFocusMode) return;
+    if (!settings.keyboard_shortcuts_enabled) return;
 
     const handleKeyDown = (event) => {
       // Check if user is typing in a text field
@@ -699,82 +706,104 @@ function ReviewTab() {
         (event.target.tagName === "INPUT" && event.target.type === "text") ||
         (event.target.tagName === "INPUT" && event.target.type === "number")
       );
-      
+
       // Don't handle shortcuts if user is typing
       if (isTyping) return;
 
       const isMac = navigator.userAgent.includes('Mac') || navigator.userAgent.includes('macOS');
       const cmdOrCtrl = isMac ? event.metaKey : event.ctrlKey;
 
-      // Handle Escape key for focus/grid toggle
+      // Handle Escape key for focus/grid toggle (works in both modes)
       if (event.key === 'Escape') {
         event.preventDefault();
         setIsFocusMode(prev => !prev);
         return;
       }
 
-      // Only handle other shortcuts if cmd/ctrl is pressed
-      if (!cmdOrCtrl) return;
+      // Handle Ctrl/Cmd shortcuts
+      if (cmdOrCtrl) {
+        // Prevent default behavior for our shortcuts
+        const shortcutKeys = ['a', 's', 'd', 'f', 'j', 'k', 'c', 'o', ','];
+        if (shortcutKeys.includes(event.key.toLowerCase())) {
+          event.preventDefault();
+        }
 
-      // Prevent default behavior for our shortcuts
-      const shortcutKeys = ['a', 's', 'd', 'f', 'j', 'k', 'c'];
-      if (shortcutKeys.includes(event.key.toLowerCase())) {
-        event.preventDefault();
+        // Handle global shortcuts (work in both grid and focus mode)
+        switch (event.key.toLowerCase()) {
+          case 's':
+            if (!event.shiftKey) {
+              // Ctrl/Cmd+S: Save annotations
+              handleExportAnnotations();
+              return;
+            }
+            break;
+          case 'o':
+            // Ctrl/Cmd+O: Open annotation file
+            handleLoadAnnotationTask();
+            return;
+          case ',':
+            // Ctrl/Cmd+,: Open settings panel
+            setIsSettingsPanelOpen(true);
+            return;
+        }
       }
 
-      switch (event.key.toLowerCase()) {
-        case 'a':
-          if (event.shiftKey) {
-            // Cmd/Ctrl+Shift+A: bulk annotate as Yes
-            if (settings.review_mode === 'binary') {
-              handleBulkAnnotation('yes');
+      // Grid mode only shortcuts
+      if (!isFocusMode && cmdOrCtrl) {
+        switch (event.key.toLowerCase()) {
+          case 'a':
+            if (event.shiftKey) {
+              // Cmd/Ctrl+Shift+A: bulk annotate as Yes
+              if (settings.review_mode === 'binary') {
+                handleBulkAnnotation('yes');
+              }
             }
-          }
-          break;
-        case 's':
-          if (event.shiftKey) {
-            // Cmd/Ctrl+Shift+S: bulk annotate as No
-            if (settings.review_mode === 'binary') {
-              handleBulkAnnotation('no');
+            break;
+          case 's':
+            if (event.shiftKey) {
+              // Cmd/Ctrl+Shift+S: bulk annotate as No
+              if (settings.review_mode === 'binary') {
+                handleBulkAnnotation('no');
+              }
             }
-          }
-          break;
-        case 'd':
-          if (event.shiftKey) {
-            // Cmd/Ctrl+Shift+D: bulk annotate as Unsure
-            if (settings.review_mode === 'binary') {
-              handleBulkAnnotation('unsure');
+            break;
+          case 'd':
+            if (event.shiftKey) {
+              // Cmd/Ctrl+Shift+D: bulk annotate as Unsure
+              if (settings.review_mode === 'binary') {
+                handleBulkAnnotation('unsure');
+              }
             }
-          }
-          break;
-        case 'f':
-          if (event.shiftKey) {
-            // Cmd/Ctrl+Shift+F: bulk annotate as Unlabeled
-            if (settings.review_mode === 'binary') {
-              handleBulkAnnotation('unlabeled');
+            break;
+          case 'f':
+            if (event.shiftKey) {
+              // Cmd/Ctrl+Shift+F: bulk annotate as Unlabeled
+              if (settings.review_mode === 'binary') {
+                handleBulkAnnotation('unlabeled');
+              }
             }
-          }
-          break;
-        case 'j':
-          // Cmd/Ctrl+J: previous page
-          if (currentPage > 0) {
-            setCurrentPage(prev => prev - 1);
-          }
-          break;
-        case 'k':
-          // Cmd/Ctrl+K: next page
-          if (currentPage < totalPages - 1) {
-            setCurrentPage(prev => prev + 1);
-          }
-          break;
-        case 'c':
-          if (event.shiftKey) {
-            // Cmd/Ctrl+Shift+C: toggle comments
-            handleSettingsChange({ ...settings, show_comments: !settings.show_comments });
-          }
-          break;
-        default:
-          break;
+            break;
+          case 'j':
+            // Cmd/Ctrl+J: previous page
+            if (currentPage > 0) {
+              setCurrentPage(prev => prev - 1);
+            }
+            break;
+          case 'k':
+            // Cmd/Ctrl+K: next page
+            if (currentPage < totalPages - 1) {
+              setCurrentPage(prev => prev + 1);
+            }
+            break;
+          case 'c':
+            if (event.shiftKey) {
+              // Cmd/Ctrl+Shift+C: toggle comments
+              handleSettingsChange({ ...settings, show_comments: !settings.show_comments });
+            }
+            break;
+          default:
+            break;
+        }
       }
     };
 
@@ -888,11 +917,11 @@ function ReviewTab() {
         alert('Auto-save location selection is only available in the desktop app');
         return;
       }
-      
+
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const defaultName = `annotations_${timestamp}.csv`;
       const filePath = await window.electronAPI.saveFile(defaultName);
-      
+
       if (filePath) {
         setAutoSaveLocation(filePath);
         // Save to localStorage
@@ -905,19 +934,19 @@ function ReviewTab() {
 
   const performAutoSave = async () => {
     if (!autoSaveEnabled || !hasUnsavedChanges) return;
-    
+
     try {
       let saveLocation = autoSaveLocation;
-      
+
       // If no location set, prompt for one
       if (!saveLocation) {
         await handleSelectAutoSaveLocation();
         saveLocation = autoSaveLocation;
       }
-      
+
       if (saveLocation) {
         const csvContent = exportToCSV();
-        
+
         if (window.electronAPI?.writeFile) {
           await window.electronAPI.writeFile(saveLocation, csvContent);
           setHasUnsavedChanges(false);
@@ -948,7 +977,7 @@ function ReviewTab() {
       const csvContent = exportToCSV();
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const defaultName = `annotations_${timestamp}.csv`;
-      
+
       // Check if writeFile is available for proper Electron file saving
       if (window.electronAPI.writeFile) {
         const filePath = await window.electronAPI.saveFile(defaultName);
@@ -1398,7 +1427,7 @@ function ReviewTab() {
             >
               <span className="material-symbols-outlined">menu</span>
             </button>
-            
+
             {/* File Operations */}
             <button
               onClick={handleLoadAnnotationTask}
@@ -1408,7 +1437,7 @@ function ReviewTab() {
             >
               <span className="material-symbols-outlined">folder_open</span>
             </button>
-            
+
             <button
               onClick={handleExportAnnotations}
               className="toolbar-btn"
@@ -1454,14 +1483,29 @@ function ReviewTab() {
                   </span>
                 </button>
 
-                {/* Comments Toggle */}
-                <button
-                  className={`toolbar-btn ${settings.show_comments ? 'active' : ''}`}
-                  onClick={() => handleSettingsChange({ ...settings, show_comments: !settings.show_comments })}
-                  title="Toggle Comments Visibility"
-                >
-                  <span className="material-symbols-outlined">comment</span>
-                </button>
+                {/* Comments Toggle - Only show in Grid mode */}
+                {!isFocusMode && (
+                  <button
+                    className={`toolbar-btn ${settings.show_comments ? 'active' : ''}`}
+                    onClick={() => handleSettingsChange({ ...settings, show_comments: !settings.show_comments })}
+                    title="Toggle Comments Visibility"
+                  >
+                    <span className="material-symbols-outlined">comment</span>
+                  </button>
+                )}
+
+                {/* Autoplay Toggle - Only show in Focus mode */}
+                {isFocusMode && (
+                  <button
+                    className={`toolbar-btn ${settings.focus_mode_autoplay ? 'active' : ''}`}
+                    onClick={() => handleSettingsChange({ ...settings, focus_mode_autoplay: !settings.focus_mode_autoplay })}
+                    title="Toggle Autoplay in Focus Mode"
+                  >
+                    <span className="material-symbols-outlined">
+                      {settings.focus_mode_autoplay ? 'play_circle' : 'pause_circle'}
+                    </span>
+                  </button>
+                )}
 
                 {/* Page Navigation */}
                 {!isFocusMode && (
@@ -1474,11 +1518,11 @@ function ReviewTab() {
                     >
                       <span className="material-symbols-outlined">chevron_left</span>
                     </button>
-                    
+
                     <span className="page-info">
                       {currentPage + 1} / {totalPages}
                     </span>
-                    
+
                     <button
                       className="toolbar-btn"
                       onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
@@ -1519,26 +1563,28 @@ function ReviewTab() {
         )}
 
         {/* Main Content Area - Grid or Focus View */}
-        <div className="review-content">
+        <div className={`review-content ${isFocusMode ? 'focus-mode' : 'grid-mode'}`}>
           {annotationData.length > 0 && (
             <>
               {isFocusMode ? (
-                // Focus Mode View
-                <FocusView
-                  clipData={{
-                    ...filteredAnnotationData[focusClipIndex],
-                    // Find loaded spectrogram data for current clip
-                    ...loadedPageData.find(loaded => loaded.clip_id === filteredAnnotationData[focusClipIndex]?.id) || {}
-                  }}
-                  onAnnotationChange={handleFocusAnnotationChange}
-                  onCommentChange={handleFocusCommentChange}
-                  onNavigate={handleFocusNavigation}
-                  settings={settings}
-                  reviewMode={settings.review_mode}
-                  availableClasses={availableClasses}
-                  isLastClip={focusClipIndex === filteredAnnotationData.length - 1}
-                  autoAdvance={true}
-                />
+                // Focus Mode View - Centered
+                <div className="focus-view-container">
+                  <FocusView
+                    clipData={{
+                      ...filteredAnnotationData[focusClipIndex],
+                      // Find loaded spectrogram data for current clip
+                      ...loadedPageData.find(loaded => loaded.clip_id === filteredAnnotationData[focusClipIndex]?.id) || {}
+                    }}
+                    onAnnotationChange={handleFocusAnnotationChange}
+                    onCommentChange={handleFocusCommentChange}
+                    onNavigate={handleFocusNavigation}
+                    settings={settings}
+                    reviewMode={settings.review_mode}
+                    availableClasses={availableClasses}
+                    isLastClip={focusClipIndex === filteredAnnotationData.length - 1}
+                    autoAdvance={true}
+                  />
+                </div>
               ) : (
                 // Grid Mode View
                 <>
@@ -1552,33 +1598,35 @@ function ReviewTab() {
 
         {/* PLACEHOLDER - SHOWN WHEN NO DATA LOADED */}
         {annotationData.length === 0 && !loading && !error && (
-          <div className="section">
-            <div className="placeholder-content">
-              <div className="placeholder-icon">📝</div>
-              <h3>Ready for Annotation Review</h3>
-              <p>Load a CSV file to begin reviewing and annotating audio clips. The CSV should contain:</p>
-              <ul>
-                <li><strong>file</strong>: Path to audio file</li>
-                <li><strong>start_time</strong>: Start time in seconds</li>
-                <li><strong>end_time</strong>: End time in seconds (optional)</li>
-                <li>Either <strong>annotation</strong>: Binary classification label (yes/no/unsure)</li>
-                <li>Or <strong>labels</strong> and <strong>complete</strong>: Comma-separated labels for multi-class annotations</li>
-                <li><strong>comments</strong>: Text comments (optional)</li>
-              </ul>
-              <p>Choose between binary review (yes/no/unsure) or multi-class review modes.</p>
-              
-              {/* Load CSV Button */}
-              <div className="placeholder-actions">
-                <button 
-                  onClick={handleLoadAnnotationTask} 
-                  disabled={loading}
-                  className="primary-button load-csv-button"
-                >
-                  {loading ? 'Loading...' : 'Load Annotation CSV'}
-                </button>
-                <p className="load-button-help">
-                  <small>You can also use the menu button in the top-left to access loading and filtering options.</small>
-                </p>
+          <div className="review-content focus-mode">
+            <div className="placeholder-container">
+              <div className="placeholder-content">
+                <div className="placeholder-icon">📝</div>
+                <h3>Ready for Annotation Review</h3>
+                <p>Load a CSV file to begin reviewing and annotating audio clips. The CSV should contain:</p>
+                <ul>
+                  <li><strong>file</strong>: Path to audio file</li>
+                  <li><strong>start_time</strong>: Start time in seconds</li>
+                  <li><strong>end_time</strong>: End time in seconds (optional)</li>
+                  <li>Either <strong>annotation</strong>: Binary classification label (yes/no/unsure)</li>
+                  <li>Or <strong>labels</strong> and <strong>complete</strong>: Comma-separated labels for multi-class annotations</li>
+                  <li><strong>comments</strong>: Text comments (optional)</li>
+                </ul>
+                <p>Choose between binary review (yes/no/unsure) or multi-class review modes.</p>
+
+                {/* Load CSV Button */}
+                <div className="placeholder-actions">
+                  <button
+                    onClick={handleLoadAnnotationTask}
+                    disabled={loading}
+                    className="primary-button load-csv-button"
+                  >
+                    {loading ? 'Loading...' : 'Load Annotation CSV'}
+                  </button>
+                  <p className="load-button-help">
+                    <small>You can also use the menu button in the top-left to access loading and filtering options.</small>
+                  </p>
+                </div>
               </div>
             </div>
           </div>

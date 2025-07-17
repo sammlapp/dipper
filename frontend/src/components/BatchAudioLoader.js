@@ -301,7 +301,7 @@ export const FastAudioClipCard = ({
           />
         ) : (
           <div className="spectrogram-placeholder">
-            <div className="placeholder-icon">🔊</div>
+            <img src="/icon.svg" alt="No spectrogram" className="placeholder-icon app-icon" />
             <div className="placeholder-text">No spectrogram available</div>
           </div>
         )}

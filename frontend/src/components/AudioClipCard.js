@@ -195,7 +195,7 @@ function AudioClipCard({
     // Placeholder spectrogram
     return (
       <div className="spectrogram-placeholder">
-        <div className="placeholder-icon">🔊</div>
+        <img src="/icon.svg" alt="Audio Clip" className="placeholder-icon app-icon" />
         <div className="placeholder-text">Click to generate spectrogram</div>
       </div>
     );
