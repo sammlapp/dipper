@@ -14,7 +14,11 @@ The app will be built for desktop guis on Mac, Linux, and Windows. Python enviro
 
 streamlit_inference.py is provided as a reference for understanding and porting basic functionality, but not as a final product. 
 
-
+# Build pipeline checklist
+- pyinstaller build of lightweight env is working
+- conda-pack is now succeeding after resolving issues with packages installed with conda then modified by pip
+- running app using pyinstaller for lightweight backend: still testing if this is working but seems ok so far
+- 
 
 # Visual design
 
@@ -101,10 +105,6 @@ User will select an annotation task. The interface will be very similar to that 
 ## Review tab Focus view refinements
 - compact the controls: file name, annotation buttons, audio playback, comments, and forward/backward should all be smaller and be located neatly beneath the spectrogram view 
 
-## Review tab issues
-- filtering or changing number of displayed spectrograms should cause a re-fetch of spectrograms. Currently, if new items are displayed the spectrograms are not rendered, and user sees blank panels after filtering or increasing number of visible samples. These two actions shoudl trigger re-fetch just like pagination does. 
-- all colormaps still result in greyscale spectrograms, but some should result in colored images. The colormaps were working previously but now colormaps except 'inverted grayscale' all look like black with white for the sounds. Add debugging information for this since this issue has been difficult to crack
-- if no annotation file is currently loaded, add a "Load annotation csv" button in the main window (exactly like the button in the left panel)
 
 ## Focus mode for review tab
 - provide a toggle at the top of the review page to switch between viewing lots of clips on a page (current setup) and viewing a single, large spectrogram (click to play) in 'focus' mode.
@@ -122,7 +122,6 @@ User will select an annotation task. The interface will be very similar to that 
 
 # Incomplete items:
 
-#TODO update 
 - the multi-selects for filtering should use the same type of selector as the annotation panels, react-select
 
 # feature requests
@@ -310,7 +309,7 @@ consolidate the global theming options into a simple config or css file, so that
 
 
 ## inference updates:
-- implement saving and loading all inference settings, including paths, to a config file
+
 - refactor as "create inference tasks" -> when user selects settings and clicks 'create and run task', task gets a name then launches background task and monitors progress in a pane that monitors each task. Alternatively can click 'create tasks' to create but not start the inference task. API is not disabled when task begins: instead, user can create additional inference tasks that are queued to run after the running one is complete. A tasks pane monitors tue status of inference tasks: completed, running, failed, queued, or unstarted. Buttons next to each task allow users to:
   - start unstarted tasks (run immediately if no task is running, otherwise add to queue)
   - rerun completed or canceled tasks
@@ -332,12 +331,11 @@ consolidate the global theming options into a simple config or css file, so that
 - use Material UI badges and small photos of the class detected for quick overview (use birdnames repo for name translation, find open-source set of images for species headshots or use the global bird svgs dataset)
 
 ## build strategy
+- implement saving and loading all inference settings, including paths, to a config file. The path to the config file will be the single argument taken by the inference.py script. 
 - we will use pyinstaller to build an executable for the backend scripts EXCLUDING ml and heavy dependencies (no predict, train embed). The scripts should only depend on pandas, matplotlib, numpy, librosa, etc. They will not require pytorch, opensoundscape, or bioacoustics-model-zoo
-- to do this, we should first refactor get_sample_detections to use librosa and pillow (PIL) rather than opensoundscape (use create_audio_clips.create_audio_clip_and_spectrogram)
-- we will build frozen python enviornment(s) that will be downloaded on an as-needed basis: for now, just pytorch.yml which we will build using conda-pack to create a .tar.gz. Adapt the backend/requirements.txt to create pytorch_env_requirements.yml, I've specified the required dependencies for the pytorch models inference and training in that file. 
-- inference will run in the background by writing a config file, and running the python script specifying the inference environment python, eg `/path/to/pytorch_env/bin/python inference.py --config inference_config.yml" (but in background)
+- we will build frozen python enviornment(s) that will be downloaded on an as-needed basis: for now, just dipper_pytorch_env.yml which we will build using conda-pack to create a .tar.gz. 
+- inference will run in the background by writing a config file, and running the python script specifying the inference environment python, something like `/path/to/dipper_pytorch_env/bin/python inference.py --config inference_config.yml &"
 - make sure we can build the app, communicate between the frontend and backend with the pyinstaller compiled simpler backend enviornment, build the distributable environment with conda-pack, and run a simple python script using the conda-pack env
-
 
 
 ## long-term plan for shipping environments for BMZ models

@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 
-function AudioClipCard({ 
-  clipData, 
-  showPredictions = false, 
-  showAnnotations = false, 
+function AudioClipCard({
+  clipData,
+  showPredictions = false,
+  showAnnotations = false,
   showComments = false,
   onPlaybackChange = null,
   className = "",
@@ -81,15 +81,15 @@ function AudioClipCard({
 
       if (window.electronAPI) {
         const result = await window.electronAPI.createAudioClips(
-          file_path, 
-          start_time, 
-          end_time, 
+          file_path,
+          start_time,
+          end_time,
           settings
         );
 
         if (result.status === 'success') {
           setClipResult(result);
-          
+
           // Prioritize base64 data over file paths for faster loading
           if (result.audio_base64) {
             setAudioBase64(result.audio_base64);
@@ -97,13 +97,13 @@ function AudioClipCard({
             // Fallback to file path if base64 not available
             setAudioUrl(`file://${result.audio_path}`);
           }
-          
+
           // Update spectrogram if we got a new one
           if (result.spectrogram_base64) {
             const dataUrl = `data:image/png;base64,${result.spectrogram_base64}`;
             setSpectrogramUrl(dataUrl);
           }
-          
+
           setDuration(result.duration || (end_time - start_time));
         } else {
           setError(result.error || 'Failed to create audio clip');
@@ -184,19 +184,19 @@ function AudioClipCard({
   const renderSpectrogram = () => {
     if (spectrogramUrl) {
       return (
-        <img 
-          src={spectrogramUrl} 
-          alt="Spectrogram" 
+        <img
+          src={spectrogramUrl}
+          alt="Spectrogram"
           className="spectrogram-image"
         />
       );
     }
-    
+
     // Placeholder spectrogram
     return (
       <div className="spectrogram-placeholder">
         <img src="/icon.svg" alt="Audio Clip" className="placeholder-icon app-icon" />
-        <div className="placeholder-text">Click to generate spectrogram</div>
+        <div className="placeholder-text">Loading audio clip...</div>
       </div>
     );
   };
@@ -231,7 +231,7 @@ function AudioClipCard({
         {/* Progress bar only (no play button overlay) */}
         {duration > 0 && (
           <div className="progress-bar">
-            <div 
+            <div
               className="progress-fill"
               style={{ width: `${(currentTime / duration) * 100}%` }}
             />
@@ -247,7 +247,7 @@ function AudioClipCard({
             {file_path ? file_path.split('/').pop() : 'Unknown file'}
           </div>
           <div className="time-range">
-            {start_time !== undefined && end_time !== undefined 
+            {start_time !== undefined && end_time !== undefined
               ? `${start_time.toFixed(1)}s - ${end_time.toFixed(1)}s`
               : 'Unknown time range'
             }
@@ -277,7 +277,7 @@ function AudioClipCard({
             <h5>Predictions:</h5>
             <div className="predictions-list">
               {Object.entries(predictions)
-                .sort(([,a], [,b]) => b - a)
+                .sort(([, a], [, b]) => b - a)
                 .slice(0, 3)
                 .map(([pred_species, pred_score]) => (
                   <div key={pred_species} className="prediction-item">

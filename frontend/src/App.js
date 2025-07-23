@@ -138,11 +138,6 @@ function App() {
       return;
     }
 
-    if (!window.electronAPI) {
-      setError('Electron API not available - running in browser mode');
-      return;
-    }
-
     setIsRunning(true);
     setLogs([]);
     setError('');
@@ -150,54 +145,87 @@ function App() {
 
     try {
       const processId = Date.now().toString();
+      
+      // Create temporary config file
+      const tempConfigPath = `/tmp/inference_config_${processId}.json`;
+      const configData = {
+        model: selectedModel,
+        files: selectedFiles,
+        output_file: outputFile,
+        inference_settings: config.inference
+      };
 
-      const args = [
-        '--model', selectedModel,
-        '--files', JSON.stringify(selectedFiles),
-        '--output', outputFile || '',
-        '--config', JSON.stringify(config.inference)
-      ];
+      // Save temporary config file using HTTP API
+      setProgress('Preparing configuration...');
+      const saveResponse = await fetch('http://localhost:8000/config/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config_data: configData,
+          output_path: tempConfigPath
+        })
+      });
 
-      const result = await window.electronAPI.runPythonScript(
-        'inference.py',
-        args,
-        processId
-      );
+      const saveResult = await saveResponse.json();
+      if (saveResult.status !== 'success') {
+        throw new Error(`Failed to save configuration: ${saveResult.error}`);
+      }
 
-      // Parse the JSON output more safely
-      try {
-        const outputLines = result.stdout.split('\n').filter(line => line.trim());
-        let summary = null;
+      // Run inference with environment setup via HTTP API
+      setProgress('Setting up ML environment and running inference...');
+      const envPath = './runtime_envs/dipper_pytorch_env';
+      const archivePath = './environments/dipper_pytorch_env.tar.gz';
+      
+      const inferenceResponse = await fetch('http://localhost:8000/inference/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config_path: tempConfigPath,
+          env_path: envPath,
+          archive_path: archivePath
+        })
+      });
 
-        // Look for the JSON output (usually the last line)
-        for (let i = outputLines.length - 1; i >= 0; i--) {
+      const inferenceResult = await inferenceResponse.json();
+      
+      if (inferenceResult.status === 'success') {
+        setProgress('Inference completed successfully!');
+        if (outputFile) {
+          setProgress(prev => prev + ` Results saved to: ${outputFile.split('/').pop()}`);
+        }
+        
+        // Parse any results from the inference output
+        if (inferenceResult.output) {
           try {
-            const parsed = JSON.parse(outputLines[i]);
-            if (parsed.status) {
-              summary = parsed;
-              break;
-            }
-          } catch (e) {
-            // Continue looking for valid JSON
-          }
-        }
+            const outputLines = inferenceResult.output.split('\n').filter(line => line.trim());
+            let summary = null;
 
-        if (summary && summary.status === 'success') {
-          setProgress(`Inference completed! Processed ${summary.files_processed} files`);
-          if (summary.species_detected && summary.species_detected.length > 0) {
-            setProgress(prev => prev + `. Detected species: ${summary.species_detected.slice(0, 3).join(', ')}${summary.species_detected.length > 3 ? '...' : ''}`);
+            // Look for JSON output from inference script
+            for (let i = outputLines.length - 1; i >= 0; i--) {
+              try {
+                const parsed = JSON.parse(outputLines[i]);
+                if (parsed.status) {
+                  summary = parsed;
+                  break;
+                }
+              } catch (e) {
+                // Continue looking for valid JSON
+              }
+            }
+
+            if (summary && summary.species_detected && summary.species_detected.length > 0) {
+              setProgress(prev => prev + `. Detected species: ${summary.species_detected.slice(0, 3).join(', ')}${summary.species_detected.length > 3 ? '...' : ''}`);
+            }
+          } catch (parseError) {
+            // Ignore parsing errors for output
           }
-          if (summary.output_file) {
-            setProgress(prev => prev + `. Results saved to: ${summary.output_file.split('/').pop()}`);
-          }
-        } else if (summary && summary.status === 'error') {
-          setError(summary.error);
-        } else {
-          setProgress('Inference completed successfully!');
         }
-      } catch (parseError) {
-        console.log('JSON parse error, but inference may have succeeded:', parseError);
-        setProgress('Inference completed! Check the output file for results.');
+      } else {
+        throw new Error(inferenceResult.error || 'Inference failed');
       }
 
     } catch (err) {
@@ -234,6 +262,89 @@ function App() {
       }
     } catch (err) {
       setError('Failed to test Python path: ' + err.message);
+    }
+  };
+
+  const saveInferenceConfig = async () => {
+    try {
+      if (!window.electronAPI) {
+        setError('Electron API not available - running in browser mode');
+        return;
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const defaultName = `inference_config_${timestamp}.json`;
+      const configPath = await window.electronAPI.saveFile(defaultName);
+      
+      if (configPath) {
+        const configData = {
+          model: selectedModel,
+          files: selectedFiles,
+          output_file: outputFile,
+          inference_settings: config.inference
+        };
+
+        // Use HTTP API to save config
+        const response = await fetch('http://localhost:8000/config/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            config_data: configData,
+            output_path: configPath
+          })
+        });
+
+        const result = await response.json();
+        if (result.status === 'success') {
+          setProgress(`Config saved to: ${configPath.split('/').pop()}`);
+        } else {
+          setError(`Failed to save config: ${result.error}`);
+        }
+      }
+    } catch (err) {
+      setError('Failed to save config: ' + err.message);
+    }
+  };
+
+  const loadInferenceConfig = async () => {
+    try {
+      if (!window.electronAPI) {
+        setError('Electron API not available - running in browser mode');
+        return;
+      }
+
+      const configFile = await window.electronAPI.selectFiles();
+      if (configFile && configFile.length > 0) {
+        // Use HTTP API to load config
+        const response = await fetch('http://localhost:8000/config/load', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            config_path: configFile[0]
+          })
+        });
+
+        const result = await response.json();
+        if (result.status === 'success') {
+          const configData = result.config;
+          setSelectedModel(configData.model || '');
+          setSelectedFiles(configData.files || []);
+          setOutputFile(configData.output_file || '');
+          setConfig(prev => ({
+            ...prev,
+            inference: { ...prev.inference, ...configData.inference_settings }
+          }));
+          setProgress(`Config loaded from: ${configFile[0].split('/').pop()}`);
+        } else {
+          setError(`Failed to load config: ${result.error}`);
+        }
+      }
+    } catch (err) {
+      setError('Failed to load config: ' + err.message);
     }
   };
 
@@ -286,6 +397,14 @@ function App() {
 
             <div className="section">
               <h3>2. Configure Settings</h3>
+              <div className="button-group" style={{ marginBottom: '15px' }}>
+                <button onClick={saveInferenceConfig} disabled={isRunning}>
+                  Save Config
+                </button>
+                <button onClick={loadInferenceConfig} disabled={isRunning}>
+                  Load Config
+                </button>
+              </div>
               <div className="config-grid">
                 <label>
                   Clip Overlap (seconds):

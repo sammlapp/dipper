@@ -1,16 +1,37 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+# PyInstaller spec for lightweight_server.py
+# This server handles all backend communication with the frontend
 
 a = Analysis(
-    ['scripts/http_server.py'],
+    ['lightweight_server.py'],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=[],
+    hiddenimports=[
+        'aiohttp',
+        'aiohttp_cors',
+        'pandas',
+        'numpy', 
+        'librosa',
+        'soundfile',
+        'PIL',
+        'scipy.signal',
+        'matplotlib.pyplot'
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # Exclude ML libraries to keep executable smaller
+        'torch',
+        'torchvision', 
+        'torchaudio',
+        'tensorflow',
+        'sklearn',
+        'opensoundscape',
+        'bioacoustics_model_zoo'
+    ],
     noarchive=False,
     optimize=0,
 )
@@ -22,7 +43,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='http_server',
+    name='lightweight_server',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

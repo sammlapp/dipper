@@ -57,24 +57,26 @@ function getBundledPythonPath() {
 
 // Helper function to get the best way to run a Python script
 function getPythonCommand(scriptName) {
-  // Try to get PyInstaller executable first
-  const executablePath = getBundledPythonExecutable(scriptName);
+  // For the new architecture, we primarily use the lightweight_server HTTP API
+  // This function is kept for compatibility but should only be used for the server itself
   
-  if (executablePath && !executablePath.includes('python-env')) {
-    // Use PyInstaller executable
-    return {
-      command: executablePath,
-      needsScript: false
-    };
-  } else {
-    // Fallback to Python + script
-    const pythonPath = getCondaPythonPath();
-    return {
-      command: pythonPath,
-      needsScript: true,
-      scriptPath: path.join(getBackendScriptsPath(), `${scriptName}.py`)
-    };
+  if (scriptName === 'lightweight_server') {
+    const executablePath = getBundledPythonExecutable('lightweight_server');
+    if (executablePath) {
+      return {
+        command: executablePath,
+        needsScript: false
+      };
+    }
   }
+  
+  // Fall back to system Python with script path for any remaining direct script calls
+  const pythonPath = getCondaPythonPath();
+  return {
+    command: pythonPath,
+    needsScript: true,
+    scriptPath: path.join(getBackendScriptsPath(), `${scriptName}.py`)
+  };
 }
 
 // Python path detection

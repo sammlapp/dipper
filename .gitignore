@@ -81,3 +81,6 @@ backend/pyinstaller-venv/
 frontend/python-dist/
 backend/test-venv/bin/python
 backend/pyinstaller-venv-light/
+environments/
+runtime_envs/
+runtime_envs/
