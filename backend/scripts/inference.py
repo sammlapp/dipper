@@ -209,6 +209,39 @@ def resolve_files_from_config(config_data):
     return unique_files
 
 
+def group_files_by_subfolder(files):
+    """
+    Group files by their immediate parent directory (subfolder).
+
+    Args:
+        files: List of file paths
+
+    Returns:
+        Dictionary mapping subfolder names to lists of files
+    """
+    from collections import defaultdict
+
+    subfolder_groups = defaultdict(list)
+
+    for file_path in files:
+        # Get the immediate parent directory name
+        parent_dir = os.path.dirname(file_path)
+        subfolder_name = os.path.basename(parent_dir) if parent_dir else "root"
+
+        # Handle edge cases
+        if not subfolder_name or subfolder_name == ".":
+            subfolder_name = "root"
+
+        # Raise an error if there is another subfolder with the same name
+        if subfolder_name in subfolder_groups:
+            raise ValueError(f"Duplicate subfolder name '{subfolder_name}' found")
+
+        subfolder_groups[subfolder_name].append(file_path)
+
+    # Convert to regular dict
+    return dict(subfolder_groups)
+
+
 def load_config_file(config_path):
     """Load inference configuration from YAML or JSON file"""
     try:
@@ -271,36 +304,106 @@ def main():
         model = load_model(model_name)
 
         # Save config to the output directory
-        config_save_path = output_file + "inference_config.json"
+        config_save_path = Path(output_file).parent / "inference_config.json"
         Path(config_save_path).parent.mkdir(parents=True, exist_ok=True)
         with open(config_save_path, "w") as f:
             json.dump(config_data, f, indent=4)
 
-        # potentially split up inference task into smaller sequential subtasks
-        # if config_data says to split by subfolder:
-        # files_subsets = .... # dictionary groups into folder name : file list
-        # for files, names in files_subsets.items():
-        #   output_file = ... # config's output_dir +
-        #   predictions = model.predict(files_subset)
-        #   save_results(predictions,output_file)
+        # Check if we should split by subfolder
+        split_by_subfolder = config_data.get("split_by_subfolder", False)
 
-        # Run inference
-        logger.info(f"Starting inference with model: {model_name}")
-        predictions = run_inference(files, model, inference_config)
+        if split_by_subfolder:
+            logger.info("Splitting inference task by subfolders")
 
-        # Save results
-        save_results(predictions, output_file)
+            # Group files by subfolder
+            subfolder_groups = group_files_by_subfolder(files)
+            logger.info(
+                f"Found {len(subfolder_groups)} subfolders: {list(subfolder_groups.keys())}"
+            )
+
+            all_results = []
+            output_files = []
+
+            for subfolder_name, files_subset in subfolder_groups.items():
+                logger.info(
+                    f"Processing subfolder '{subfolder_name}' with {len(files_subset)} files"
+                )
+
+                # Generate output file name for this subfolder
+                base_output = Path(output_file)
+                subfolder_output = (
+                    base_output.parent / f"{subfolder_name}_{base_output.stem}.csv"
+                )
+                output_files.append(str(subfolder_output))
+
+                # Run inference on this subset
+                try:
+                    predictions = run_inference(files_subset, model, inference_config)
+                    save_results(predictions, str(subfolder_output))
+                    all_results.append(
+                        {
+                            "subfolder": subfolder_name,
+                            "file_count": len(files_subset),
+                            "output_file": str(subfolder_output),
+                            "status": "success",
+                        }
+                    )
+                    logger.info(
+                        f"Completed subfolder '{subfolder_name}' -> {subfolder_output}"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to process subfolder '{subfolder_name}': {e}")
+                    all_results.append(
+                        {
+                            "subfolder": subfolder_name,
+                            "file_count": len(files_subset),
+                            "output_file": str(subfolder_output),
+                            "status": "error",
+                            "error": str(e),
+                        }
+                    )
+
+            # Create summary of all subfolder results
+            summary_results = {
+                "split_by_subfolder": True,
+                "subfolders_processed": len(subfolder_groups),
+                "total_files": len(files),
+                "results": all_results,
+                "output_files": output_files,
+            }
+
+        else:
+            # Run inference normally (single output)
+            logger.info(f"Starting inference with model: {model_name}")
+            predictions = run_inference(files, model, inference_config)
+            save_results(predictions, output_file)
+
+            summary_results = {
+                "split_by_subfolder": False,
+                "total_files": len(files),
+                "output_file": output_file,
+            }
 
         # Output summary for the GUI
-        summary = {
-            "status": "success",
-            "files_processed": len(files),
-            "predictions_shape": list(predictions.shape),
-            "output_file": output_file,
-            "species_detected": (
-                list(predictions.columns) if hasattr(predictions, "columns") else []
-            ),
-        }
+        if split_by_subfolder:
+            # For split mode, include summary_results and don't assume single predictions shape
+            summary = {
+                "status": "success",
+                "files_processed": len(files),
+                **summary_results,  # Include all subfolder information
+            }
+        else:
+            # For single mode, include traditional summary info
+            summary = {
+                "status": "success",
+                "files_processed": len(files),
+                "predictions_shape": list(predictions.shape),
+                "output_file": output_file,
+                "species_detected": (
+                    list(predictions.columns) if hasattr(predictions, "columns") else []
+                ),
+                **summary_results,  # Include split_by_subfolder flag
+            }
 
         logger.info("Inference completed successfully")
         print(json.dumps(summary))

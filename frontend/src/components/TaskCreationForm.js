@@ -29,7 +29,8 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     overlap: 0.0,
     batch_size: 1,
     worker_count: 1,
-    output_dir: ''
+    output_dir: '',
+    split_by_subfolder: false
   });
 
   const handleExtensionChange = (ext, checked) => {
@@ -262,6 +263,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           file_list: config.file_list,
           glob_patterns_text: globPatterns,
           output_dir: config.output_dir,
+          split_by_subfolder: config.split_by_subfolder,
           inference_settings: {
             clip_overlap: config.overlap,
             batch_size: config.batch_size,
@@ -328,6 +330,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             file_globbing_patterns: configData.file_globbing_patterns || [],
             file_list: configData.file_list || '',
             output_dir: configData.output_dir || '',
+            split_by_subfolder: configData.split_by_subfolder || false,
             overlap: configData.inference_settings?.clip_overlap || 0.0,
             batch_size: configData.inference_settings?.batch_size || 1,
             worker_count: configData.inference_settings?.num_workers || 1
@@ -537,10 +540,16 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             value={config.model}
             onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
           >
-            <option value="BirdNET">BirdNET</option>
-            <option value="Perch">Perch</option>
-            <option value="HawkEars">HawkEars</option>
+            <option value="BirdNET">BirdNET: Global Bird Species</option>
+            <option value="Perch">Perch: Global Bird Species</option>
+            <option value="HawkEars">HawkEars: North American Bird Species</option>
+            <option value="HawkEars_Low_Band">HawkEars Low Frequency (RUGR, SPGR)</option>
+            <option value="HawkEars_Embedding">HawkEars Embedding Model</option>
             <option value="RanaSierraeCNN">RanaSierraeCNN</option>
+            <option value="HawkEars_v010">HawkEars version 0.1.0</option>
+            <option value="BirdSetConvNeXT">BirdSet Global Bird Species: ConvNeXT architecture</option>
+            <option value="BirdSetEfficientNetB1">BirdSet Global Bird Species: EfficientNetB1 architecture</option>
+
           </select>
         </div>
 
@@ -579,6 +588,22 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             value={config.worker_count}
             onChange={(e) => setConfig(prev => ({ ...prev, worker_count: parseInt(e.target.value) }))}
           />
+        </div>
+
+        {/* Subfolder Splitting */}
+        <div className="form-group full-width">
+          <label>
+            <input
+              type="checkbox"
+              checked={config.split_by_subfolder}
+              onChange={(e) => setConfig(prev => ({ ...prev, split_by_subfolder: e.target.checked }))}
+              style={{ marginRight: '8px' }}
+            />
+            Separate inference by subfolders
+          </label>
+          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
+            Create separate output files for each subfolder containing audio files
+          </div>
         </div>
 
 

@@ -177,7 +177,7 @@ Config:
 - select root audio folder (if dataframes use relative paths)
 - optionally select an evaluation task (annotated dataframe with same format as training dfs: file,start_time,end_time,and col for each class)
 - select save location for trained model
-- training settings: batch size, N parallel preprocessing workers, device (populate dropdown with visible GPU/CPU devices using pytorch)
+- training settings: batch size, N parallel preprocessing workers
 
 
 training script example: (don't worry about the TODO's for first iteration)
