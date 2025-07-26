@@ -269,6 +269,98 @@ def check_inference_status(process):
         return {"status": "error", "error": str(e)}
 
 
+def start_training_process(job_id, config_path, env_python_path):
+    """Start training process in background and return immediately"""
+    try:
+        # Resolve paths to absolute paths
+        config_path = resolve_path(config_path)
+        env_python_path = resolve_path(env_python_path)
+        
+        logger.info(f"Starting training job {job_id} with config: {config_path}")
+        logger.info(f"Using Python environment: {env_python_path}")
+        
+        # Verify environment exists
+        if not os.path.exists(env_python_path):
+            return {"status": "error", "error": f"Python environment not found: {env_python_path}"}
+        
+        # Verify config file exists
+        if not os.path.exists(config_path):
+            return {"status": "error", "error": f"Config file not found: {config_path}"}
+        
+        # Run train_model.py with the specified Python environment
+        training_script = os.path.join(os.path.dirname(__file__), "scripts", "train_model.py")
+        cmd = [env_python_path, training_script, "--config", config_path]
+        
+        logger.info(f"Running command: {' '.join(cmd)}")
+        
+        # Start the process (non-blocking)
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        
+        return {
+            "status": "started",
+            "job_id": job_id,
+            "process": process,
+            "command": " ".join(cmd),
+            "message": "Training process started successfully"
+        }
+            
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+def check_training_status(process):
+    """Check status of running training process"""
+    try:
+        if process is None:
+            return {"status": "error", "error": "No process to check"}
+        
+        # Check if process is still running
+        return_code = process.poll()
+        
+        if return_code is None:
+            # Process is still running
+            return {
+                "status": "running",
+                "message": "Training process is still running"
+            }
+        else:
+            # Process has completed, get output
+            stdout, stderr = process.communicate()
+            
+            logger.info(f"Training process completed with exit code: {return_code}")
+            if stdout:
+                logger.info(f"Stdout: {stdout[:500]}...")  # Log first 500 chars
+            if stderr:
+                logger.error(f"Stderr: {stderr[:500]}...")  # Log first 500 chars
+            
+            if return_code == 0:
+                return {
+                    "status": "completed", 
+                    "message": "Training completed successfully", 
+                    "output": stdout,
+                    "stdout": stdout,
+                    "stderr": stderr if stderr else "",
+                    "exit_code": return_code
+                }
+            else:
+                return {
+                    "status": "failed", 
+                    "error": f"Training failed with exit code {return_code}", 
+                    "exit_code": return_code,
+                    "stdout": stdout if stdout else "",
+                    "stderr": stderr if stderr else ""
+                }
+                
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
 def spec_to_image(spectrogram, range=None, colormap=None, channels=3, shape=None):
     """Convert spectrogram to image array (fast version)"""
     # Apply range if specified
@@ -464,9 +556,14 @@ class LightweightServer:
         self.app.router.add_post("/inference/run", self.run_inference)
         self.app.router.add_get("/inference/status/{job_id}", self.get_inference_status)
         
+        # Training routes
+        self.app.router.add_post("/training/run", self.run_training)
+        self.app.router.add_get("/training/status/{job_id}", self.get_training_status)
+        
         # File counting routes
         self.app.router.add_post("/files/count-glob", self.count_files_glob)
         self.app.router.add_post("/files/count-list", self.count_files_list)
+        self.app.router.add_post("/files/get-csv-columns", self.get_csv_columns)
 
     async def root_handler(self, request):
         """Root endpoint to handle HEAD requests from wait-on"""
@@ -485,7 +582,8 @@ class LightweightServer:
                     "load_scores", 
                     "config_management",
                     "env_management", 
-                    "inference_runner"
+                    "inference_runner",
+                    "training_runner"
                 ],
             }
         )
@@ -811,6 +909,93 @@ class LightweightServer:
             logger.error(f"Error checking inference status: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
+    # Training Process Management Routes
+    async def run_training(self, request):
+        """Start training process and return immediately with job ID"""
+        try:
+            data = await request.json()
+            config_path = data.get("config_path")
+            env_path = data.get("env_path")
+            archive_path = data.get("archive_path")
+            job_id = data.get("job_id", f"training_job_{int(asyncio.get_event_loop().time() * 1000)}")
+            
+            logger.info(f"Training request received:")
+            logger.info(f"  job_id: {job_id}")
+            logger.info(f"  config_path: {config_path}")
+            logger.info(f"  env_path: {env_path}")
+            logger.info(f"  archive_path: {archive_path}")
+            
+            if not config_path or not env_path:
+                return web.json_response({"error": "config_path and env_path required"}, status=400)
+            
+            # First check/setup environment
+            env_result = setup_environment(env_path, archive_path)
+            if env_result["status"] != "ready":
+                logger.error(f"Environment setup failed: {env_result}")
+                return web.json_response(env_result, status=500)
+            
+            # Start training process (non-blocking)
+            result = start_training_process(job_id, config_path, env_result["python_path"])
+            
+            if result["status"] == "started":
+                # Store job info for status tracking
+                self.running_jobs[job_id] = {
+                    "process": result["process"],
+                    "status": "running",
+                    "job_id": job_id,
+                    "command": result["command"],
+                    "started_at": asyncio.get_event_loop().time(),
+                    "job_type": "training"
+                }
+                
+                return web.json_response({
+                    "status": "started",
+                    "job_id": job_id,
+                    "message": "Training started successfully. Use /training/status/{job_id} to check progress."
+                })
+            else:
+                return web.json_response(result, status=500)
+            
+        except Exception as e:
+            logger.error(f"Error starting training: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def get_training_status(self, request):
+        """Get status of running training job"""
+        try:
+            job_id = request.match_info['job_id']
+            
+            if job_id not in self.running_jobs:
+                return web.json_response({"status": "error", "error": f"Training job {job_id} not found"}, status=404)
+            
+            job_info = self.running_jobs[job_id]
+            process = job_info["process"]
+            
+            # Check current status
+            status_result = check_training_status(process)
+            
+            # Update job info
+            job_info["status"] = status_result["status"]
+            job_info["last_checked"] = asyncio.get_event_loop().time()
+            
+            # If completed or failed, add final results and optionally clean up
+            if status_result["status"] in ["completed", "failed"]:
+                job_info.update(status_result)
+                # Keep job info for a while so frontend can retrieve results
+                # Could add cleanup logic here if needed
+            
+            return web.json_response({
+                "job_id": job_id,
+                "job_type": "training",
+                "started_at": job_info["started_at"],
+                "last_checked": job_info["last_checked"],
+                **status_result
+            })
+            
+        except Exception as e:
+            logger.error(f"Error checking training status: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
     async def count_files_glob(self, request):
         """Count files matching glob patterns"""
         try:
@@ -911,6 +1096,40 @@ class LightweightServer:
             
         except Exception as e:
             logger.error(f"Error counting files from file list: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def get_csv_columns(self, request):
+        """Get column names from a CSV file"""
+        try:
+            data = await request.json()
+            file_path = data.get("file_path")
+            
+            if not file_path:
+                return web.json_response({"status": "error", "error": "No file_path provided"}, status=400)
+            
+            if not os.path.exists(file_path):
+                return web.json_response({"status": "error", "error": f"CSV file not found: {file_path}"}, status=400)
+            
+            logger.info(f"Reading CSV columns from: {file_path}")
+            
+            try:
+                # Read just the header row to get column names
+                df = pd.read_csv(file_path, nrows=0)
+                columns = df.columns.tolist()
+                
+                logger.info(f"CSV columns: {columns}")
+                
+                return web.json_response({
+                    "status": "success",
+                    "columns": columns,
+                    "file_path": file_path
+                })
+                
+            except Exception as e:
+                return web.json_response({"status": "error", "error": f"Failed to read CSV file: {str(e)}"}, status=400)
+            
+        except Exception as e:
+            logger.error(f"Error getting CSV columns: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def start_server(self):

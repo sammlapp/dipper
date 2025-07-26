@@ -1,5 +1,5 @@
 /**
- * Task Management System for Inference Tasks
+ * Task Management System for Inference and Training Tasks
  * Handles task CRUD operations, persistence, and queue management
  */
 
@@ -14,6 +14,11 @@ export const TASK_STATUS = {
   CANCELLED: 'cancelled'
 };
 
+export const TASK_TYPE = {
+  INFERENCE: 'inference',
+  TRAINING: 'training'
+};
+
 class TaskManager {
   constructor() {
     this.tasks = new Map();
@@ -24,10 +29,14 @@ class TaskManager {
   }
 
   // Task CRUD Operations
-  createTask(config, name = null) {
+  createTask(config, name = null, taskType = null) {
+    // Determine task type from config or parameter
+    const type = taskType || this.determineTaskType(config);
+    
     const task = {
       id: uuidv4(),
-      name: name || this.generateTaskName(config),
+      name: name || this.generateTaskName(config, type),
+      type: type,
       status: TASK_STATUS.UNSTARTED,
       config: { ...config },
       created: Date.now(),
@@ -42,6 +51,16 @@ class TaskManager {
     this.saveTasks();
     this.notifyListeners('taskCreated', task);
     return task;
+  }
+
+  determineTaskType(config) {
+    // Check if config has training-specific properties
+    if (config.class_list !== undefined || 
+        config.fully_annotated_files !== undefined || 
+        config.single_class_annotations !== undefined) {
+      return TASK_TYPE.TRAINING;
+    }
+    return TASK_TYPE.INFERENCE;
   }
 
   getTask(taskId) {
@@ -126,15 +145,18 @@ class TaskManager {
     if (!task) return;
 
     try {
-      // Update task to running status
+      // Update task to running status with appropriate start message
+      const startMessage = task.type === TASK_TYPE.TRAINING ? 'Starting training...' : 'Starting inference...';
       this.updateTask(taskId, {
         status: TASK_STATUS.RUNNING,
         started: Date.now(),
-        progress: 'Starting inference...'
+        progress: startMessage
       });
 
-      // Execute the inference (this will be implemented separately)
-      const result = await this.runInference(task);
+      // Execute based on task type
+      const result = task.type === TASK_TYPE.TRAINING 
+        ? await this.runTraining(task)
+        : await this.runInference(task);
 
       // Update task with results
       this.updateTask(taskId, {
@@ -328,6 +350,178 @@ class TaskManager {
     });
   }
 
+  async runTraining(task) {
+    const config = task.config;
+    
+    // Generate unique process ID for this task
+    const processId = `training_${task.id}_${Date.now()}`;
+    
+    // Update task with process ID
+    this.updateTask(task.id, { processId });
+
+    try {
+      // Update progress
+      this.updateTask(task.id, { progress: 'Preparing training configuration...' });
+
+      // Create job folder and output paths
+      const jobFolderName = task.name.replace(/[^a-zA-Z0-9\-_\s]/g, '').replace(/\s+/g, '_');
+      const jobFolder = config.save_location ? `${config.save_location}/${jobFolderName}` : '';
+      const modelSavePath = jobFolder ? `${jobFolder}/trained_model.pth` : '';
+      const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
+
+      // Create temporary config file
+      const tempConfigPath = `/tmp/training_config_${processId}.json`;
+      const configData = {
+        model: config.model || 'BirdNET',
+        class_list: config.class_list || [],
+        fully_annotated_files: config.fully_annotated_files || [],
+        single_class_annotations: config.single_class_annotations || [],
+        background_samples_file: config.background_samples_file || '',
+        root_audio_folder: config.root_audio_folder || '',
+        evaluation_file: config.evaluation_file || '',
+        model_save_path: modelSavePath,
+        job_folder: jobFolder,
+        config_output_path: configJsonPath,
+        training_settings: {
+          batch_size: config.batch_size || 32,
+          num_workers: config.num_workers || 4,
+          freeze_feature_extractor: config.freeze_feature_extractor !== false
+        }
+      };
+
+      // Save temporary config file using HTTP API
+      const saveResponse = await fetch('http://localhost:8000/config/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config_data: configData,
+          output_path: tempConfigPath
+        })
+      });
+
+      const saveResult = await saveResponse.json();
+      if (saveResult.status !== 'success') {
+        throw new Error(`Failed to save configuration: ${saveResult.error}`);
+      }
+
+      // Update progress
+      this.updateTask(task.id, { progress: 'Setting up ML environment...' });
+
+      // Get environment paths using Electron userData directory
+      const envPathResult = await window.electronAPI.getEnvironmentPath('dipper_pytorch_env');
+      const archivePathResult = await window.electronAPI.getArchivePath('dipper_pytorch_env.tar.gz');
+
+      if (!envPathResult.success || !archivePathResult.success) {
+        throw new Error('Failed to get environment paths');
+      }
+
+      const envPath = envPathResult.path;
+      const archivePath = archivePathResult.path;
+
+      // Update progress
+      this.updateTask(task.id, { progress: 'Starting training...' });
+
+      // Start training via HTTP API (returns immediately with job ID)
+      const trainingResponse = await fetch('http://localhost:8000/training/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config_path: tempConfigPath,
+          env_path: envPath,
+          archive_path: archivePath,
+          job_id: processId
+        })
+      });
+
+      const startResult = await trainingResponse.json();
+
+      if (startResult.status === 'started') {
+        const jobId = startResult.job_id;
+        this.updateTask(task.id, { progress: 'Training running...', processId: jobId });
+
+        // Poll for completion
+        const finalResult = await this.pollTrainingStatus(jobId, task.id);
+        
+        if (finalResult.status === 'completed') {
+          return {
+            success: true,
+            model_save_path: configData.model_save_path,
+            job_folder: configData.job_folder,
+            config_path: configData.config_output_path,
+            classes_trained: configData.class_list.length,
+            message: 'Training completed successfully',
+            job_id: jobId
+          };
+        } else {
+          // Show detailed error information
+          let errorMessage = finalResult.error || 'Training failed';
+
+          if (finalResult.stderr) {
+            errorMessage += '\n\nError output:\n' + finalResult.stderr;
+          }
+
+          if (finalResult.stdout) {
+            errorMessage += '\n\nStandard output:\n' + finalResult.stdout;
+          }
+
+          throw new Error(errorMessage);
+        }
+      } else {
+        throw new Error(startResult.error || 'Failed to start training');
+      }
+    } catch (error) {
+      throw new Error(`Training failed: ${error.message}`);
+    }
+  }
+
+  async pollTrainingStatus(jobId, taskId, pollInterval = 2000) {
+    /**
+     * Poll training status until completion or failure
+     * @param {string} jobId - Backend job ID 
+     * @param {string} taskId - Frontend task ID
+     * @param {number} pollInterval - Polling interval in milliseconds
+     * @returns {Promise} Final result when training completes
+     */
+    return new Promise((resolve, reject) => {
+      const poll = async () => {
+        try {
+          const response = await fetch(`http://localhost:8000/training/status/${jobId}`);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const result = await response.json();
+          
+          // Update task progress based on status
+          if (result.status === 'running') {
+            this.updateTask(taskId, { progress: 'Training running...' });
+            // Continue polling
+            setTimeout(poll, pollInterval);
+          } else if (result.status === 'completed') {
+            this.updateTask(taskId, { progress: 'Training completed' });
+            resolve(result);
+          } else if (result.status === 'failed') {
+            this.updateTask(taskId, { progress: 'Training failed' });
+            resolve(result); // Resolve with failed status, let caller handle error
+          } else {
+            // Unknown status, treat as error
+            reject(new Error(`Unknown training status: ${result.status}`));
+          }
+        } catch (error) {
+          reject(new Error(`Failed to check training status: ${error.message}`));
+        }
+      };
+      
+      // Start polling
+      poll();
+    });
+  }
+
   cancelTask(taskId) {
     const task = this.getTask(taskId);
     if (!task) return false;
@@ -359,23 +553,31 @@ class TaskManager {
   }
 
   // Utility Methods
-  generateTaskName(config) {
+  generateTaskName(config, taskType = TASK_TYPE.INFERENCE) {
     const modelName = config.model || 'Unknown';
     const timestamp = new Date().toLocaleString();
     
-    // Generate appropriate file description based on selection mode
-    let fileDescription = '';
-    if (config.files && config.files.length > 0) {
-      fileDescription = `${config.files.length} files`;
-    } else if (config.file_globbing_patterns && config.file_globbing_patterns.length > 0) {
-      fileDescription = 'pattern-based';
-    } else if (config.file_list) {
-      fileDescription = 'file list';
+    if (taskType === TASK_TYPE.TRAINING) {
+      // Generate training task name
+      const classCount = Array.isArray(config.class_list) ? config.class_list.length : 
+                        (config.class_list ? config.class_list.split(/[,\n]/).filter(c => c.trim()).length : 0);
+      const classDescription = classCount > 0 ? `${classCount} classes` : 'no classes';
+      return `Training ${modelName} - ${classDescription} - ${timestamp}`;
     } else {
-      fileDescription = 'no files';
+      // Generate inference task name
+      let fileDescription = '';
+      if (config.files && config.files.length > 0) {
+        fileDescription = `${config.files.length} files`;
+      } else if (config.file_globbing_patterns && config.file_globbing_patterns.length > 0) {
+        fileDescription = 'pattern-based';
+      } else if (config.file_list) {
+        fileDescription = 'file list';
+      } else {
+        fileDescription = 'no files';
+      }
+      
+      return `${modelName} - ${fileDescription} - ${timestamp}`;
     }
-    
-    return `${modelName} - ${fileDescription} - ${timestamp}`;
   }
 
   // Persistence

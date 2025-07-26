@@ -3,6 +3,7 @@ import './App.css';
 import ExploreTab from './components/ExploreTab';
 import ReviewTab from './components/ReviewTab';
 import TaskCreationForm from './components/TaskCreationForm';
+import TrainingTaskCreationForm from './components/TrainingTaskCreationForm';
 import TaskMonitor from './components/TaskMonitor';
 import taskManager from './utils/TaskManager';
 
@@ -13,6 +14,7 @@ function App() {
 
   const tabs = [
     { id: 'inference', name: 'Inference' },
+    { id: 'training', name: 'Training' },
     { id: 'explore', name: 'Explore' },
     { id: 'review', name: 'Review' }
   ];
@@ -74,6 +76,22 @@ function App() {
 
             <div className="section">
               <h3>Task Management</h3>
+              <TaskMonitor taskManager={taskManager} />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'training' && (
+          <div className="tab-content">
+            <div className="section">
+              <TrainingTaskCreationForm
+                onTaskCreate={handleTaskCreate}
+                onTaskCreateAndRun={handleTaskCreateAndRun}
+              />
+            </div>
+
+            <div className="section">
+              <h3>Training Task Management</h3>
               <TaskMonitor taskManager={taskManager} />
             </div>
           </div>
