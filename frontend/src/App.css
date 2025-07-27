@@ -3727,19 +3727,19 @@ button:disabled {
   color: var(--medium-gray);
 }
 
-/* Review Tab Full Window Layout */
+/* Review Tab Layout - Updated for drawer navigation */
 .review-tab-layout {
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
-  margin-right: calc(-50vw + 50%);
+  width: 100%;
+  height: 100%;
   max-width: none;
+  /* Remove negative margins that conflict with drawer */
 }
 
 .review-main-content {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 60px);
-  /* Account for fixed tabs */
+  height: 100%;
+  /* Remove fixed height calculation for drawer integration */
   background-color: var(--light-bg);
   width: 100%;
   position: relative;
@@ -3747,8 +3747,8 @@ button:disabled {
 
 .review-toolbar {
   position: fixed;
-  top: 45px;
-  left: 0;
+  top: 0;
+  left: calc(64px + 1px); /* Account for collapsed navigation drawer (8 * 8px + 1px) */
   right: 0;
   z-index: 100;
   display: flex;
@@ -3759,8 +3759,9 @@ button:disabled {
   border-bottom: 1px solid var(--border);
   box-shadow: none;
   gap: 1rem;
-  width: 100%;
+  width: calc(100% - 65px); /* Adjust width to account for left offset */
   box-sizing: border-box;
+  transition: left 0.2s ease, width 0.2s ease; /* Smooth transition when drawer expands */
 }
 
 /* Save Status Indicator */
@@ -4250,6 +4251,11 @@ button:disabled {
   .button-group {
     justify-content: center;
   }
+}
+
+.top-banner {
+  background-color: #395756;
+  font-family: 'Rokkit', sans-serif;
 }
 
 /* Modal Dialog Styles */

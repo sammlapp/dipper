@@ -1,4 +1,4 @@
-# Bioacoustics Training GUI - Build Instructions
+# Dipper - Build Instructions
 
 This document provides instructions for building distributable versions of the Bioacoustics Training GUI desktop application.
 

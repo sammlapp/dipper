@@ -206,7 +206,9 @@ training form tweaks:
 ## embedding: 
 add toggle in inference script to embed instead or in addition to classification
 
+
 # TODO fixes and tweaks
+
 
 # updates for review tab
 

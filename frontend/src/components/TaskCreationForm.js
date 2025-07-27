@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import HelpIcon from './HelpIcon';
 
 function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   const [taskName, setTaskName] = useState('');
@@ -370,7 +371,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* File Selection Mode */}
         <div className="form-group full-width">
-          <label>Audio File Selection</label>
+          <label>Audio File Selection <HelpIcon section="inference-file-selection" /></label>
           <div className="segmented-control">
             <button
               type="button"
@@ -517,7 +518,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Output Directory */}
         <div className="form-group full-width">
-          <label>Output Directory</label>
+          <label>Output Directory <HelpIcon section="inference-output" /></label>
           <div className="file-selection">
             <button onClick={handleOutputDirSelection}>
               Select Output Directory
@@ -532,7 +533,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Model */}
         <div className="form-group">
-          <label>Model</label>
+          <label>Model <HelpIcon section="inference-models" /></label>
           <select
             value={config.model}
             onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
@@ -546,7 +547,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Overlap */}
         <div className="form-group">
-          <label>Overlap</label>
+          <label>Overlap <HelpIcon section="inference-overlap" /></label>
           <input
             type="number"
             min="0"
@@ -559,7 +560,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Batch Size */}
         <div className="form-group">
-          <label>Batch Size</label>
+          <label>Batch Size <HelpIcon section="inference-batch-size" /></label>
           <input
             type="number"
             min="1"
@@ -571,7 +572,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Worker Count */}
         <div className="form-group">
-          <label>Workers</label>
+          <label>Workers <HelpIcon section="inference-workers" /></label>
           <input
             type="number"
             min="1"
@@ -622,6 +623,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           >
             Create and Run Task
           </button>
+          <HelpIcon section="inference-tasks" />
 
         </div>
       </div>

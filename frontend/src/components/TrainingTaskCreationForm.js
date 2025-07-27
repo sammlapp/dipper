@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import HelpIcon from './HelpIcon';
 
 function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   const [taskName, setTaskName] = useState('');
@@ -347,7 +348,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Model Selection */}
         <div className="form-group">
-          <label>Base Model</label>
+          <label>Base Model <HelpIcon section="training-model-selection" /></label>
           <select
             value={config.model}
             onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
@@ -362,7 +363,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Fully Annotated Files */}
         <div className="form-group full-width">
-          <label>Fully Annotated Files (optional)</label>
+          <label>Fully Annotated Files (optional) <HelpIcon section="training-fully-annotated" /></label>
           <div className="file-selection">
             <button onClick={handleFullyAnnotatedSelection}>
               Select Fully Annotated CSV Files
@@ -387,7 +388,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Single Class Annotations */}
         <div className="form-group full-width">
-          <label>Single Class Annotations (optional)</label>
+          <label>Single Class Annotations (optional) <HelpIcon section="training-single-class" /></label>
           <div className="file-selection">
             <button onClick={handleSingleClassAnnotationSelection}>
               Add Single Class Annotation Files
@@ -425,7 +426,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Class List */}
         <div className="form-group full-width">
-          <label>Class List (comma or newline separated)</label>
+          <label>Class List (comma or newline separated) <HelpIcon section="training-class-list" /></label>
           <textarea
             value={config.class_list}
             onChange={handleClassListChange}
@@ -463,7 +464,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Root Audio Folder */}
         <div className="form-group full-width">
-          <label>Root Audio Folder (optional)</label>
+          <label>Root Audio Folder (optional) <HelpIcon section="training-root-folder" /></label>
           <div className="file-selection">
             <button onClick={handleRootAudioFolderSelection}>
               Select Root Audio Folder
@@ -514,7 +515,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {/* Training Settings */}
         <div className="form-group">
-          <label>Batch Size</label>
+          <label>Batch Size <HelpIcon section="training-batch-size" /></label>
           <input
             type="number"
             min="1"
@@ -525,7 +526,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         </div>
 
         <div className="form-group">
-          <label>Workers</label>
+          <label>Workers <HelpIcon section="training-workers" /></label>
           <input
             type="number"
             min="1"
@@ -542,7 +543,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
               checked={config.freeze_feature_extractor}
               onChange={(e) => setConfig(prev => ({ ...prev, freeze_feature_extractor: e.target.checked }))}
             />
-            Freeze Feature Extractor
+            Freeze Feature Extractor <HelpIcon section="training-freeze" />
           </label>
           <div className="help-text">
             Keep pre-trained feature extractor frozen (recommended for small datasets)

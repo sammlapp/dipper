@@ -1,4 +1,4 @@
-# Bioacoustics Training GUI - Distribution Build
+# Dipper (Bioacoustics Training GUI) - Distribution Build
 
 This is a standalone desktop application for bioacoustics machine learning inference and annotation review.
 

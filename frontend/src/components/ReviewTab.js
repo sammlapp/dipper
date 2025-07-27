@@ -6,7 +6,7 @@ import ReviewSettings from './ReviewSettings';
 import FocusView from './FocusView';
 import { useHttpAudioLoader, HttpServerStatus } from './HttpAudioLoader';
 
-function ReviewTab() {
+function ReviewTab({ drawerOpen = false }) {
   const [selectedFile, setSelectedFile] = useState('');
   const [annotationData, setAnnotationData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1154,14 +1154,18 @@ function ReviewTab() {
         open={isLeftTrayOpen}
         onClose={() => setIsLeftTrayOpen(false)}
         variant="temporary"
-        sx={{
+        sx={(theme) => ({
           '& .MuiDrawer-paper': {
             width: 400,
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
             fontFamily: 'Rokkitt, sans-serif',
+            marginLeft: `calc(${theme.spacing(8)} + 1px)`, // Account for navigation drawer
+            [theme.breakpoints.up('sm')]: {
+              marginLeft: `calc(${theme.spacing(8)} + 1px)`
+            }
           },
-        }}
+        })}
       >
         <div className="drawer-header">
           <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
@@ -1427,7 +1431,13 @@ function ReviewTab() {
       {/* Main Content Area - Full Window */}
       <div className="review-main-content">
         {/* Compact Top Toolbar */}
-        <div className="review-toolbar">
+        <div 
+          className="review-toolbar"
+          style={{
+            left: drawerOpen ? '240px' : 'calc(64px + 1px)',
+            width: drawerOpen ? 'calc(100% - 240px)' : 'calc(100% - 65px)'
+          }}
+        >
           <div className="toolbar-left">
             {/* Left Tray Toggle */}
             <button

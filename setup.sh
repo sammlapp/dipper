@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Setting up Bioacoustics Training GUI..."
+echo "Setting up Dipper..."
 
 # Check if Node.js is installed
 if ! command -v node &> /dev/null; then
