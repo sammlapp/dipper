@@ -19,7 +19,6 @@ streamlit_inference.py is provided as a reference for understanding and porting 
 - running app using pyinstaller for lightweight backend: works well
 - conda-pack is now succeeding after resolving issues with packages installed with conda then modified by pip
 - the environment built with conda pack works. I can run /path/to/env/bin/python backend/scripts/predict.py --config /path/to/config.txt. It runs inference and creates the csv. 
-- inference in the GUI is broken
 
 # Visual design
 
@@ -139,7 +138,16 @@ We need to implement a thorough "help" functionality:
 
 - the multi-selects for filtering should use the same type of selector as the annotation panels, react-select
 
-# feature requests
+# feature requests and TODO
+add 'test on sample' button for inference and training
+system notifications for task completion/failure
+find inference or training process/PID to monitor i
+see logs of training runs (forward output of python script to a log file in output dir)
+add etas and progress for inference and training
+report metrics during training, simple loss and AUROC curve vs step
+implement embedding to hoplite db
+implement training on embeddings from hoplite db (does hoplite work on windows?)
+persistent content in each tab after navigating to other tabs
 
 ## rewind
 - throughout the application, when providing click-to-play spectrograms, make it so that clicking on the left 20% of the spectrogram rewinds the clip to the beginning instead of performing the play/pause action. Show a rewind icon when hovering over the left 20% of the spectrogram. 
@@ -171,9 +179,14 @@ within stratification bins, selection based on score:
 - make sure none of the other features depend on electron
 - provide instructions for port forwarding to access the gui on a web browser
 
+- would be huge if task management can be integrated across users; eg what if two people run the app on the same server, should have a central task management system and run jobs sequentially
+
 alternatively, could run backend on remote, run frontend locally, connect to backend via GUI on frontend. This seems more complicated overall because it requires more custom IPC.
 
 ## Training
+need logging: perhaps training run logs to a log file in the output dir, and main backend process checks this log for progress updates such as "loading training data", "initializing model", "running training"
+
+
 Implement a Training tab with a Configure Training Run panel and task monitoring of training runs, similar to the Inference tab and Inference task tracking system. 
 
 We will use a model configuration panel to load and save model configuration parameters to a config file. 

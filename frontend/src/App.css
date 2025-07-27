@@ -1271,6 +1271,10 @@ button:disabled {
   border: 2px dashed var(--medium-accent);
 }
 
+.placeholder-container {
+  padding-top: 20px;
+}
+
 .placeholder-icon {
   font-size: 4rem;
   margin-bottom: 1rem;
@@ -3989,6 +3993,390 @@ button:disabled {
 
 .shortcuts-note p:last-child {
   margin-bottom: 0;
+}
+
+/* New Compact Focus Mode Layout */
+.focus-view-redesigned {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Rokkitt', sans-serif;
+}
+
+.focus-main-area {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--light-bg);
+  padding: 2rem;
+  min-height: 0;
+}
+
+.focus-spectrogram-new {
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--white);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.focus-spectrogram-image-new {
+  width: auto;
+  height: auto;
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.focus-spectrogram-placeholder-new {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  min-width: 400px;
+  color: var(--medium-gray);
+  padding: 2rem;
+}
+
+.focus-spectrogram-placeholder-new .placeholder-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.focus-spectrogram-placeholder-new .placeholder-text {
+  font-size: 1.1rem;
+  font-weight: 200;
+}
+
+.focus-progress-bar-new {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.focus-progress-fill-new {
+  height: 100%;
+  background-color: var(--dark-accent);
+  transition: width 0.1s ease;
+}
+
+.focus-play-overlay-new {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.focus-spectrogram-new:hover .focus-play-overlay-new {
+  opacity: 1;
+}
+
+.focus-play-button-new {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  transition: transform 0.2s ease;
+}
+
+.focus-play-button-new:hover {
+  transform: scale(1.1);
+}
+
+.focus-play-button-new .material-symbols-outlined {
+  font-size: 2rem;
+}
+
+.focus-control-panel {
+  flex: 0 0 auto;
+  background-color: var(--white);
+  border-top: 1px solid var(--border);
+  padding: 1rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.focus-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.focus-file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.focus-file-name-new {
+  font-weight: 600;
+  color: var(--dark);
+  font-size: 0.95rem;
+}
+
+.focus-time-info-new {
+  font-size: 0.8rem;
+  color: var(--medium-gray);
+}
+
+.focus-navigation-new {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nav-btn-new {
+  padding: 0.5rem;
+  background-color: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--dark);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+}
+
+.nav-btn-new:hover {
+  background-color: var(--light-gray);
+  border-color: var(--dark-accent);
+}
+
+.nav-btn-new .material-symbols-outlined {
+  font-size: 1.2rem;
+}
+
+.focus-audio-row-new {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.audio-controls-new {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.audio-btn-new {
+  padding: 0.5rem;
+  background-color: var(--dark-accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: white;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+}
+
+.audio-btn-new:hover {
+  background-color: var(--dark);
+  transform: translateY(-1px);
+}
+
+.audio-btn-new .material-symbols-outlined {
+  font-size: 1.2rem;
+}
+
+.audio-timeline-new {
+  flex: 1;
+  margin: 0 1rem;
+}
+
+.audio-scrubber-new {
+  width: 100%;
+  height: 6px;
+  background: var(--light-gray);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.audio-scrubber-new::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--dark-accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.audio-scrubber-new::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--dark-accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.audio-time-new {
+  font-size: 0.8rem;
+  color: var(--medium-gray);
+  font-family: monospace;
+  min-width: 80px;
+  text-align: right;
+}
+
+.focus-main-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.focus-annotation-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.focus-binary-controls-new {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.focus-binary-btn {
+  padding: 0.5rem 0.75rem;
+  border: 1.5px solid;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: fit-content;
+  white-space: nowrap;
+  font-family: 'Rokkitt', sans-serif;
+}
+
+.focus-binary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.focus-key {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.focus-label {
+  font-size: 0.8rem;
+}
+
+.focus-binary-btn .material-symbols-outlined {
+  font-size: 0.9rem;
+}
+
+.focus-multiclass-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.focus-multiclass-select-new {
+  min-width: 250px;
+}
+
+.focus-status-controls-new {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.focus-status-btn-new {
+  padding: 0.4rem;
+  border: 1.5px solid;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.focus-status-btn-new:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.focus-status-btn-new .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.focus-comments-section {
+  flex: 0 0 250px;
+  min-width: 200px;
+}
+
+.focus-comment-textarea-new {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: 'Rokkitt', sans-serif;
+  font-size: 0.85rem;
+  resize: vertical;
+  min-height: 60px;
+  max-height: 120px;
+  background-color: var(--light-bg);
+  transition: border-color 0.2s ease;
+}
+
+.focus-comment-textarea-new:focus {
+  outline: none;
+  border-color: var(--dark-accent);
+  box-shadow: 0 0 0 2px rgba(79, 93, 117, 0.1);
+}
+
+.focus-shortcuts-help-new {
+  text-align: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.focus-shortcuts-help-new small {
+  color: var(--medium-gray);
+  font-size: 0.75rem;
 }
 
 /* Status Bar */

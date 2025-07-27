@@ -9,17 +9,17 @@ function HelpTab() {
       if (event.detail && event.detail.section) {
         console.log('Navigating to help section:', event.detail.section);
         setActiveSection(event.detail.section);
-        
+
         // Function to attempt scrolling to element
         const scrollToElement = (sectionId, attempts = 0) => {
           const element = document.getElementById(sectionId);
           console.log(`Attempt ${attempts + 1} - Found element:`, element);
-          
+
           if (element) {
             // Add highlighted class temporarily
             element.classList.add('help-highlight');
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
+
             // Remove highlight after animation
             setTimeout(() => {
               element.classList.remove('help-highlight');
@@ -49,8 +49,8 @@ function HelpTab() {
         <div>
           <h3>Overview</h3>
           <p>
-            The Inference tab is used to run existing machine learning models on audio data to detect classes of interest (such as bird species). 
-            You select audio files and configure parameters, then the system processes the audio and saves detection results to CSV files. 
+            The Inference tab is used to run existing machine learning models on audio data to detect classes of interest (such as bird species).
+            You select audio files and configure parameters, then the system processes the audio and saves detection results to CSV files.
             These results can later be loaded in the Review tab to inspect and validate detections.
           </p>
 
@@ -95,8 +95,8 @@ function HelpTab() {
         <div>
           <h3>Overview</h3>
           <p>
-            The Training tab allows you to train custom machine learning models using your own annotated audio data. 
-            You can fine-tune existing models from the bioacoustics model zoo on your specific classes of interest, 
+            The Training tab allows you to train custom machine learning models using your own annotated audio data.
+            You can fine-tune existing models from the bioacoustics model zoo on your specific classes of interest,
             creating specialized detectors for your research needs.
           </p>
 
@@ -142,8 +142,8 @@ function HelpTab() {
         <div>
           <h3>Overview</h3>
           <p>
-            The Explore tab allows you to load and analyze inference results from CSV files. 
-            You can visualize detection scores, listen to audio clips, view spectrograms, and explore your data 
+            The Explore tab allows you to load and analyze inference results from CSV files.
+            You can visualize detection scores, listen to audio clips, view spectrograms, and explore your data
             to understand model performance and identify interesting detections.
           </p>
 
@@ -170,8 +170,8 @@ function HelpTab() {
         <div>
           <h3>Overview</h3>
           <p>
-            The Review tab provides tools for manual annotation and validation of audio data. 
-            You can review detection results, annotate audio clips for training data, and create ground truth datasets. 
+            The Review tab provides tools for manual annotation and validation of audio data.
+            You can review detection results, annotate audio clips for training data, and create ground truth datasets.
             The interface supports both binary classification (yes/no/uncertain) and multi-class annotation workflows.
           </p>
 
@@ -206,8 +206,8 @@ function HelpTab() {
         <div>
           <h3>Getting Started</h3>
           <p>
-            This application provides a complete workflow for bioacoustic analysis: from running pre-trained models on your audio data (Inference), 
-            to exploring and understanding the results (Explore), annotating clips for validation or training (Review), 
+            This application provides a complete workflow for bioacoustic analysis: from running pre-trained models on your audio data (Inference),
+            to exploring and understanding the results (Explore), annotating clips for validation or training (Review),
             and training custom models on your annotated data (Training).
           </p>
 
@@ -239,7 +239,7 @@ function HelpTab() {
     <div className="help-tab">
       <div className="help-header">
         <h2>Dipper - Help Documentation</h2>
-        <p>Comprehensive guide to using all features of the application</p>
+
       </div>
 
       <div className="help-navigation">
@@ -247,7 +247,7 @@ function HelpTab() {
         <ul>
           {sections.map(section => (
             <li key={section.id}>
-              <button 
+              <button
                 className={`nav-link ${activeSection === section.id ? 'active' : ''}`}
                 onClick={() => setActiveSection(section.id)}
               >

@@ -180,10 +180,10 @@ function App() {
       >
         <DrawerHeader>
           {!open && (
-            <IconButton 
+            <IconButton
               onClick={handleDrawerOpen}
-              sx={{ 
-                width: '100%', 
+              sx={{
+                width: '100%',
                 justifyContent: 'center',
                 color: 'var(--dark)'
               }}
@@ -192,9 +192,9 @@ function App() {
             </IconButton>
           )}
           {open && (
-            <IconButton 
+            <IconButton
               onClick={handleDrawerClose}
-              sx={{ 
+              sx={{
                 marginLeft: 'auto',
                 color: 'var(--dark)'
               }}
@@ -257,20 +257,18 @@ function App() {
           ))}
         </List>
       </Drawer>
-      <Box component="main" sx={{ 
-        flexGrow: 1, 
+      <Box component="main" sx={{
+        flexGrow: 1,
         p: 3,
         marginLeft: isDrawerOpen ? 0 : 0, // Remove any margin conflicts
         width: '100%' // Ensure full width
       }}>
         {activeTab === 'inference' && (
           <div className="tab-content">
-            <div className="section">
-              <TaskCreationForm
-                onTaskCreate={handleTaskCreate}
-                onTaskCreateAndRun={handleTaskCreateAndRun}
-              />
-            </div>
+            <TaskCreationForm
+              onTaskCreate={handleTaskCreate}
+              onTaskCreateAndRun={handleTaskCreateAndRun}
+            />
 
             <div className="section">
               <h3>Task Management</h3>
@@ -281,12 +279,10 @@ function App() {
 
         {activeTab === 'training' && (
           <div className="tab-content">
-            <div className="section">
-              <TrainingTaskCreationForm
-                onTaskCreate={handleTaskCreate}
-                onTaskCreateAndRun={handleTaskCreateAndRun}
-              />
-            </div>
+            <TrainingTaskCreationForm
+              onTaskCreate={handleTaskCreate}
+              onTaskCreateAndRun={handleTaskCreateAndRun}
+            />
 
             <div className="section">
               <h3>Training Task Management</h3>

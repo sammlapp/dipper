@@ -14,7 +14,9 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     save_location: '',
     batch_size: 32,
     num_workers: 4,
-    freeze_feature_extractor: true
+    freeze_feature_extractor: true,
+    use_multi_layer_classifier: false,
+    classifier_hidden_layer_sizes_input: '100'
   });
 
   // State for single class annotations - array of {file: '', class: ''}
@@ -25,10 +27,21 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   };
 
   const getClassListArray = () => {
-    return config.class_list
-      .split(/[,\n]/)
-      .map(cls => cls.trim())
-      .filter(cls => cls.length > 0);
+    // Handle case where class_list might be an array (from loaded config) or string
+    if (Array.isArray(config.class_list)) {
+      return config.class_list.filter(cls => cls && cls.length > 0);
+    }
+    
+    // Handle string case
+    if (typeof config.class_list === 'string') {
+      return config.class_list
+        .split(/[,\n]/)
+        .map(cls => cls.trim())
+        .filter(cls => cls.length > 0);
+    }
+    
+    // Fallback for other types
+    return [];
   };
 
   const populateClassListFromFile = async (filePath) => {
@@ -196,11 +209,26 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       return;
     }
 
+    // Parse hidden layer sizes from string to array of integers
+    const parseHiddenLayerSizes = (input) => {
+      if (!input || input.trim() === '') return null;
+      return input.split(',').map(size => {
+        const parsed = parseInt(size.trim());
+        return isNaN(parsed) ? null : parsed;
+      }).filter(size => size !== null && size > 0);
+    };
+
     // Prepare final config
     const taskConfig = {
       ...config,
       class_list: classList,
-      single_class_annotations: singleClassAnnotations
+      single_class_annotations: singleClassAnnotations,
+      training_settings: {
+        batch_size: config.batch_size,
+        num_workers: config.num_workers,
+        freeze_feature_extractor: config.freeze_feature_extractor,
+        classifier_hidden_layer_sizes: config.use_multi_layer_classifier ? parseHiddenLayerSizes(config.classifier_hidden_layer_sizes_input) : null
+      }
     };
 
     const finalTaskName = taskName.trim() || null;
@@ -225,7 +253,9 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       save_location: '',
       batch_size: 32,
       num_workers: 4,
-      freeze_feature_extractor: true
+      freeze_feature_extractor: true,
+      use_multi_layer_classifier: false,
+      classifier_hidden_layer_sizes_input: '100'
     });
   };
 
@@ -241,6 +271,15 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       const configPath = await window.electronAPI.saveFile(defaultName);
 
       if (configPath) {
+        // Parse hidden layer sizes from string to array of integers
+        const parseHiddenLayerSizes = (input) => {
+          if (!input || input.trim() === '') return null;
+          return input.split(',').map(size => {
+            const parsed = parseInt(size.trim());
+            return isNaN(parsed) ? null : parsed;
+          }).filter(size => size !== null && size > 0);
+        };
+
         const configData = {
           task_name: taskName,
           model: config.model,
@@ -254,7 +293,8 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           training_settings: {
             batch_size: config.batch_size,
             num_workers: config.num_workers,
-            freeze_feature_extractor: config.freeze_feature_extractor
+            freeze_feature_extractor: config.freeze_feature_extractor,
+            classifier_hidden_layer_sizes: config.use_multi_layer_classifier ? parseHiddenLayerSizes(config.classifier_hidden_layer_sizes_input) : null
           }
         };
 
@@ -271,13 +311,13 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         const result = await response.json();
         if (result.status === 'success') {
-          alert(`Training config saved to: ${configPath.split('/').pop()}`);
+          console.log(`Training config saved to: ${configPath.split('/').pop()}`);
         } else {
-          alert(`Failed to save config: ${result.error}`);
+          console.error(`Failed to save config: ${result.error}`);
         }
       }
     } catch (err) {
-      alert('Failed to save config: ' + err.message);
+      console.error('Failed to save config: ' + err.message);
     }
   };
 
@@ -309,7 +349,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           setConfig(prev => ({
             ...prev,
             model: configData.model || 'BirdNET',
-            class_list: configData.class_list || '',
+            class_list: Array.isArray(configData.class_list) ? configData.class_list.join(', ') : (configData.class_list || ''),
             fully_annotated_files: configData.fully_annotated_files || [],
             background_samples_file: configData.background_samples_file || '',
             root_audio_folder: configData.root_audio_folder || '',
@@ -317,16 +357,20 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             save_location: configData.save_location || '',
             batch_size: configData.training_settings?.batch_size || 32,
             num_workers: configData.training_settings?.num_workers || 4,
-            freeze_feature_extractor: configData.training_settings?.freeze_feature_extractor !== false
+            freeze_feature_extractor: configData.training_settings?.freeze_feature_extractor !== false,
+            use_multi_layer_classifier: Boolean(configData.training_settings?.classifier_hidden_layer_sizes),
+            classifier_hidden_layer_sizes_input: Array.isArray(configData.training_settings?.classifier_hidden_layer_sizes) 
+              ? configData.training_settings.classifier_hidden_layer_sizes.join(', ') 
+              : '100'
           }));
 
-          alert(`Training config loaded from: ${configFile[0].split('/').pop()}`);
+          console.log(`Training config loaded from: ${configFile[0].split('/').pop()}`);
         } else {
-          alert(`Failed to load config: ${result.error}`);
+          console.error(`Failed to load config: ${result.error}`);
         }
       }
     } catch (err) {
-      alert('Failed to load config: ' + err.message);
+      console.error('Failed to load config: ' + err.message);
     }
   };
 
@@ -353,10 +397,14 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             value={config.model}
             onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
           >
-            <option value="BirdNET">BirdNET</option>
-            <option value="Perch">Perch</option>
+            <option value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</option>
             <option value="HawkEars">HawkEars</option>
-            <option value="BirdSetEfficientNetB1">BirdSetEfficientNetB1</option>
+            <option value="BirdNET">BirdNET Global bird species classifier</option>
+            {/* don't allow training low-band hawkears, weird architecture */}
+            <option value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</option>
+            <option value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</option>
+            {/* <option value="Perch">Perch Global bird species classifier </option> */}
+
 
           </select>
         </div>
@@ -548,6 +596,35 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           <div className="help-text">
             Keep pre-trained feature extractor frozen (recommended for small datasets)
           </div>
+        </div>
+
+        <div className="form-group full-width">
+          <label>
+            <input
+              type="checkbox"
+              checked={config.use_multi_layer_classifier}
+              onChange={(e) => setConfig(prev => ({ ...prev, use_multi_layer_classifier: e.target.checked }))}
+            />
+            Multi-layer Classifier <HelpIcon section="training-multi-layer" />
+          </label>
+          <div className="help-text">
+            Use a multi-layer classifier instead of a single linear layer
+          </div>
+          {config.use_multi_layer_classifier && (
+            <div className="form-group" style={{ marginTop: '8px', marginLeft: '24px' }}>
+              <label>Hidden Layer Sizes (comma-separated)</label>
+              <input
+                type="text"
+                value={config.classifier_hidden_layer_sizes_input}
+                onChange={(e) => setConfig(prev => ({ ...prev, classifier_hidden_layer_sizes_input: e.target.value }))}
+                placeholder="100,50,25"
+                style={{ width: '200px' }}
+              />
+              <div className="help-text">
+                Specify hidden layer sizes, e.g., "100,50" for two layers with 100 and 50 neurons
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -385,7 +385,8 @@ class TaskManager {
         training_settings: {
           batch_size: config.batch_size || 32,
           num_workers: config.num_workers || 4,
-          freeze_feature_extractor: config.freeze_feature_extractor !== false
+          freeze_feature_extractor: config.freeze_feature_extractor !== false,
+          classifier_hidden_layer_sizes: config.training_settings?.classifier_hidden_layer_sizes || null
         }
       };
 

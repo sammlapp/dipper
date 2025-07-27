@@ -82,7 +82,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         // Count files using backend
         await countFilesFromPatterns(patterns);
       } else if (folder && selectedExtensions.length === 0) {
-        alert('Please select at least one file extension to search for.');
+        console.log('Please select at least one file extension to search for.');
       }
     } catch (error) {
       console.error('Failed to select folder:', error);
@@ -151,7 +151,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       console.error('Failed to count files:', error);
       // Fallback: show estimated count message
       setFileCount('? (Server not available)');
-      alert('Cannot count files - backend server not available. Files will be counted during inference.');
+      console.log('Cannot count files - backend server not available. Files will be counted during inference.');
     }
   };
 
@@ -176,7 +176,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       console.error('Failed to count files:', error);
       // Fallback: show estimated count message
       setFileCount('? (Server not available)');
-      alert('Cannot count files - backend server not available. Files will be counted during inference.');
+      console.log('Cannot count files - backend server not available. Files will be counted during inference.');
     }
   };
 
@@ -198,12 +198,12 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       config.file_list.trim() !== '';
 
     if (!hasFiles) {
-      alert('Please select audio files, folder, patterns, or file list first');
+      console.log('Please select audio files, folder, patterns, or file list first');
       return;
     }
 
     if (fileCount === 0) {
-      alert('No audio files found with current selection');
+      console.log('No audio files found with current selection');
       return;
     }
 
@@ -214,7 +214,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     }
 
     if (!config.output_dir) {
-      alert('Please select an output directory');
+      console.log('Please select an output directory');
       return;
     }
 
@@ -244,7 +244,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   const saveInferenceConfig = async () => {
     try {
       if (!window.electronAPI) {
-        alert('Electron API not available - running in browser mode');
+        console.log('Electron API not available - running in browser mode');
         return;
       }
 
@@ -284,20 +284,20 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         const result = await response.json();
         if (result.status === 'success') {
-          alert(`Config saved to: ${configPath.split('/').pop()}`);
+          console.log(`Config saved to: ${configPath.split('/').pop()}`);
         } else {
-          alert(`Failed to save config: ${result.error}`);
+          console.error(`Failed to save config: ${result.error}`);
         }
       }
     } catch (err) {
-      alert('Failed to save config: ' + err.message);
+      console.error('Failed to save config: ' + err.message);
     }
   };
 
   const loadInferenceConfig = async () => {
     try {
       if (!window.electronAPI) {
-        alert('Electron API not available - running in browser mode');
+        console.log('Electron API not available - running in browser mode');
         return;
       }
 
@@ -343,13 +343,13 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             await countFilesFromList(configData.file_list);
           }
 
-          alert(`Config loaded from: ${configFile[0].split('/').pop()}`);
+          console.log(`Config loaded from: ${configFile[0].split('/').pop()}`);
         } else {
-          alert(`Failed to load config: ${result.error}`);
+          console.error(`Failed to load config: ${result.error}`);
         }
       }
     } catch (err) {
-      alert('Failed to load config: ' + err.message);
+      console.error('Failed to load config: ' + err.message);
     }
   };
 
