@@ -413,9 +413,20 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         <div className="form-group full-width">
           <label>Fully Annotated Files (optional) <HelpIcon section="training-fully-annotated" /></label>
           <div className="file-selection">
-            <button onClick={handleFullyAnnotatedSelection}>
-              Select Fully Annotated CSV Files
-            </button>
+            <div className="file-selection-buttons">
+              <button onClick={handleFullyAnnotatedSelection}>
+                Select Fully Annotated CSV Files
+              </button>
+              {config.fully_annotated_files.length > 0 && (
+                <button 
+                  onClick={() => setConfig(prev => ({ ...prev, fully_annotated_files: [] }))}
+                  className="button-clear"
+                  title="Clear selected files"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             {config.fully_annotated_files.length > 0 && (
               <div className="selected-files">
                 <div className="file-count">{config.fully_annotated_files.length} files selected</div>
@@ -438,9 +449,23 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         <div className="form-group full-width">
           <label>Single Class Annotations (optional) <HelpIcon section="training-single-class" /></label>
           <div className="file-selection">
-            <button onClick={handleSingleClassAnnotationSelection}>
-              Add Single Class Annotation Files
-            </button>
+            <div className="file-selection-buttons">
+              <button onClick={handleSingleClassAnnotationSelection}>
+                Add Single Class Annotation Files
+              </button>
+              {singleClassAnnotations.length > 0 && (
+                <button 
+                  onClick={() => {
+                    setSingleClassAnnotations([]);
+                    setConfig(prev => ({ ...prev, single_class_annotations: [] }));
+                  }}
+                  className="button-clear"
+                  title="Clear all single class annotations"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
             {singleClassAnnotations.length > 0 && (
               <div className="single-class-annotations">
                 {singleClassAnnotations.map((item, index) => (
@@ -496,9 +521,20 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         <div className="form-group full-width">
           <label>Background Samples (optional)</label>
           <div className="file-selection">
-            <button onClick={handleBackgroundSamplesSelection}>
-              Select Background Samples CSV
-            </button>
+            <div className="file-selection-buttons">
+              <button onClick={handleBackgroundSamplesSelection}>
+                Select Background Samples CSV
+              </button>
+              {config.background_samples_file && (
+                <button 
+                  onClick={() => setConfig(prev => ({ ...prev, background_samples_file: '' }))}
+                  className="button-clear"
+                  title="Clear selected background samples file"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             {config.background_samples_file && (
               <span className="selected-path">
                 {config.background_samples_file.split('/').pop()}
@@ -514,9 +550,20 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         <div className="form-group full-width">
           <label>Root Audio Folder (optional) <HelpIcon section="training-root-folder" /></label>
           <div className="file-selection">
-            <button onClick={handleRootAudioFolderSelection}>
-              Select Root Audio Folder
-            </button>
+            <div className="file-selection-buttons">
+              <button onClick={handleRootAudioFolderSelection}>
+                Select Root Audio Folder
+              </button>
+              {config.root_audio_folder && (
+                <button 
+                  onClick={() => setConfig(prev => ({ ...prev, root_audio_folder: '' }))}
+                  className="button-clear"
+                  title="Clear selected root audio folder"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             {config.root_audio_folder && (
               <span className="selected-path">
                 {config.root_audio_folder}
@@ -532,9 +579,20 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         <div className="form-group full-width">
           <label>Evaluation Task (optional)</label>
           <div className="file-selection">
-            <button onClick={handleEvaluationFileSelection}>
-              Select Evaluation CSV
-            </button>
+            <div className="file-selection-buttons">
+              <button onClick={handleEvaluationFileSelection}>
+                Select Evaluation CSV
+              </button>
+              {config.evaluation_file && (
+                <button 
+                  onClick={() => setConfig(prev => ({ ...prev, evaluation_file: '' }))}
+                  className="button-clear"
+                  title="Clear selected evaluation file"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             {config.evaluation_file && (
               <span className="selected-path">
                 {config.evaluation_file.split('/').pop()}
@@ -550,9 +608,20 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         <div className="form-group full-width">
           <label>Model Save Location *</label>
           <div className="file-selection">
-            <button onClick={handleSaveLocationSelection}>
-              Select Save Directory
-            </button>
+            <div className="file-selection-buttons">
+              <button onClick={handleSaveLocationSelection}>
+                Select Save Directory
+              </button>
+              {config.save_location && (
+                <button 
+                  onClick={() => setConfig(prev => ({ ...prev, save_location: '' }))}
+                  className="button-clear"
+                  title="Clear selected save location"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             {config.save_location && (
               <span className="selected-path">
                 {config.save_location}

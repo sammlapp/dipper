@@ -4833,6 +4833,29 @@ button:disabled {
   background-color: var(--border);
 }
 
+.button-clear {
+  background-color: var(--alert);
+  color: var(--white);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Rokkitt', sans-serif;
+  font-size: 0.85rem;
+  transition: background-color 0.2s ease;
+}
+
+.button-clear:hover {
+  background-color: #b85530;
+}
+
+.file-selection-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 /* Task Management Styles */
 
 /* Task Creation Form */

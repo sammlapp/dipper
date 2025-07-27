@@ -407,9 +407,23 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           <div className="file-selection-content">
             {fileSelectionMode === 'files' && (
               <div className="file-selection">
-                <button onClick={handleFileSelection}>
-                  Select Audio Files
-                </button>
+                <div className="file-selection-buttons">
+                  <button onClick={handleFileSelection}>
+                    Select Audio Files
+                  </button>
+                  {config.files.length > 0 && (
+                    <button 
+                      onClick={() => {
+                        setConfig(prev => ({ ...prev, files: [] }));
+                        setFileCount(0);
+                      }}
+                      className="button-clear"
+                      title="Clear selected files"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 {config.files.length > 0 && (
                   <span className="file-count">
                     {config.files.length} files selected
@@ -438,9 +452,23 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                     ))}
                   </div>
                 </div>
-                <button onClick={handleFolderSelection}>
-                  Select Folder (Recursive)
-                </button>
+                <div className="file-selection-buttons">
+                  <button onClick={handleFolderSelection}>
+                    Select Folder (Recursive)
+                  </button>
+                  {config.file_globbing_patterns.length > 0 && (
+                    <button 
+                      onClick={() => {
+                        setConfig(prev => ({ ...prev, file_globbing_patterns: [] }));
+                        setFileCount(0);
+                      }}
+                      className="button-clear"
+                      title="Clear selected folder"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 {config.file_globbing_patterns.length > 0 && (
                   <span className="file-count">
                     Searching in folder - {fileCount} files found
@@ -481,6 +509,19 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                     Find Files
                   </button>
                   {config.file_globbing_patterns.length > 0 && (
+                    <button 
+                      onClick={() => {
+                        setConfig(prev => ({ ...prev, file_globbing_patterns: [] }));
+                        setGlobPatterns('');
+                        setFileCount(0);
+                      }}
+                      className="button-clear"
+                      title="Clear patterns and found files"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  {config.file_globbing_patterns.length > 0 && (
                     <span className="file-count">
                       {fileCount} files found
                     </span>
@@ -491,9 +532,23 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
             {fileSelectionMode === 'filelist' && (
               <div className="file-selection">
-                <button onClick={handleFileListSelection}>
-                  Select Text File (One File Per Line)
-                </button>
+                <div className="file-selection-buttons">
+                  <button onClick={handleFileListSelection}>
+                    Select Text File (One File Per Line)
+                  </button>
+                  {config.file_list && (
+                    <button 
+                      onClick={() => {
+                        setConfig(prev => ({ ...prev, file_list: '' }));
+                        setFileCount(0);
+                      }}
+                      className="button-clear"
+                      title="Clear selected file list"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 {config.file_list && (
                   <div>
                     <span className="selected-path">
@@ -520,9 +575,20 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         <div className="form-group full-width">
           <label>Output Directory <HelpIcon section="inference-output" /></label>
           <div className="file-selection">
-            <button onClick={handleOutputDirSelection}>
-              Select Output Directory
-            </button>
+            <div className="file-selection-buttons">
+              <button onClick={handleOutputDirSelection}>
+                Select Output Directory
+              </button>
+              {config.output_dir && (
+                <button 
+                  onClick={() => setConfig(prev => ({ ...prev, output_dir: '' }))}
+                  className="button-clear"
+                  title="Clear selected output directory"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             {config.output_dir && (
               <span className="selected-path">
                 {config.output_dir}
