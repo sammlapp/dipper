@@ -1,11 +1,30 @@
 import React, { useState } from 'react';
 import HelpIcon from './HelpIcon';
 
+// Default values for inference form
+const DEFAULT_VALUES = {
+  taskName: '',
+  fileSelectionMode: 'files',
+  globPatterns: '',
+  fileCount: 0,
+  selectedExtensions: ['wav', 'mp3', 'flac'],
+  config: {
+    files: [],
+    file_globbing_patterns: [],
+    file_list: '',
+    model: 'BirdNET',
+    overlap: 0.0,
+    batch_size: 1,
+    worker_count: 1,
+    output_dir: ''
+  }
+};
+
 function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
-  const [taskName, setTaskName] = useState('');
-  const [fileSelectionMode, setFileSelectionMode] = useState('files'); // 'files', 'folder', 'patterns', 'filelist'
-  const [globPatterns, setGlobPatterns] = useState('');
-  const [fileCount, setFileCount] = useState(0);
+  const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
+  const [fileSelectionMode, setFileSelectionMode] = useState(DEFAULT_VALUES.fileSelectionMode);
+  const [globPatterns, setGlobPatterns] = useState(DEFAULT_VALUES.globPatterns);
+  const [fileCount, setFileCount] = useState(DEFAULT_VALUES.fileCount);
 
   // Available audio extensions with their descriptions
   const availableExtensions = [
@@ -20,18 +39,9 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   ];
 
   // Selected extensions (default to most common)
-  const [selectedExtensions, setSelectedExtensions] = useState(['wav', 'mp3', 'flac']);
+  const [selectedExtensions, setSelectedExtensions] = useState(DEFAULT_VALUES.selectedExtensions);
 
-  const [config, setConfig] = useState({
-    files: [],
-    file_globbing_patterns: [],
-    file_list: '',
-    model: 'BirdNET',
-    overlap: 0.0,
-    batch_size: 1,
-    worker_count: 1,
-    output_dir: ''
-  });
+  const [config, setConfig] = useState(DEFAULT_VALUES.config);
 
   const handleExtensionChange = (ext, checked) => {
     if (checked) {
@@ -226,19 +236,15 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     } else {
       onTaskCreate(taskConfig, finalTaskName);
     }
+  };
 
-    // Reset form
-    setTaskName('');
-    setGlobPatterns('');
-    setFileCount(0);
-    setSelectedExtensions(['wav', 'mp3', 'flac']); // Reset to defaults
-    setConfig(prev => ({
-      ...prev,
-      files: [],
-      file_globbing_patterns: [],
-      file_list: '',
-      output_dir: ''
-    }));
+  const resetForm = () => {
+    setTaskName(DEFAULT_VALUES.taskName);
+    setFileSelectionMode(DEFAULT_VALUES.fileSelectionMode);
+    setGlobPatterns(DEFAULT_VALUES.globPatterns);
+    setFileCount(DEFAULT_VALUES.fileCount);
+    setSelectedExtensions([...DEFAULT_VALUES.selectedExtensions]);
+    setConfig({ ...DEFAULT_VALUES.config });
   };
 
   const saveInferenceConfig = async () => {
@@ -412,7 +418,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                     Select Audio Files
                   </button>
                   {config.files.length > 0 && (
-                    <button 
+                    <button
                       onClick={() => {
                         setConfig(prev => ({ ...prev, files: [] }));
                         setFileCount(0);
@@ -457,7 +463,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                     Select Folder (Recursive)
                   </button>
                   {config.file_globbing_patterns.length > 0 && (
-                    <button 
+                    <button
                       onClick={() => {
                         setConfig(prev => ({ ...prev, file_globbing_patterns: [] }));
                         setFileCount(0);
@@ -500,7 +506,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 <textarea
                   value={globPatterns}
                   onChange={handlePatternChange}
-                  placeholder="/Users/name/data/project1/**/*.WAV&#10;/Users/name/data/project2/**/*.mp3&#10;/path/to/audio/**/*.{wav,mp3,flac}"
+                  placeholder="Use * for wildcard in folder/file name and ** for all subfolders (recursive)&#10;/Users/name/data/project1/**/*.WAV&#10;/Users/name/data/project2/**/*.mp3&#10;/path/to/audio/*_103000.wav"
                   rows={4}
                   style={{ width: '100%', marginBottom: '8px' }}
                 />
@@ -509,7 +515,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                     Find Files
                   </button>
                   {config.file_globbing_patterns.length > 0 && (
-                    <button 
+                    <button
                       onClick={() => {
                         setConfig(prev => ({ ...prev, file_globbing_patterns: [] }));
                         setGlobPatterns('');
@@ -537,7 +543,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                     Select Text File (One File Per Line)
                   </button>
                   {config.file_list && (
-                    <button 
+                    <button
                       onClick={() => {
                         setConfig(prev => ({ ...prev, file_list: '' }));
                         setFileCount(0);
@@ -580,7 +586,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 Select Output Directory
               </button>
               {config.output_dir && (
-                <button 
+                <button
                   onClick={() => setConfig(prev => ({ ...prev, output_dir: '' }))}
                   className="button-clear"
                   title="Clear selected output directory"
@@ -606,7 +612,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           >
             <option value="HawkEars">HawkEars</option>
             <option value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</option>
-            <option value="HawkEars_Low Band">Ruffed & Spruce Grouse (HawkEars Low-band)</option>
+            <option value="HawkEars_Low_Band">Ruffed & Spruce Grouse (HawkEars Low-band)</option>
             <option value="BirdNET">BirdNET Global bird species classifier</option>
             <option value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</option>
             <option value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</option>
@@ -675,7 +681,15 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           >
             Load Config
           </button>
-
+          <button
+            type="button"
+            className="button-clear"
+            onClick={resetForm}
+            style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+            title="Reset form to default values"
+          >
+            Reset Form
+          </button>
 
           <button
             className="button-secondary"

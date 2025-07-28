@@ -69,7 +69,7 @@ function TaskMonitor({ taskManager }) {
 
   const handleClearHistory = () => {
     if (taskManager && window.confirm('Clear all completed, failed, and canceled tasks?')) {
-      const tasksToDelete = tasks.filter(task => 
+      const tasksToDelete = tasks.filter(task =>
         [TASK_STATUS.COMPLETED, TASK_STATUS.FAILED, TASK_STATUS.CANCELLED].includes(task.status)
       );
       tasksToDelete.forEach(task => taskManager.deleteTask(task.id));
@@ -138,7 +138,7 @@ function TaskMonitor({ taskManager }) {
       <div className="all-tasks">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h4>All Tasks ({tasks.length})</h4>
-          <button 
+          <button
             className="task-action clear-history"
             onClick={handleClearHistory}
             style={{ fontSize: '0.8rem', padding: '4px 8px' }}
@@ -216,7 +216,7 @@ function TaskMonitor({ taskManager }) {
                       className="task-action delete"
                       onClick={() => handleDeleteTask(task.id)}
                     >
-                      Delete
+                      Clear
                     </button>
                   </>
                 )}

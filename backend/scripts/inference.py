@@ -271,7 +271,7 @@ def main():
         model = load_model(model_name)
 
         # Save config to the output directory
-        config_save_path = output_file + "inference_config.json"
+        config_save_path = Path(config_data.get("job_folder")) / "inference_config.json"
         Path(config_save_path).parent.mkdir(parents=True, exist_ok=True)
         with open(config_save_path, "w") as f:
             json.dump(config_data, f, indent=4)

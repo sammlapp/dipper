@@ -34,39 +34,6 @@ function HelpIcon({ section, className = '' }) {
       }}
     >
       ?
-      <style jsx>{`
-        .help-icon {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background-color: var(--secondary, #6c757d);
-          color: white;
-          font-size: 11px;
-          font-weight: bold;
-          cursor: pointer;
-          margin-left: 6px;
-          transition: all 0.2s ease;
-          user-select: none;
-          vertical-align: middle;
-        }
-
-        .help-icon:hover {
-          background-color: var(--primary, #1976d2);
-          transform: scale(1.1);
-        }
-
-        .help-icon:focus {
-          outline: 2px solid var(--primary, #1976d2);
-          outline-offset: 2px;
-        }
-
-        .help-icon:active {
-          transform: scale(0.95);
-        }
-      `}</style>
     </span>
   );
 }

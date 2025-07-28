@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import HelpIcon from './HelpIcon';
 
-function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
-  const [taskName, setTaskName] = useState('');
-  const [config, setConfig] = useState({
+// Default values for training form
+const DEFAULT_VALUES = {
+  taskName: '',
+  singleClassAnnotations: [],
+  config: {
     model: 'BirdNET',
     class_list: '',
     fully_annotated_files: [],
@@ -17,10 +19,15 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     freeze_feature_extractor: true,
     use_multi_layer_classifier: false,
     classifier_hidden_layer_sizes_input: '100'
-  });
+  }
+};
+
+function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
+  const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
+  const [config, setConfig] = useState(DEFAULT_VALUES.config);
 
   // State for single class annotations - array of {file: '', class: ''}
-  const [singleClassAnnotations, setSingleClassAnnotations] = useState([]);
+  const [singleClassAnnotations, setSingleClassAnnotations] = useState(DEFAULT_VALUES.singleClassAnnotations);
 
   const handleClassListChange = (e) => {
     setConfig(prev => ({ ...prev, class_list: e.target.value }));
@@ -238,25 +245,12 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     } else {
       onTaskCreate(taskConfig, finalTaskName);
     }
+  };
 
-    // Reset form
-    setTaskName('');
-    setSingleClassAnnotations([]);
-    setConfig({
-      model: 'BirdNET',
-      class_list: '',
-      fully_annotated_files: [],
-      single_class_annotations: [],
-      background_samples_file: '',
-      root_audio_folder: '',
-      evaluation_file: '',
-      save_location: '',
-      batch_size: 32,
-      num_workers: 4,
-      freeze_feature_extractor: true,
-      use_multi_layer_classifier: false,
-      classifier_hidden_layer_sizes_input: '100'
-    });
+  const resetForm = () => {
+    setTaskName(DEFAULT_VALUES.taskName);
+    setSingleClassAnnotations([...DEFAULT_VALUES.singleClassAnnotations]);
+    setConfig({ ...DEFAULT_VALUES.config });
   };
 
   const saveTrainingConfig = async () => {
@@ -715,6 +709,15 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
           >
             Load Config
+          </button>
+          <button
+            type="button"
+            className="button-clear"
+            onClick={resetForm}
+            style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+            title="Reset form to default values"
+          >
+            Reset Form
           </button>
 
           <button

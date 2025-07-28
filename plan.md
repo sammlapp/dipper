@@ -139,6 +139,7 @@ We need to implement a thorough "help" functionality:
 - the multi-selects for filtering should use the same type of selector as the annotation panels, react-select
 
 # feature requests and TODO
+# HAWKEARS Low band is BROKEN with dimension mismatch error
 add 'test on sample' button for inference and training
 system notifications for task completion/failure
 find inference or training process/PID to monitor i
@@ -294,10 +295,16 @@ option to split up inference tasks into one task per subfolder
 - TODO: better progress reporting, currently goes from 0-100 instantly
 - TODO: smart segmenting into subtasks for large prediction tasks, with intermittent saving
 
+Job management and display bugs:
+- jobs used to show as completed, but now even when an inference job is actually finished, it shows as running indefinitely
+- "Inference running..." is shown for canceled tasks. 
+- as with training, the outputs of the inference script should be logged to a file in the job folder
+
 
 # Explore tab updates
 - should have a little button in the panel (gold medal icon: 🥇) to return to viewing the highest-scoring clip (eg after clicking on a histogram bin)
-- put the settings in a side panel/tray, exactly like the settings panel in the review tab
+- put the display settings in a side panel/tray, like the settings panel in the review tab. Make sure the settings are properly implemented and are not mixed up with the display settings for the review tab. 
+- images are being cut off at the bottom. Resize them to the height of the 
 
 future items:
 - use Material UI badges and small photos of the class detected for quick overview (use birdnames repo for name translation, find open-source set of images for species headshots or use the global bird svgs dataset)
