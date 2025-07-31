@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Select from 'react-select';
 
-function FocusView({ 
-  clipData, 
-  onAnnotationChange, 
+function FocusView({
+  clipData,
+  onAnnotationChange,
   onCommentChange,
-  onNavigate, 
+  onNavigate,
   settings,
   reviewMode = 'binary',
   availableClasses = [],
@@ -34,7 +34,7 @@ function FocusView({
   // Local state for comment to prevent re-renders on every keystroke
   const [localComment, setLocalComment] = useState(comments || '');
   const commentTimeoutRef = useRef(null);
-  
+
   // Update local comment when external comments change
   useEffect(() => {
     setLocalComment(comments || '');
@@ -43,19 +43,19 @@ function FocusView({
   const handleCommentChange = (event) => {
     const newComment = event.target.value;
     setLocalComment(newComment);
-    
+
     // Debounce the callback to parent to prevent excessive re-renders
     if (commentTimeoutRef.current) {
       clearTimeout(commentTimeoutRef.current);
     }
-    
+
     commentTimeoutRef.current = setTimeout(() => {
       if (onCommentChange) {
         onCommentChange(newComment);
       }
     }, 500); // Wait 500ms after user stops typing
   };
-  
+
   // Clean up timeout on unmount
   useEffect(() => {
     return () => {
@@ -84,10 +84,10 @@ function FocusView({
       setIsPlaying(false);
       setCurrentTime(0);
     }
-    
+
     // Reset auto-play flag for new clip
     hasAutoPlayedRef.current = false;
-    
+
     if (audioUrl && settings?.focus_mode_autoplay) {
       setTimeout(() => {
         // Double-check that this is still the current audio and we haven't navigated away
@@ -181,7 +181,7 @@ function FocusView({
     if (onAnnotationChange) {
       onAnnotationChange(newAnnotation, newAnnotationStatus);
     }
-    
+
     // Auto-advance to next clip if not the last clip
     if (autoAdvance && !isLastClip) {
       setTimeout(() => {
@@ -267,7 +267,7 @@ function FocusView({
         (event.target.tagName === "INPUT" && event.target.type === "text") ||
         (event.target.tagName === "INPUT" && event.target.type === "number")
       );
-      
+
       // Don't handle shortcuts if user is typing
       if (isTyping) return;
 
@@ -344,259 +344,257 @@ function FocusView({
         )}
 
         {/* Large spectrogram display */}
-      <div className={`focus-spectrogram-container ${settings?.focus_size ? `size-${settings.focus_size}` : 'size-medium'}`}>
-        <div 
-          className="focus-spectrogram"
-          onClick={handleSpectrogramClick}
-          title={audioUrl ? (isPlaying ? 'Click to pause audio' : 'Click to play audio') : 'Audio not available'}
-        >
-          {spectrogram_base64 ? (
-            <img
-              src={`data:image/png;base64,${spectrogram_base64}`}
-              alt="Spectrogram"
-              className="focus-spectrogram-image"
-            />
-          ) : (
-            <div className="focus-spectrogram-placeholder">
-              <img src="/icon.svg" alt="Loading" className="placeholder-icon app-icon" />
-              <div className="placeholder-text">Loading spectrogram...</div>
-            </div>
-          )}
-
-          {/* Progress bar overlay */}
-          {duration > 0 && (
-            <div className="focus-progress-bar">
-              <div
-                className="focus-progress-fill"
-                style={{ width: `${(currentTime / duration) * 100}%` }}
+        <div className={`focus-spectrogram-container ${settings?.focus_size ? `size-${settings.focus_size}` : 'size-medium'}`}>
+          <div
+            className="focus-spectrogram"
+            onClick={handleSpectrogramClick}
+            title={audioUrl ? (isPlaying ? 'Click to pause audio' : 'Click to play audio') : 'Audio not available'}
+          >
+            {spectrogram_base64 ? (
+              <img
+                src={`data:image/png;base64,${spectrogram_base64}`}
+                alt="Spectrogram"
+                className="focus-spectrogram-image"
               />
-            </div>
-          )}
-
-          {/* Play/pause overlay */}
-          <div className="focus-play-overlay">
-            <div className={`focus-play-button ${isPlaying ? 'playing' : 'paused'}`}>
-              <span className="material-symbols-outlined">
-                {isPlaying ? 'pause' : 'play_arrow'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Compact controls beneath spectrogram */}
-      <div className="focus-controls-compact">
-        {/* File info row */}
-        <div className="focus-info-row">
-          <div className="focus-file-name">{file ? file.split('/').pop() : 'Unknown file'}</div>
-          <div className="focus-time-info">
-            {start_time !== undefined && (
-              <span>{start_time.toFixed(1)}s</span>
+            ) : (
+              <div className="focus-spectrogram-placeholder">
+                <img src="/icon.svg" alt="Loading" className="placeholder-icon app-icon" />
+                <div className="placeholder-text">Loading spectrogram...</div>
+              </div>
             )}
-            {end_time && end_time !== start_time && (
-              <span> - {end_time.toFixed(1)}s</span>
-            )}
-          </div>
-        </div>
 
-        {/* Binary annotation controls with comments on the right */}
-        {reviewMode === 'binary' && (
-          <div className="focus-annotation-controls">
-            <div className="focus-binary-segmented-control">
-              {binaryOptions.map((option, index) => (
-                <button
-                  key={option.value}
-                  className={`segmented-control-option ${
-                    (option.value === 'unlabeled' && annotationValue === null) || 
-                    (option.value !== 'unlabeled' && annotationValue === option.value) ? 'active' : ''
-                  } ${
-                    index === 0 ? 'first' : index === binaryOptions.length - 1 ? 'last' : 'middle'
-                  }`}
-                  style={{
-                    backgroundColor: ((option.value === 'unlabeled' && annotationValue === null) || 
-                                    (option.value !== 'unlabeled' && annotationValue === option.value)) ? option.color : 'transparent',
-                    borderColor: option.color,
-                    color: ((option.value === 'unlabeled' && annotationValue === null) || 
-                           (option.value !== 'unlabeled' && annotationValue === option.value)) ? 'white' : option.color
-                  }}
-                  onClick={() => handleAnnotationChangeWithAdvance(option.value === 'unlabeled' ? '' : option.value)}
-                >
-                  <span className="segmented-key">({option.key})</span>
-                  {option.value === 'unlabeled' ? (
-                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>restart_alt</span>
-                  ) : (
-                    <span className="segmented-label">{option.label}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <div className="focus-comments-right">
-              <textarea
-                placeholder="Comments..."
-                value={localComment}
-                onChange={handleCommentChange}
-                className="focus-comment-textarea-right"
-                rows={2}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Multi-class annotation controls with comments on the right */}
-        {reviewMode === 'multiclass' && (
-          <div className="focus-annotation-controls">
-            <div className="focus-multiclass-controls">
-              <div className="focus-multiclass-select">
-                <Select
-                  isMulti
-                  options={multiclassOptions}
-                  value={multiclassValue}
-                  onChange={handleMulticlassAnnotationChange}
-                  placeholder="Select classes..."
-                  styles={{
-                    control: (provided) => ({
-                      ...provided,
-                      minHeight: '44px',
-                      fontSize: '0.9rem',
-                      backgroundColor: 'var(--white)',
-                      borderColor: 'var(--border)',
-                      '&:hover': {
-                        borderColor: 'var(--dark-accent)'
-                      }
-                    }),
-                    multiValue: (provided) => ({
-                      ...provided,
-                      backgroundColor: 'var(--dark-accent)',
-                      borderRadius: '4px',
-                    }),
-                    multiValueLabel: (provided) => ({
-                      ...provided,
-                      color: 'white',
-                      fontSize: '0.85rem',
-                      fontWeight: '500'
-                    }),
-                    multiValueRemove: (provided) => ({
-                      ...provided,
-                      color: 'white',
-                      '&:hover': {
-                        backgroundColor: 'var(--dark)',
-                        color: 'white',
-                      }
-                    }),
-                    placeholder: (provided) => ({
-                      ...provided,
-                      color: 'var(--medium-gray)',
-                      fontSize: '0.9rem'
-                    })
-                  }}
-                  className="focus-multiclass-select"
-                  classNamePrefix="select"
-                  isClearable
-                  closeMenuOnSelect={false}
-                  hideSelectedOptions={false}
-                  blurInputOnSelect={false}
+            {/* Progress bar overlay */}
+            {duration > 0 && (
+              <div className="focus-progress-bar">
+                <div
+                  className="focus-progress-fill"
+                  style={{ width: `${(currentTime / duration) * 100}%` }}
                 />
               </div>
+            )}
 
-              {/* Annotation status control */}
-              <div className="focus-annotation-status-control">
-                <label className="focus-status-label">Review Status:</label>
-                <div className="focus-status-buttons">
-                  {annotationStatusOptions.map(option => (
-                    <button
-                      key={option.value}
-                      className={`focus-status-button ${annotation_status === option.value ? 'active' : ''}`}
-                      style={{
-                        backgroundColor: annotation_status === option.value ? option.color : 'transparent',
-                        borderColor: option.color,
-                        color: annotation_status === option.value ? 'white' : option.color
-                      }}
-                      onClick={() => handleAnnotationStatusChange(option.value)}
-                      title={option.label}
-                    >
-                      <span className="material-symbols-outlined">{option.symbol}</span>
-                      <span className="status-label">{option.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="focus-comments-right">
-              <textarea
-                placeholder="Comments..."
-                value={localComment}
-                onChange={handleCommentChange}
-                className="focus-comment-textarea-right"
-                rows={2}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Audio controls row */}
-        {audioUrl && (
-          <div className="focus-audio-row">
-            <div className="audio-controls-compact">
-              <button
-                onClick={togglePlayPause}
-                className="audio-btn"
-                title={isPlaying ? 'Pause' : 'Play'}
-              >
+            {/* Play/pause overlay */}
+            <div className="focus-play-overlay">
+              <div className={`focus-play-button ${isPlaying ? 'playing' : 'paused'}`}>
                 <span className="material-symbols-outlined">
                   {isPlaying ? 'pause' : 'play_arrow'}
                 </span>
-              </button>
-              <button
-                onClick={handleRestart}
-                className="audio-btn"
-                title="Restart"
-              >
-                <span className="material-symbols-outlined">restart_alt</span>
-              </button>
+              </div>
             </div>
-            <div className="audio-timeline-compact">
-              <input
-                type="range"
-                min="0"
-                max={duration || 0}
-                value={currentTime}
-                onChange={handleSeek}
-                className="audio-scrubber-compact"
-                step="0.1"
-              />
-            </div>
-            <div className="audio-time-compact">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </div>
-          </div>
-        )}
-
-        {/* Navigation row */}
-        <div className="focus-navigation-row">
-          <div className="focus-navigation-compact">
-            <button 
-              className="nav-btn"
-              onClick={() => onNavigate('previous')}
-              title="Previous clip (j)"
-            >
-              <span className="material-symbols-outlined">skip_previous</span>
-            </button>
-            <button 
-              className="nav-btn"
-              onClick={() => onNavigate('next')}
-              title="Next clip (k)"
-            >
-              <span className="material-symbols-outlined">skip_next</span>
-            </button>
           </div>
         </div>
-      </div>
+
+        {/* Compact controls beneath spectrogram */}
+        <div className="focus-controls-compact">
+
+          {/* Binary annotation controls with comments on the right */}
+          {reviewMode === 'binary' && (
+            <div className="focus-annotation-controls">
+              <div className="focus-binary-segmented-control">
+                {binaryOptions.map((option, index) => (
+                  <button
+                    key={option.value}
+                    className={`segmented-control-option ${(option.value === 'unlabeled' && annotationValue === null) ||
+                      (option.value !== 'unlabeled' && annotationValue === option.value) ? 'active' : ''
+                      } ${index === 0 ? 'first' : index === binaryOptions.length - 1 ? 'last' : 'middle'
+                      }`}
+                    style={{
+                      backgroundColor: ((option.value === 'unlabeled' && annotationValue === null) ||
+                        (option.value !== 'unlabeled' && annotationValue === option.value)) ? option.color : 'transparent',
+                      borderColor: option.color,
+                      color: ((option.value === 'unlabeled' && annotationValue === null) ||
+                        (option.value !== 'unlabeled' && annotationValue === option.value)) ? 'white' : option.color
+                    }}
+                    onClick={() => handleAnnotationChangeWithAdvance(option.value === 'unlabeled' ? '' : option.value)}
+                  >
+                    <span className="segmented-key">({option.key})</span>
+                    {option.value === 'unlabeled' ? (
+                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>restart_alt</span>
+                    ) : (
+                      <span className="segmented-label">{option.label}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="focus-comments-right">
+                <textarea
+                  placeholder="Comments..."
+                  value={localComment}
+                  onChange={handleCommentChange}
+                  className="focus-comment-textarea-right"
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+          {/* Audio controls row */}
+          {audioUrl && (
+            <div className="focus-audio-row">
+              <div className="audio-controls-compact">
+                <button
+                  onClick={togglePlayPause}
+                  className="audio-btn"
+                  title={isPlaying ? 'Pause' : 'Play'}
+                >
+                  <span className="material-symbols-outlined">
+                    {isPlaying ? 'pause' : 'play_arrow'}
+                  </span>
+                </button>
+                <button
+                  onClick={handleRestart}
+                  className="audio-btn"
+                  title="Restart"
+                >
+                  <span className="material-symbols-outlined">restart_alt</span>
+                </button>
+              </div>
+              <div className="audio-timeline-compact">
+                <input
+                  type="range"
+                  min="0"
+                  max={duration || 0}
+                  value={currentTime}
+                  onChange={handleSeek}
+                  className="audio-scrubber-compact"
+                  step="0.1"
+                />
+              </div>
+              <div className="audio-time-compact">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </div>
+            </div>
+          )}
+
+          {/* Multi-class annotation controls with comments on the right */}
+          {reviewMode === 'multiclass' && (
+            <div className="focus-annotation-controls">
+              <div className="focus-multiclass-controls">
+                <div className="focus-multiclass-select">
+                  <Select
+                    isMulti
+                    options={multiclassOptions}
+                    value={multiclassValue}
+                    onChange={handleMulticlassAnnotationChange}
+                    placeholder="Select classes..."
+                    styles={{
+                      control: (provided) => ({
+                        ...provided,
+                        minHeight: '44px',
+                        fontSize: '0.9rem',
+                        backgroundColor: 'var(--white)',
+                        borderColor: 'var(--border)',
+                        '&:hover': {
+                          borderColor: 'var(--dark-accent)'
+                        }
+                      }),
+                      multiValue: (provided) => ({
+                        ...provided,
+                        backgroundColor: 'var(--dark-accent)',
+                        borderRadius: '4px',
+                      }),
+                      multiValueLabel: (provided) => ({
+                        ...provided,
+                        color: 'white',
+                        fontSize: '0.85rem',
+                        fontWeight: '500'
+                      }),
+                      multiValueRemove: (provided) => ({
+                        ...provided,
+                        color: 'white',
+                        '&:hover': {
+                          backgroundColor: 'var(--dark)',
+                          color: 'white',
+                        }
+                      }),
+                      placeholder: (provided) => ({
+                        ...provided,
+                        color: 'var(--medium-gray)',
+                        fontSize: '0.9rem'
+                      })
+                    }}
+                    className="focus-multiclass-select"
+                    classNamePrefix="select"
+                    isClearable
+                    closeMenuOnSelect={false}
+                    hideSelectedOptions={false}
+                    blurInputOnSelect={false}
+                  />
+                </div>
+
+                {/* Annotation status control */}
+                <div className="focus-annotation-status-control">
+                  <label className="focus-status-label">Review Status:</label>
+                  <div className="focus-status-buttons">
+                    {annotationStatusOptions.map(option => (
+                      <button
+                        key={option.value}
+                        className={`focus-status-button ${annotation_status === option.value ? 'active' : ''}`}
+                        style={{
+                          backgroundColor: annotation_status === option.value ? option.color : 'transparent',
+                          borderColor: option.color,
+                          color: annotation_status === option.value ? 'white' : option.color
+                        }}
+                        onClick={() => handleAnnotationStatusChange(option.value)}
+                        title={option.label}
+                      >
+                        <span className="material-symbols-outlined">{option.symbol}</span>
+                        <span className="status-label">{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="focus-navigation-compact">
+                <button
+                  className="nav-btn"
+                  onClick={() => onNavigate('previous')}
+                  title="Previous clip (j)"
+                >
+                  <span className="material-symbols-outlined">skip_previous</span>j
+                </button>
+                <button
+                  className="nav-btn"
+                  onClick={() => onNavigate('next')}
+                  title="Next clip (k)"
+                >
+                  k<span className="material-symbols-outlined">skip_next</span>
+                </button>
+              </div>
+              <div className="focus-comments-right">
+                <textarea
+                  placeholder="Comments..."
+                  value={localComment}
+                  onChange={handleCommentChange}
+                  className="focus-comment-textarea-right"
+                  rows={2}
+                />
+              </div>
+
+            </div>
+
+          )}
+
+
+
+          {/* File info row */}
+          <div className="focus-info-row">
+            <div className="focus-file-name">{file ? file.split('/').pop() : 'Unknown file'}</div>
+            <div className="focus-time-info">
+              {start_time !== undefined && (
+                <span>{start_time.toFixed(1)}s</span>
+              )}
+              {end_time && end_time !== start_time && (
+                <span> - {end_time.toFixed(1)}s</span>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Keyboard shortcuts help */}
         <div className="focus-shortcuts-help">
           <small>
-            <strong>Shortcuts:</strong> 
-            {reviewMode === 'binary' && ' a=Yes, s=No, d=Uncertain, f=Unlabeled |'} 
+            <strong>Shortcuts:</strong>
+            {reviewMode === 'binary' && ' a=Yes, s=No, d=Uncertain, f=Unlabeled |'}
             j=Previous, k=Next | Space=Play/Pause
           </small>
         </div>
