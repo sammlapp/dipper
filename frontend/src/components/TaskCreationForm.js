@@ -18,7 +18,8 @@ const DEFAULT_VALUES = {
     worker_count: 1,
     output_dir: '',
     sparse_outputs_enabled: false,
-    sparse_save_threshold: -3.0
+    sparse_save_threshold: -3.,
+    split_by_subfolder: false
   }
 };
 
@@ -238,7 +239,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       return;
     }
 
-    const taskConfig = { 
+    const taskConfig = {
       ...config,
       // Convert sparse outputs settings for TaskManager
       sparse_save_threshold: config.sparse_outputs_enabled ? config.sparse_save_threshold : null
@@ -284,6 +285,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           file_list: config.file_list,
           glob_patterns_text: globPatterns,
           output_dir: config.output_dir,
+          split_by_subfolder: config.split_by_subfolder,
           inference_settings: {
             clip_overlap: config.overlap,
             batch_size: config.batch_size,
@@ -354,6 +356,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             file_globbing_patterns: configData.file_globbing_patterns || [],
             file_list: configData.file_list || '',
             output_dir: configData.output_dir || '',
+            split_by_subfolder: configData.split_by_subfolder || false,
             overlap: configData.inference_settings?.clip_overlap || 0.0,
             batch_size: configData.inference_settings?.batch_size || 1,
             worker_count: configData.inference_settings?.num_workers || 1,
@@ -722,6 +725,22 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             </small>
           </div>
         )}
+        {/* Subfolder Splitting */}
+        <div className="form-group full-width">
+          <label>
+            <input
+              type="checkbox"
+              checked={config.split_by_subfolder}
+              onChange={(e) => setConfig(prev => ({ ...prev, split_by_subfolder: e.target.checked }))}
+              style={{ marginRight: '8px' }}
+            />
+            Separate inference by subfolders
+          </label>
+          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
+            Create separate output files for each subfolder containing audio files
+          </div>
+        </div>
+
 
       </div>
 

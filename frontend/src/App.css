@@ -4983,6 +4983,7 @@ button:disabled {
   background: var(--light-gray);
   padding: 2px 8px;
   border-radius: 12px;
+  margin: 0px;
 }
 
 .selected-path {

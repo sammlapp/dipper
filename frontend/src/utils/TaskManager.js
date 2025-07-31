@@ -230,6 +230,7 @@ class TaskManager {
         job_folder: jobFolder,
         config_output_path: configJsonPath,
         log_file_path: logFilePath,
+        split_by_subfolder: config.split_by_subfolder || false,
         inference_settings: {
           clip_overlap: config.overlap || 0.0,
           batch_size: config.batch_size || 1,
