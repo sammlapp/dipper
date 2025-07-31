@@ -259,8 +259,7 @@ function HelpTab() {
 
           <p><strong>Best practices:</strong></p>
           <ul>
-            <li>Use 10-20% of your total annotated data for evaluation</li>
-            <li>Ensure evaluation data represents the same conditions as deployment</li>
+            <li>When possible, select evaluation data that represents the same conditions as deployment (especially if your training data looks different from your deployment data)</li>
             <li>Include all target classes in evaluation set</li>
             <li>Consider geographic or temporal separation from training data</li>
           </ul>
@@ -270,9 +269,8 @@ function HelpTab() {
 
           <p><strong>Size recommendations:</strong></p>
           <ul>
-            <li><strong>8-16:</strong> Small datasets (&lt;1000 samples), limited GPU memory</li>
-            <li><strong>16-32:</strong> Medium datasets (1000-10000 samples), standard choice</li>
-            <li><strong>32-64:</strong> Large datasets (&gt;10000 samples), high-end hardware</li>
+            <li><strong>128-512:</strong>GPU Training</li>
+            <li><strong>32-64:</strong>CPU Training (slow)</li>
           </ul>
 
           <p><strong>Trade-offs:</strong></p>
@@ -281,7 +279,7 @@ function HelpTab() {
             <li><strong>Smaller batches:</strong> More noise in gradients (can help escape local minima), less memory</li>
           </ul>
 
-          <p><em>Rule of thumb:</em> Start with 32, reduce if you get out-of-memory errors, increase if training is slow and you have spare GPU memory.</p>
+          <p><em>Rule of thumb:</em> Start with 128, reduce if you get out-of-memory errors, increase if training is slow and you have spare GPU memory.</p>
 
           <h4 id="training-workers">Workers Setting</h4>
           <p><strong>Workers (0-8):</strong> Number of parallel processes for loading and preprocessing training data. This is PyTorch's DataLoader num_workers parameter.</p>

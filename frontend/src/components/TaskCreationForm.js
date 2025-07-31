@@ -16,7 +16,9 @@ const DEFAULT_VALUES = {
     overlap: 0.0,
     batch_size: 1,
     worker_count: 1,
-    output_dir: ''
+    output_dir: '',
+    sparse_outputs_enabled: false,
+    sparse_save_threshold: -3.0
   }
 };
 
@@ -236,7 +238,11 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       return;
     }
 
-    const taskConfig = { ...config };
+    const taskConfig = { 
+      ...config,
+      // Convert sparse outputs settings for TaskManager
+      sparse_save_threshold: config.sparse_outputs_enabled ? config.sparse_save_threshold : null
+    };
     const finalTaskName = taskName.trim() || null; // Let TaskManager generate name if empty
 
     if (createAndRun) {
@@ -282,6 +288,10 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             clip_overlap: config.overlap,
             batch_size: config.batch_size,
             num_workers: config.worker_count
+          },
+          sparse_outputs: {
+            enabled: config.sparse_outputs_enabled,
+            threshold: config.sparse_save_threshold
           }
         };
 
@@ -346,7 +356,9 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             output_dir: configData.output_dir || '',
             overlap: configData.inference_settings?.clip_overlap || 0.0,
             batch_size: configData.inference_settings?.batch_size || 1,
-            worker_count: configData.inference_settings?.num_workers || 1
+            worker_count: configData.inference_settings?.num_workers || 1,
+            sparse_outputs_enabled: configData.sparse_outputs?.enabled || false,
+            sparse_save_threshold: configData.sparse_outputs?.threshold || -3.0
           }));
 
           // Update file count based on loaded config
@@ -678,6 +690,38 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           />
         </div>
 
+        {/* Sparse Outputs */}
+        <div className="form-group">
+          <label>
+            <input
+              type="checkbox"
+              checked={config.sparse_outputs_enabled}
+              onChange={(e) => setConfig(prev => ({ ...prev, sparse_outputs_enabled: e.target.checked }))}
+              style={{ marginRight: '8px' }}
+            />
+            Save sparse outputs <HelpIcon section="inference-sparse-outputs" />
+          </label>
+          <small style={{ display: 'block', marginTop: '4px', color: '#6b7280' }}>
+            Only save scores above threshold, output as .pkl file instead of .csv
+          </small>
+        </div>
+
+        {config.sparse_outputs_enabled && (
+          <div className="form-group" style={{ marginLeft: '20px' }}>
+            <label>Score Threshold <HelpIcon section="inference-sparse-threshold" /></label>
+            <input
+              type="number"
+              min="-10"
+              max="5"
+              step="0.1"
+              value={config.sparse_save_threshold}
+              onChange={(e) => setConfig(prev => ({ ...prev, sparse_save_threshold: parseFloat(e.target.value) }))}
+            />
+            <small style={{ display: 'block', marginTop: '4px', color: '#6b7280' }}>
+              Logit scores below this threshold will be discarded (default: -3.0)
+            </small>
+          </div>
+        )}
 
       </div>
 

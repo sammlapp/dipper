@@ -209,7 +209,11 @@ class TaskManager {
       // Create job folder and output paths
       const jobFolderName = task.name.replace(/[^a-zA-Z0-9\-_\s]/g, '').replace(/\s+/g, '_');
       const jobFolder = config.output_dir ? `${config.output_dir}/${jobFolderName}` : '';
-      const outputCsvPath = jobFolder ? `${jobFolder}/predictions.csv` : '';
+
+      // Determine output file based on sparse threshold setting
+      const isSparseOutput = config.sparse_save_threshold !== null && config.sparse_save_threshold !== undefined;
+      const outputFile = jobFolder ? `${jobFolder}/${isSparseOutput ? 'sparse_predictions.pkl' : 'predictions.csv'}` : '';
+
       const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
       const logFilePath = jobFolder ? `${jobFolder}/inference_log.txt` : '';
 
@@ -221,7 +225,8 @@ class TaskManager {
         file_globbing_patterns: config.file_globbing_patterns || [],
         file_list: config.file_list || '',
         output_dir: config.output_dir,
-        output_file: outputCsvPath,
+        output_file: outputFile,
+        sparse_save_threshold: config.sparse_save_threshold || null,
         job_folder: jobFolder,
         config_output_path: configJsonPath,
         log_file_path: logFilePath,
