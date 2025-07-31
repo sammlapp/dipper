@@ -1411,7 +1411,7 @@ button:disabled {
 .spectrogram-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   transition: opacity 0.2s ease;
 }
 
@@ -2209,7 +2209,7 @@ button:disabled {
 .annotation-spectrogram-container {
   position: relative;
   flex: 1;
-  min-height: 150px;
+  /* min-height: 150px; */
   background-color: var(--light-gray);
   display: flex;
   align-items: center;
@@ -2228,7 +2228,7 @@ button:disabled {
 .annotation-spectrogram {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .spectrogram-loading {
