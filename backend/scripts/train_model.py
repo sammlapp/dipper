@@ -370,6 +370,12 @@ def run_training(config):
                 validation_interval=1,
             )
 
+            # add class names to per-class metrics
+            metrics["per_class_auroc"] = {
+                class_name: metrics["per_class_auroc"][i]
+                for i, class_name in enumerate(config["class_list"])
+            }
+
             # save the model
             model.save(model_save_path, pickle=True)
             logger.info(f"Saved trained model to: {model_save_path}")
@@ -422,8 +428,10 @@ def run_training(config):
 
         logger.info("Training completed successfully!")
 
-        # Get validation metrics
+        # Log and save validation metrics
         logger.info(f"Final validation metrics: {metrics}")
+        with open(Path(out_dir) / "validation_metrics.json", "w") as f:
+            json.dump(metrics, f, indent=4)
 
         # Output summary for the GUI
         summary = {
