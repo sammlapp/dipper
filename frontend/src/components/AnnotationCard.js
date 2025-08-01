@@ -185,10 +185,9 @@ const AnnotationCard = memo(function AnnotationCard({
     if (onAnnotationChange) {
       // Convert to string format for storage
       const annotationString = classes.length > 0 ? JSON.stringify(classes) : '[]';
-      // Pass both the new labels and preserve the current annotation status
-      onAnnotationChange(annotationString, annotation_status || 'unreviewed');
+      onAnnotationChange(annotationString);
     }
-  }, [onAnnotationChange, annotation_status]);
+  }, [onAnnotationChange]);
 
   const handleAnnotationStatusChange = useCallback((value) => {
     if (onAnnotationChange) {

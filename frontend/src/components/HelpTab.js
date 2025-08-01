@@ -320,6 +320,55 @@ function HelpTab() {
 
           <p><em>Decision guide:</em> Keep enabled unless you have &gt;10,000 labeled samples and understand the risks of overfitting.</p>
 
+          <h4 id="training-augmentation-variants">Augmentation Variants</h4>
+          <p><strong>Augmentation Variants:</strong> Number of augmented versions created for each training sample when the feature extractor is frozen. Only appears when "Freeze Feature Extractor" is enabled.</p>
+          <ul>
+            <li><strong>Purpose:</strong> Increases training data diversity without requiring more labeled samples</li>
+            <li><strong>How it works:</strong> Each audio sample is processed to create multiple augmented versions (time shifts, noise overlay, etc.)</li>
+            <li><strong>Default value:</strong> 5 variants per sample</li>
+            <li><strong>Range:</strong> 0-20 variants</li>
+          </ul>
+          <p><strong>Choosing the right value:</strong></p>
+          <ul>
+            <li><strong>Small datasets (&lt;1000 samples):</strong> Use 8-15 variants for maximum data augmentation</li>
+            <li><strong>Medium datasets (1000-5000 samples):</strong> Use 3-8 variants</li>
+            <li><strong>Large datasets (&gt;5000 samples):</strong> Use 1-3 variants</li>
+          </ul>
+          <p><em>Note:</em> More variants increase training time but can improve model generalization, especially with limited training data.</p>
+
+          <h4 id="training-feature-extractor-lr">Feature Extractor Learning Rate</h4>
+          <p><strong>Feature Extractor Learning Rate:</strong> Controls how much the pre-trained feature extractor weights are updated during training. Only appears when "Freeze Feature Extractor" is disabled.</p>
+          <ul>
+            <li><strong>Purpose:</strong> Fine-tunes the feature extraction layers for your specific data</li>
+            <li><strong>Default value:</strong> 0.00001 (very small to preserve pre-trained features)</li>
+            <li><strong>Range:</strong> 0.000001 - 0.01</li>
+            <li><strong>Typical values:</strong> 0.00001 - 0.0001</li>
+          </ul>
+          <p><strong>Guidelines:</strong></p>
+          <ul>
+            <li><strong>Conservative approach:</strong> Start with 0.00001 to minimally adjust pre-trained features</li>
+            <li><strong>Your data differs from training data:</strong> Try 0.00005 - 0.0001 for more adaptation</li>
+            <li><strong>Warning:</strong> Values above 0.001 risk destroying pre-trained representations</li>
+          </ul>
+          <p><em>Best practice:</em> Use 10-100x smaller learning rate than the classifier to preserve feature quality.</p>
+
+          <h4 id="training-classifier-lr">Classifier Learning Rate</h4>
+          <p><strong>Classifier Learning Rate:</strong> Controls how quickly the final classification layers learn. Only appears when "Freeze Feature Extractor" is disabled.</p>
+          <ul>
+            <li><strong>Purpose:</strong> Adjusts the classification head for your specific classes</li>
+            <li><strong>Default value:</strong> 0.001 (standard for classification layers)</li>
+            <li><strong>Range:</strong> 0.0001 - 0.1</li>
+            <li><strong>Typical values:</strong> 0.0005 - 0.005</li>
+          </ul>
+          <p><strong>Tuning guidelines:</strong></p>
+          <ul>
+            <li><strong>Stable training:</strong> 0.001 - 0.003 works well for most cases</li>
+            <li><strong>Slow convergence:</strong> Increase to 0.005 - 0.01</li>
+            <li><strong>Training instability:</strong> Decrease to 0.0005 - 0.001</li>
+            <li><strong>Many classes (&gt;50):</strong> Consider lower values (0.0005 - 0.002)</li>
+          </ul>
+          <p><em>Relationship:</em> Should be 10-100x higher than feature extractor learning rate for balanced training.</p>
+
           <h4 id="training-multi-layer">Multi-layer Classifier</h4>
           <p><strong>Multi-layer Classifier:</strong> Controls the architecture of the final classification head. This affects model capacity and learning ability.</p>
 

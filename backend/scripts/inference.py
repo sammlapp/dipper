@@ -9,10 +9,13 @@ import json
 import sys
 import os
 import logging
+import opensoundscape
 import pandas as pd
 import numpy as np
 import glob
 from pathlib import Path
+import bioacoustics_model_zoo as bmz
+import torch
 
 # Set up logging
 logging.basicConfig(
@@ -23,14 +26,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_model(model_name):
+def load_bmz_model(model_name):
     """Load a model from the bioacoustics model zoo"""
     try:
         logger.info(f"Loading model: {model_name}")
-
-        # Import here to avoid import errors if not installed
-        import bioacoustics_model_zoo as bmz
-        import pydantic.deprecated.decorator  # Fix for pydantic error
 
         # Load model using the same approach as streamlit_inference.py
         model = getattr(bmz, model_name)()
@@ -290,34 +289,50 @@ def main():
     config_data = load_config_file(args.config)
 
     try:
-        # Extract values from config file, with command line overrides
-        model_name = config_data.get("model")
-        output_file = config_data.get("output_file")
-        inference_config = config_data.get("inference_settings", {})
-
-        if not model_name:
-            raise ValueError("Model name not specified in config file or command line")
-
-        # Resolve files using new multi-method approach
+        # Resolve files from any of the specified methods in the config
         files = resolve_files_from_config(config_data)
 
-        logger.info(f"Processing {len(files)} files")
-        logger.info(f"Configuration: {inference_config}")
-        logger.info(f"Output file: {output_file}")
-
-        # Validate files exist (TODO: skip this? will be slow for very large datsets. Could get list back from .predict() instead.)
+        # Validate first file exists
         if not os.path.exists(files[0]):
             raise FileNotFoundError(
                 f"Did not find first file {files[0]}: was this config generated for a different file system? Perhaps an external drive is detached?"
             )
+
+        # initialize model from BMZ or local file
+        logger.info("Loading and initializing model from configuration")
+        model_source = config_data.get("model_source", "bmz")
+        if model_source == "bmz":
+            model_name = config_data.get("model")
+            if not model_name:
+                raise ValueError("Model name for BMZ model not specified in config")
+            model = load_bmz_model(model_name)
+        elif model_source == "local_file":  # local file model
+            # Special case for local file model
+            model_path = config_data.get("model", None)
+            if not Path(model_path).is_file():
+                raise ValueError(
+                    f"Local OpenSoundscape CNN model file '{model_path}' not found"
+                )
+            model = torch.load(model_path, weights_only=False, map_location="cpu")
+            model.device = opensoundscape.ml.cnn._gpu_if_available()
+            model.network.to(model.device)
+            # TODO: avoid save/load of pickles, use dictionaries and state dicts
+            # but this gets complicated when supporting various model types
+        else:
+            raise ValueError(f"Unknown model source: {model_source}")
+
+        # Extract values from config file
+        output_file = config_data.get("output_file")
+        inference_config = config_data.get("inference_settings", {})
+
+        logger.info(f"Running model on {len(files)} files")
+        logger.info(f"Configuration: {inference_config}")
+        logger.info(f"Output file: {output_file}")
+
         # missing_files = [f for f in files if not os.path.exists(f)]
         # if missing_files:
         #     logger.error(f"Missing files: {missing_files[:5]}...")  # Show first 5
         #     raise FileNotFoundError(f"Missing {len(missing_files)} files")
-
-        # Load model
-        logger.info(f"Loading model: {model_name}")
-        model = load_model(model_name)
 
         # Save config to the output directory
         config_save_path = Path(config_data.get("job_folder")) / "inference_config.json"

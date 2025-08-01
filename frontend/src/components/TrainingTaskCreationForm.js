@@ -18,7 +18,12 @@ const DEFAULT_VALUES = {
     num_workers: 4,
     freeze_feature_extractor: true,
     use_multi_layer_classifier: false,
-    classifier_hidden_layer_sizes_input: '100'
+    classifier_hidden_layer_sizes_input: '100',
+    // Frozen feature extractor parameters
+    n_augmentation_variants: 5,
+    // Unfrozen feature extractor parameters
+    feature_extractor_lr: 0.00001,
+    classifier_lr: 0.001
   }
 };
 
@@ -234,7 +239,14 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         batch_size: config.batch_size,
         num_workers: config.num_workers,
         freeze_feature_extractor: config.freeze_feature_extractor,
-        classifier_hidden_layer_sizes: config.use_multi_layer_classifier ? parseHiddenLayerSizes(config.classifier_hidden_layer_sizes_input) : null
+        classifier_hidden_layer_sizes: config.use_multi_layer_classifier ? parseHiddenLayerSizes(config.classifier_hidden_layer_sizes_input) : null,
+        // Conditional parameters based on freeze setting
+        ...(config.freeze_feature_extractor ? {
+          n_augmentation_variants: config.n_augmentation_variants
+        } : {
+          feature_extractor_lr: config.feature_extractor_lr,
+          classifier_lr: config.classifier_lr
+        })
       }
     };
 
@@ -288,7 +300,14 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             batch_size: config.batch_size,
             num_workers: config.num_workers,
             freeze_feature_extractor: config.freeze_feature_extractor,
-            classifier_hidden_layer_sizes: config.use_multi_layer_classifier ? parseHiddenLayerSizes(config.classifier_hidden_layer_sizes_input) : null
+            classifier_hidden_layer_sizes: config.use_multi_layer_classifier ? parseHiddenLayerSizes(config.classifier_hidden_layer_sizes_input) : null,
+            // Conditional parameters based on freeze setting
+            ...(config.freeze_feature_extractor ? {
+              n_augmentation_variants: config.n_augmentation_variants
+            } : {
+              feature_extractor_lr: config.feature_extractor_lr,
+              classifier_lr: config.classifier_lr
+            })
           }
         };
 
@@ -355,7 +374,11 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             use_multi_layer_classifier: Boolean(configData.training_settings?.classifier_hidden_layer_sizes),
             classifier_hidden_layer_sizes_input: Array.isArray(configData.training_settings?.classifier_hidden_layer_sizes)
               ? configData.training_settings.classifier_hidden_layer_sizes.join(', ')
-              : '100'
+              : '100',
+            // Conditional parameters
+            n_augmentation_variants: configData.training_settings?.n_augmentation_variants || 5,
+            feature_extractor_lr: configData.training_settings?.feature_extractor_lr || 0.00001,
+            classifier_lr: configData.training_settings?.classifier_lr || 0.001
           }));
 
           console.log(`Training config loaded from: ${configFile[0].split('/').pop()}`);
@@ -392,13 +415,12 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
           >
             <option value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</option>
-            <option value="HawkEars">HawkEars</option>
+            {/* don't allow ensembled HawkEars <option value="HawkEars">HawkEars</option> */}
             <option value="BirdNET">BirdNET Global bird species classifier</option>
             {/* don't allow training low-band hawkears, weird architecture */}
             <option value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</option>
-            <option value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</option>
+            {/* <option value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</option> */}
             {/* <option value="Perch">Perch Global bird species classifier </option> */}
-
 
           </select>
         </div>
@@ -660,6 +682,54 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             Keep pre-trained feature extractor frozen (recommended for small datasets)
           </div>
         </div>
+
+        {/* Conditional training parameters based on freeze setting */}
+        {config.freeze_feature_extractor ? (
+          <div className="form-group" style={{ marginLeft: '20px' }}>
+            <label>Augmentation Variants <HelpIcon section="training-augmentation-variants" /></label>
+            <input
+              type="number"
+              min="0"
+              max="20"
+              value={config.n_augmentation_variants}
+              onChange={(e) => setConfig(prev => ({ ...prev, n_augmentation_variants: parseInt(e.target.value) }))}
+            />
+            <div className="help-text">
+              Number of augmented versions per sample (default: 5)
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginLeft: '20px' }}>
+            <div className="form-group">
+              <label>Feature Extractor Learning Rate <HelpIcon section="training-feature-extractor-lr" /></label>
+              <input
+                type="number"
+                min="0.000001"
+                max="0.01"
+                step="0.000001"
+                value={config.feature_extractor_lr}
+                onChange={(e) => setConfig(prev => ({ ...prev, feature_extractor_lr: parseFloat(e.target.value) }))}
+              />
+              <div className="help-text">
+                Learning rate for feature extractor (default: 0.00001)
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Classifier Learning Rate <HelpIcon section="training-classifier-lr" /></label>
+              <input
+                type="number"
+                min="0.0001"
+                max="0.1"
+                step="0.0001"
+                value={config.classifier_lr}
+                onChange={(e) => setConfig(prev => ({ ...prev, classifier_lr: parseFloat(e.target.value) }))}
+              />
+              <div className="help-text">
+                Learning rate for classifier head (default: 0.001)
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="form-group full-width">
           <label>

@@ -206,8 +206,8 @@ class TaskManager {
       // Update progress
       this.updateTask(task.id, { progress: 'Preparing configuration...' });
 
-      // Create job folder and output paths
-      const jobFolderName = task.name.replace(/[^a-zA-Z0-9\-_\s]/g, '').replace(/\s+/g, '_');
+      // Create job folder and output paths with unique name
+      const jobFolderName = await this.generateUniqueJobFolderName(config.output_dir, task.name);
       const jobFolder = config.output_dir ? `${config.output_dir}/${jobFolderName}` : '';
 
       // Determine output file based on sparse threshold setting
@@ -220,6 +220,7 @@ class TaskManager {
       // Create temporary config file
       const tempConfigPath = `/tmp/inference_config_${processId}.json`;
       const configData = {
+        model_source: config.model_source || 'bmz',
         model: config.model,
         files: config.files || [],
         file_globbing_patterns: config.file_globbing_patterns || [],
@@ -399,8 +400,8 @@ class TaskManager {
       // Update progress
       this.updateTask(task.id, { progress: 'Preparing training configuration...' });
 
-      // Create job folder and output paths
-      const jobFolderName = task.name.replace(/[^a-zA-Z0-9\-_\s]/g, '').replace(/\s+/g, '_');
+      // Create job folder and output paths with unique name
+      const jobFolderName = await this.generateUniqueJobFolderName(config.save_location, task.name);
       const jobFolder = config.save_location ? `${config.save_location}/${jobFolderName}` : '';
       const modelSavePath = jobFolder ? `${jobFolder}/trained_model.pth` : '';
       const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
@@ -631,6 +632,24 @@ class TaskManager {
     }
 
     return true;
+  }
+
+  // Generate unique job folder name
+  async generateUniqueJobFolderName(baseDir, taskName) {
+    // Clean the task name for use as folder name
+    const cleanedName = taskName.replace(/[^a-zA-Z0-9\-_\s]/g, '').replace(/\s+/g, '_');
+    
+    // Use Electron API to generate unique folder name
+    if (window.electronAPI && window.electronAPI.generateUniqueFolderName) {
+      try {
+        return await window.electronAPI.generateUniqueFolderName(baseDir, cleanedName);
+      } catch (error) {
+        console.warn('Failed to generate unique folder name via Electron API, using fallback:', error);
+      }
+    }
+    
+    // Fallback: just return the cleaned name (original behavior)
+    return cleanedName;
   }
 
   // Utility Methods

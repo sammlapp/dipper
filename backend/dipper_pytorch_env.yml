@@ -5,18 +5,15 @@ channels:
   - defaults
 
 dependencies:
-  - python=3.9
+  - python=3.11
   - pip
 
   # Core ML libraries
-  - pytorch>=1.9.0
+  - pytorch==2.7.1 # avoids opso later changing version
   - torchvision>=0.9.0
   - torchaudio>=0.9.0
-  - numpy>=1.21.0,<2.0.0
   - pandas>=1.3.0
   - scikit-learn>=1.0.0
-  - pandera<0.20.0 # avoids opso later downgrading sympy version
-  - sympy==1.13.1 # pandera 0.19.0 requirement
 
   # Additional ML dependencies
   - scipy>=1.7.0
@@ -36,7 +33,10 @@ dependencies:
   - psutil>=5.8.0
   - tqdm>=4.60.0
   - pyyaml>=6.0
-  
+  - scikit-learn==1.7.0  # avoids opso later changing version
+  - numpy==2.2.6  # avoids opso later changing version
+  - sympy==1.14.0  # avoids opso later changing version
+
   # Jupyter and development
   - jupyter
   - ipython
@@ -54,6 +54,9 @@ dependencies:
     #litert #1.4.0 has a bug on Mac OSX
     - ai-edge-litert>=1.3.0, <1.4.0
 
-    # Bioacoustics libraries
-    - opensoundscape>=0.11.0
-    - git+https://github.com/kitzeslab/bioacoustics-model-zoo.git@0.12.0
+    # Bioacoustics libraries (with latest development code)
+    - git+https://github.com/kitzeslab/opensoundscape.git@issue_1143_mplclassifier
+    - git+https://github.com/kitzeslab/bioacoustics-model-zoo.git@main
+    - torch==2.7.1  # Ensure PyTorch version matches conda version
+    - numpy==2.2.6  # Ensure NumPy version matches conda version
+    - sympy==1.14.0  # Ensure SymPy version matches conda

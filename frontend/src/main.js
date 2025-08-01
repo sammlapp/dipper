@@ -355,6 +355,29 @@ ipcMain.handle('select-json-files', async () => {
   return result.filePaths;
 });
 
+ipcMain.handle('select-model-files', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+  return result.filePaths;
+});
+
+ipcMain.handle('generate-unique-folder-name', async (event, basePath, folderName) => {
+  // Generate a unique folder name by adding numeric suffix if needed
+  let uniqueName = folderName;
+  let counter = 1;
+  
+  while (fs.existsSync(path.join(basePath, uniqueName))) {
+    uniqueName = `${folderName}_${counter}`;
+    counter++;
+  }
+  
+  return uniqueName;
+});
+
 ipcMain.handle('save-file', async (event, defaultName) => {
   // Determine file type from extension
   const isJsonFile = defaultName && defaultName.toLowerCase().includes('.json');

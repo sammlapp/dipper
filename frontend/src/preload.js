@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectCSVFiles: () => ipcRenderer.invoke('select-csv-files'),
   selectTextFiles: () => ipcRenderer.invoke('select-text-files'),
   selectJSONFiles: () => ipcRenderer.invoke('select-json-files'),
+  selectModelFiles: () => ipcRenderer.invoke('select-model-files'),
+  generateUniqueFolderName: (basePath, folderName) => ipcRenderer.invoke('generate-unique-folder-name', basePath, folderName),
   saveFile: (defaultName) => ipcRenderer.invoke('save-file', defaultName),
   writeFile: (filePath, content) => ipcRenderer.invoke('write-file', filePath, content),
 

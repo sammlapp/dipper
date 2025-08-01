@@ -9,10 +9,13 @@ import pandas as pd
 import json
 import sys
 import os
+import torch
 
 import sklearn.model_selection
 from pathlib import Path
 import datetime
+from opensoundscape.ml.shallow_classifier import fit_classifier_on_embeddings
+from opensoundscape.ml.cnn import _gpu_if_available
 
 # Set up logging
 logging.basicConfig(
@@ -184,24 +187,42 @@ def load_evaluation_data(config):
 def run_training(config):
     """Run the training process"""
     try:
+        # Create output directory
+        model_save_path = config.get("model_save_path")
+        out_dir = Path(model_save_path).parent
+        out_dir.mkdir(parents=True, exist_ok=True)
+        # Save configuration
+        config_save_path = config.get(
+            "config_output_path", str(out_dir / "training_config.json")
+        )
+        Path(config_save_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(config_save_path, "w") as f:
+            json.dump(config, f, indent=4)
+
         # Log training start information
-        logger.info("="*80)
+        logger.info("=" * 80)
         logger.info("BIOACOUSTICS MODEL TRAINING STARTED")
-        logger.info("="*80)
+        logger.info("=" * 80)
         logger.info(f"Timestamp: {datetime.datetime.now().isoformat()}")
         logger.info(f"Model: {config.get('model', 'Unknown')}")
         logger.info(f"Target classes: {config.get('class_list', [])}")
-        logger.info(f"Save location: {config.get('model_save_path', 'Unknown')}")
-        
+        logger.info(f"Save location: {config.get('model_save_path')}")
+
         # Log configuration summary
         training_settings = config.get("training_settings", {})
         logger.info(f"Training settings:")
         logger.info(f"  - Batch size: {training_settings.get('batch_size', 32)}")
         logger.info(f"  - Number of workers: {training_settings.get('num_workers', 4)}")
-        logger.info(f"  - Freeze feature extractor: {training_settings.get('freeze_feature_extractor', True)}")
-        logger.info(f"  - Multi-layer classifier: {training_settings.get('classifier_hidden_layer_sizes') is not None}")
-        if training_settings.get('classifier_hidden_layer_sizes'):
-            logger.info(f"  - Hidden layer sizes: {training_settings.get('classifier_hidden_layer_sizes')}")
+        logger.info(
+            f"  - Freeze feature extractor: {training_settings.get('freeze_feature_extractor', True)}"
+        )
+        logger.info(
+            f"  - Multi-layer classifier: {training_settings.get('classifier_hidden_layer_sizes') is not None}"
+        )
+        if training_settings.get("classifier_hidden_layer_sizes"):
+            logger.info(
+                f"  - Hidden layer sizes: {training_settings.get('classifier_hidden_layer_sizes')}"
+            )
         logger.info("")
 
         # Load and process annotation data
@@ -237,6 +258,8 @@ def run_training(config):
         model_name = config.get("model")
         logger.info(f"Loading model: {model_name}")
         model = load_model(model_name)
+
+        logger.info(f" Using device: {model.device}")
 
         # Configure model for target classes
         # if model.classes != config["class_list"]: (always initialize new classifier for now)
@@ -296,41 +319,94 @@ def run_training(config):
                 after_key="to_spec",
             )
 
-        # Create output directory
-        model_save_path = config.get("model_save_path", None)
-        out_dir = Path(model_save_path).parent
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-        # Save configuration
-        config_save_path = config.get(
-            "config_output_path", str(out_dir / "training_config.json")
-        )
-        Path(config_save_path).parent.mkdir(parents=True, exist_ok=True)
-        with open(config_save_path, "w") as f:
-            json.dump(config, f, indent=4)
-
-        logger.info(f"Training configuration saved to: {config_save_path}")
-
         # configure settings form config file or use defaults
         batch_size = training_settings.get("batch_size", 32)
         num_workers = training_settings.get("num_workers", 0)
-        epochs = training_settings.get("epochs", 10)  # Default epochs
 
         # Set audio root if provided
         audio_root = config.get("root_audio_folder", None)
 
-        # Start training loop
-        logger.info("Starting model training...")
-        model.train(
-            train_df,
-            evaluation_df,
-            epochs=epochs,
-            batch_size=batch_size,
-            num_workers=num_workers,
-            save_path=out_dir,
-            save_interval=-1,  # Only save best epoch
-            audio_root=audio_root,
-        )
+        # training strategy dependds on whether the feature extractor is frozen
+        # if it is frozen, we can quickly train the classifier head on embeddings
+        # if it is not frozen, we need to train the entire model
+
+        if config.get("freeze_feature_extractor", True):
+            logger.info(
+                "Feature extractor is frozen. Training will only update the classifier head (fast)."
+            )
+            # Default epochs for shallow training
+            epochs = training_settings.get("epochs", 1000)
+
+            # create embeddings once and use them for quickly training the classifier head
+            # after fitting, this function loads the weights of the best step
+            fit_classifier_on_embeddings(
+                embedding_model=model,
+                classifier_model=model.network.classifier,
+                train_df=train_df,
+                validation_df=evaluation_df,
+                n_augmentation_variants=training_settings.get(
+                    "n_augmentation_variants", 5
+                ),
+                audio_root=audio_root,
+                embedding_batch_size=batch_size,
+                embedding_num_workers=num_workers,
+                steps=epochs,
+                optimizer=None,
+                criterion=None,
+                device=model.device,  # auto-selected to GPU if available
+                early_stopping_patience=None,  # should we allow early stopping?
+                logging_interval=100,
+                validation_interval=1,
+            )
+
+            # save the model
+            model.save(model_save_path, pickle=True)
+            logger.info(f"Saved trained model to: {model_save_path}")
+        else:
+            logger.info(
+                "Feature extractor is not frozen. Training will update the entire model (slow)."
+            )
+            # Default epochs for full training
+            epochs = training_settings.get("epochs", 20)
+            try:
+                assert "class" in model.optimizer_params
+                # use AdamW optimizer with custom parameters
+                model.optimizer_params = {
+                    "class": torch.optim.AdamW,
+                    "kwargs": {
+                        "lr": training_settings.get("feature_extractor_lr", 0.001)
+                    },
+                    "classifier_lr": training_settings.get("classifier_lr", 0.01),
+                }
+            except:
+                logger.warning(
+                    "Model does not support custom optimizer parameters. Using default learning rate and optimizer."
+                )
+            try:
+                assert "class" in model.lr_scheduler_params
+                model.lr_scheduler_params = {
+                    "class": torch.optim.lr_scheduler.CosineAnnealingLR,
+                    "kwargs": {
+                        "T_max": epochs,
+                        "eta_min": training_settings.get("min_lr", 1e-6),
+                    },
+                }
+            except:
+                logger.warning(
+                    "Model does not support custom learning rate scheduler parameters. Using default scheduler."
+                )
+            # Start training loop
+            logger.info("Starting model training...")
+            model.train(
+                train_df,
+                evaluation_df,
+                epochs=epochs,
+                batch_size=batch_size,
+                num_workers=num_workers,
+                save_path=out_dir,
+                save_interval=-1,  # Only save best epoch (saves best.pkl)
+                audio_root=audio_root,
+            )
 
         logger.info("Training completed successfully!")
 
@@ -355,28 +431,29 @@ def run_training(config):
             ),
         }
 
-        logger.info("="*80)
+        logger.info("=" * 80)
         logger.info("TRAINING COMPLETED SUCCESSFULLY!")
-        logger.info("="*80)
-        logger.info(f"Model saved to: {config.get('model_save_path', 'Unknown')}")
+        logger.info("=" * 80)
+        logger.info(f"Model saved to: {model_save_path}")
         logger.info(f"Training samples processed: {len(train_df)}")
         logger.info(f"Validation samples: {len(evaluation_df)}")
         logger.info(f"Final timestamp: {datetime.datetime.now().isoformat()}")
         if hasattr(model, "validation_metrics") and model.validation_metrics:
             logger.info(f"Final validation metrics: {model.validation_metrics[-1]}")
-        logger.info("="*80)
+        logger.info("=" * 80)
         print(json.dumps(summary))
 
     except Exception as e:
-        logger.error("="*80)
+        logger.error("=" * 80)
         logger.error("TRAINING FAILED!")
-        logger.error("="*80)
+        logger.error("=" * 80)
         logger.error(f"Error: {e}")
         logger.error(f"Timestamp: {datetime.datetime.now().isoformat()}")
         import traceback
+
         logger.error(f"Full traceback:")
         logger.error(traceback.format_exc())
-        logger.error("="*80)
+        logger.error("=" * 80)
         error_summary = {"status": "error", "error": str(e)}
         print(json.dumps(error_summary))
         sys.exit(1)

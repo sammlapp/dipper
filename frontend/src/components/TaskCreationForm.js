@@ -12,6 +12,7 @@ const DEFAULT_VALUES = {
     files: [],
     file_globbing_patterns: [],
     file_list: '',
+    model_source: 'bmz',
     model: 'BirdSetEfficientNetB1',
     overlap: 0.0,
     batch_size: 1,
@@ -212,6 +213,18 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     }
   };
 
+  const handleModelFileSelection = async () => {
+    try {
+      const files = await window.electronAPI.selectModelFiles();
+      if (files && files.length > 0) {
+        const modelFile = files[0];
+        setConfig(prev => ({ ...prev, model: modelFile }));
+      }
+    } catch (error) {
+      console.error('Failed to select model file:', error);
+    }
+  };
+
   const handleSubmit = (createAndRun = false) => {
     // Validate file selection based on mode
     const hasFiles = config.files.length > 0 ||
@@ -279,6 +292,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           task_name: taskName,
           file_selection_mode: fileSelectionMode,
           selected_extensions: selectedExtensions,
+          model_source: config.model_source,
           model: config.model,
           files: config.files,
           file_globbing_patterns: config.file_globbing_patterns,
@@ -351,6 +365,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
           setConfig(prev => ({
             ...prev,
+            model_source: configData.model_source || 'bmz',
             model: configData.model || 'BirdNET',
             files: configData.files || [],
             file_globbing_patterns: configData.file_globbing_patterns || [],
@@ -637,24 +652,83 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           </div>
         </div>
 
-        {/* Model */}
-        <div className="form-group">
-          <label>Model <HelpIcon section="inference-models" /></label>
-          <select
-            value={config.model}
-            onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
-          >
-            <option value="HawkEars">HawkEars</option>
-            <option value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</option>
-            <option value="HawkEars_Low_Band">Ruffed & Spruce Grouse (HawkEars Low-band)</option>
-            <option value="BirdNET">BirdNET Global bird species classifier</option>
-            <option value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</option>
-            <option value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</option>
-            {/* <option value="Perch">Perch Global bird species classifier </option> */}
-            {/* haven't created TF environments yet */}
-
-          </select>
+        {/* Model Source Selection */}
+        <div className="form-group full-width">
+          <label>Model Source <HelpIcon section="inference-model-source" /></label>
+          <div className="segmented-control">
+            <button
+              type="button"
+              className={`segment ${config.model_source === 'bmz' ? 'active' : ''}`}
+              onClick={() => {
+                setConfig(prev => ({ 
+                  ...prev, 
+                  model_source: 'bmz',
+                  model: 'BirdSetEfficientNetB1' // Reset to default BMZ model
+                }));
+              }}
+            >
+              Bioacoustics Model Zoo
+            </button>
+            <button
+              type="button"
+              className={`segment ${config.model_source === 'local_file' ? 'active' : ''}`}
+              onClick={() => {
+                setConfig(prev => ({ 
+                  ...prev, 
+                  model_source: 'local_file',
+                  model: '' // Clear model path when switching to local file
+                }));
+              }}
+            >
+              Local Model File
+            </button>
+          </div>
         </div>
+
+        {/* Conditional Model Selection */}
+        {config.model_source === 'bmz' ? (
+          <div className="form-group">
+            <label>Model <HelpIcon section="inference-models" /></label>
+            <select
+              value={config.model}
+              onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
+            >
+              <option value="HawkEars">HawkEars</option>
+              <option value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</option>
+              <option value="HawkEars_Low_Band">Ruffed & Spruce Grouse (HawkEars Low-band)</option>
+              <option value="BirdNET">BirdNET Global bird species classifier</option>
+              <option value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</option>
+              <option value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</option>
+              {/* <option value="Perch">Perch Global bird species classifier </option> */}
+              {/* haven't created TF environments yet */}
+            </select>
+          </div>
+        ) : (
+          <div className="form-group full-width">
+            <label>Local Model File <HelpIcon section="inference-local-model" /></label>
+            <div className="file-selection">
+              <div className="file-selection-buttons">
+                <button onClick={handleModelFileSelection}>
+                  Select Model File
+                </button>
+                {config.model && (
+                  <button
+                    onClick={() => setConfig(prev => ({ ...prev, model: '' }))}
+                    className="button-clear"
+                    title="Clear selected model file"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {config.model && (
+                <span className="selected-path">
+                  {config.model.split('/').pop()}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Overlap */}
         <div className="form-group">
