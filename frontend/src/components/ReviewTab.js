@@ -415,7 +415,7 @@ function ReviewTab({ drawerOpen = false }) {
       // Use Python script to read CSV file
       const processId = Date.now().toString();
       const result = await window.electronAPI.runPythonScript(
-        'load_annotation_task.py',
+        'load_extraction_task.py',
         [filePath],
         processId
       );

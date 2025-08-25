@@ -79,10 +79,11 @@ def run_inference(files, model, config):
         raise
 
 
-def save_results(predictions, config_data):
-    """Save predictions to file"""
-    output_file = config_data.get("output_file")
+def save_results(predictions, output_file, config_data):
+    """Save predictions to file, optionally as sparse format"""
+
     sparse_threshold = config_data.get("sparse_save_threshold")
+    # None -> save all scores
 
     if output_file:
         try:
@@ -237,6 +238,7 @@ def group_files_by_subfolder(files):
     from collections import defaultdict
 
     subfolder_groups = defaultdict(list)
+    subfolder_dirs = {}
 
     for file_path in files:
         # Get the immediate parent directory name
@@ -249,7 +251,14 @@ def group_files_by_subfolder(files):
 
         # Raise an error if there is another subfolder with the same name
         if subfolder_name in subfolder_groups:
-            raise ValueError(f"Duplicate subfolder name '{subfolder_name}' found")
+            # Same folder name: ensure parent directories are identical
+            # otherwise we have a naming conflict where multiple
+            # subfolders have the same name
+            assert (
+                parent_dir == subfolder_dirs[subfolder_name]
+            ), f"Duplicate subfolder name '{subfolder_name}' found"
+        else:
+            subfolder_dirs[subfolder_name] = parent_dir
 
         subfolder_groups[subfolder_name].append(file_path)
 
@@ -278,6 +287,32 @@ def load_config_file(config_path):
         raise
 
 
+def load_model(config_data):
+    model_source = config_data.get("model_source", "bmz")
+    if model_source == "bmz":
+        model_name = config_data.get("model")
+        if not model_name:
+            raise ValueError("Model name for BMZ model not specified in config")
+        model = load_bmz_model(model_name)
+    elif model_source == "local_file":  # local file model
+        model_name = "local model"
+        # Special case for local file model
+        model_path = config_data.get("model", None)
+        if not Path(model_path).is_file():
+            raise ValueError(
+                f"Local OpenSoundscape CNN model file '{model_path}' not found"
+            )
+        model = torch.load(model_path, weights_only=False, map_location="cpu")
+        model.device = opensoundscape.ml.cnn._gpu_if_available()
+        model.network.to(model.device)
+        # TODO: avoid save/load of pickles, use dictionaries and state dicts
+        # but this gets complicated when supporting various model types
+    else:
+        raise ValueError(f"Unknown model source: {model_source}")
+
+    return model
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run bioacoustics model inference")
     parser.add_argument(
@@ -300,35 +335,14 @@ def main():
 
         # initialize model from BMZ or local file
         logger.info("Loading and initializing model from configuration")
-        model_source = config_data.get("model_source", "bmz")
-        if model_source == "bmz":
-            model_name = config_data.get("model")
-            if not model_name:
-                raise ValueError("Model name for BMZ model not specified in config")
-            model = load_bmz_model(model_name)
-        elif model_source == "local_file":  # local file model
-            model_name = "local model"
-            # Special case for local file model
-            model_path = config_data.get("model", None)
-            if not Path(model_path).is_file():
-                raise ValueError(
-                    f"Local OpenSoundscape CNN model file '{model_path}' not found"
-                )
-            model = torch.load(model_path, weights_only=False, map_location="cpu")
-            model.device = opensoundscape.ml.cnn._gpu_if_available()
-            model.network.to(model.device)
-            # TODO: avoid save/load of pickles, use dictionaries and state dicts
-            # but this gets complicated when supporting various model types
-        else:
-            raise ValueError(f"Unknown model source: {model_source}")
+        model = load_model(config_data)
 
         # Extract values from config file
-        output_file = config_data.get("output_file")
         inference_config = config_data.get("inference_settings", {})
 
         logger.info(f"Running model on {len(files)} files")
         logger.info(f"Configuration: {inference_config}")
-        logger.info(f"Output file: {output_file}")
+        logger.info(f"Output directory: {config_data.get('output_dir')}")
 
         # missing_files = [f for f in files if not os.path.exists(f)]
         # if missing_files:
@@ -336,7 +350,8 @@ def main():
         #     raise FileNotFoundError(f"Missing {len(missing_files)} files")
 
         # Save config to the output directory
-        config_save_path = Path(config_data.get("job_folder")) / "inference_config.json"
+        job_dir = Path(config_data.get("job_folder"))
+        config_save_path = job_dir / "inference_config.json"
         Path(config_save_path).parent.mkdir(parents=True, exist_ok=True)
         with open(config_save_path, "w") as f:
             json.dump(config_data, f, indent=4)
@@ -346,6 +361,13 @@ def main():
             subset_size = min(config_data["subset_size"], len(files))
             logger.info(f"Using a SUBSET of {subset_size} files as a test run")
             files = np.random.choice(files, size=subset_size, replace=False).tolist()
+
+        out_name = (
+            "predictions.csv"
+            if config_data.get("sparse_save_threshold") is None
+            else "sparse_preds.pkl"
+        )
+        summary = {}
 
         # Check if we should split by subfolder
         split_by_subfolder = config_data.get("split_by_subfolder", False)
@@ -368,26 +390,27 @@ def main():
                 )
 
                 # Generate output file name for this subfolder
-                base_output = Path(output_file)
-                subfolder_output = (
-                    base_output.parent / f"{subfolder_name}_{base_output.stem}.csv"
-                )
-                output_files.append(str(subfolder_output))
+                output_file = job_dir / f"{subfolder_name}_{out_name}"
+                output_files.append(str(output_file))
 
                 # Run inference on this subset
                 try:
                     predictions = run_inference(files_subset, model, inference_config)
-                    save_results(predictions, str(subfolder_output))
+                    save_results(
+                        predictions,
+                        config_data=config_data,
+                        output_file=str(output_file),
+                    )
                     all_results.append(
                         {
                             "subfolder": subfolder_name,
                             "file_count": len(files_subset),
-                            "output_file": str(subfolder_output),
+                            "output_file": str(output_file),
                             "status": "success",
                         }
                     )
                     logger.info(
-                        f"Completed subfolder '{subfolder_name}' -> {subfolder_output}"
+                        f"Completed subfolder '{subfolder_name}' -> {output_file}"
                     )
                 except Exception as e:
                     logger.error(f"Failed to process subfolder '{subfolder_name}': {e}")
@@ -395,7 +418,7 @@ def main():
                         {
                             "subfolder": subfolder_name,
                             "file_count": len(files_subset),
-                            "output_file": str(subfolder_output),
+                            "output_file": str(output_file),
                             "status": "error",
                             "error": str(e),
                         }
@@ -403,6 +426,8 @@ def main():
 
             # Create summary of all subfolder results
             summary_results = {
+                "status": "success",
+                "files_processed": len(files),
                 "split_by_subfolder": True,
                 "subfolders_processed": len(subfolder_groups),
                 "total_files": len(files),
@@ -412,36 +437,33 @@ def main():
 
         else:
             # Run inference normally (single output)
+            model_name = (
+                config_data.get("model")
+                if config_data.get("model_source", "bmz") == "bmz"
+                else "local model"
+            )
             logger.info(f"Starting inference with model: {model_name}")
             predictions = run_inference(files, model, inference_config)
-            save_results(predictions, inference_config)
 
-            summary_results = {
-                "split_by_subfolder": False,
-                "total_files": len(files),
-                "output_file": output_file,
-            }
+            output_file = job_dir / out_name
+            save_results(predictions, output_file, inference_config)
 
-        # Output summary for the GUI
-        if split_by_subfolder:
-            # For split mode, include summary_results and don't assume single predictions shape
-            summary = {
-                "status": "success",
-                "files_processed": len(files),
-                **summary_results,  # Include all subfolder information
-            }
-        else:
-            # For single mode, include traditional summary info
-            summary = {
-                "status": "success",
-                "files_processed": len(files),
-                "predictions_shape": list(predictions.shape),
-                "output_file": output_file,
-                "species_detected": (
-                    list(predictions.columns) if hasattr(predictions, "columns") else []
-                ),
-                **summary_results,  # Include split_by_subfolder flag
-            }
+            # summary of task completed
+            summary.update(
+                {
+                    "split_by_subfolder": False,
+                    "total_files": len(files),
+                    "output_file": str(output_file),
+                    "status": "success",
+                    "files_processed": len(files),
+                    "predictions_shape": list(predictions.shape),
+                    "species_detected": (
+                        list(predictions.columns)
+                        if hasattr(predictions, "columns")
+                        else []
+                    ),
+                }
+            )
 
         logger.info("Inference completed successfully")
         print(json.dumps(summary))

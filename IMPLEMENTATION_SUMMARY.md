@@ -6,10 +6,13 @@ This document summarizes the complete implementation of the build strategy that 
 
 ```
 Electron Frontend
-    ↓ (HTTP requests)
+    ↓ (HTTP requests for most operations)
 PyInstaller lightweight_server.exe (port 8000)
     ↓ (subprocess calls)
 conda-pack dipper_pytorch_env/bin/python inference.py --config config.json
+
+    ↓ (direct IPC for UI-specific operations like file dialogs)
+Electron IPC → File Selection & Audio Clip Creation
 ```
 
 ## Key Components
@@ -21,7 +24,8 @@ A single HTTP server executable that handles ALL backend communication:
 - Audio clip processing and spectrogram generation  
 - Folder scanning for audio files
 - Sample detection analysis
-- Score file loading
+- Score file loading (CSV and PKL formats)
+- Column extraction from prediction files
 
 **New Capabilities Added:**
 - **Config Management**: Save/load inference configurations
@@ -50,10 +54,11 @@ POST /inference/run      - Run inference with conda environment
 - Self-contained Python environment for ML inference
 
 ### 4. Updated Frontend Integration
-- Communicates with lightweight server via HTTP instead of separate executables
-- Handles config save/load via HTTP API
-- Manages environment setup and inference execution through server
-- Maintains same user interface and functionality
+- **HTTP API Communication**: All data processing operations use lightweight server via HTTP
+- **Direct IPC Communication**: Only UI-specific operations like file dialogs and audio clip creation use Electron IPC
+- **Unified Architecture**: Config management, score loading, file operations all via HTTP API
+- **File Selection**: Updated to support both CSV and PKL files for prediction loading
+- **Error Reporting**: Enhanced to show actual errors from log files instead of generic messages
 
 ## Build Process
 
@@ -140,3 +145,51 @@ Run: `node test_build_pipeline.js`
 3. **Create Distribution Packages**: Platform-specific installers
 
 This implementation successfully consolidates the build strategy into a single, maintainable server architecture while preserving all functionality and improving the build/distribution process.
+
+## Current Architectural Issues
+
+### Unified Communication Architecture
+All tabs now use HTTP API for data processing operations:
+
+1. **ExploreTab**: Migrated to use HTTP API for score loading
+   - File: `/frontend/src/components/ExploreTab.js`
+   - Method: `fetch('http://localhost:8000/load_scores')` and `fetch('http://localhost:8000/files/count-rows')`
+   - Direct IPC removed for data operations
+
+2. **Lightweight Server**: Provides comprehensive HTTP API
+   - File: `/backend/lightweight_server.py`
+   - Method: Imports and calls script functions (`load_scores()`, `count_file_rows()`)
+   - **Resolution**: Function name fixed and endpoints working correctly
+
+3. **ReviewTab**: Uses correct script names
+   - File: `/frontend/src/components/ReviewTab.js`
+   - Method: `window.electronAPI.runPythonScript('load_extraction_task.py')` (renamed for consistency)
+   - Could be migrated to HTTP API in future if needed
+
+### PKL File Support Status
+- ✅ `load_scores.py` fully supports both CSV and PKL files
+- ✅ Electron IPC handlers accept both file types  
+- ✅ ExploreTab UI updated for both formats
+- ✅ `lightweight_server.py` function name fixed (now calls `load_scores()` correctly)
+- ✅ Both source and dist-electron main.js files updated for PKL support
+
+## Architecture Migration Summary
+
+**Issues Identified and Resolved:**
+1. **Function Name Mismatch**: `lightweight_server.py` was calling non-existent `load_scores_from_file()` - fixed to call `load_scores()`
+2. **File Selection**: PKL files couldn't be selected in ExploreTab - fixed by updating Electron IPC handlers  
+3. **Mixed Communication Patterns**: ExploreTab used direct IPC while other operations used HTTP API - migrated to unified HTTP API
+4. **Terminology Consistency**: Renamed `load_annotation_task.py` to `load_extraction_task.py` and updated all references
+
+**Final Architecture Status:**
+- ✅ **Unified HTTP API**: All data processing operations now use `lightweight_server.py` HTTP endpoints
+- ✅ **PKL File Support**: Fully functional for both CSV and PKL prediction files via HTTP API
+- ✅ **Sparse Data Handling**: Proper handling of NaN values in sparse prediction data
+- ✅ **Consistent Terminology**: All annotation/extraction terminology aligned
+- ✅ **Error Reporting**: Enhanced to show actual log content instead of generic messages
+- ✅ **Build Strategy Alignment**: All backend functionality consolidated into PyInstaller executable
+
+**Remaining IPC Usage** (appropriate for UI operations):
+- File selection dialogs (`electronAPI.selectCSVFiles()`, etc.)
+- Audio clip creation (`electronAPI.runPythonScript('create_audio_clips.py')`)
+- Direct script execution for ReviewTab (`load_extraction_task.py`) - could be migrated to HTTP API in future

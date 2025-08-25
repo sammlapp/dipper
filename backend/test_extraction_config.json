@@ -1,0 +1,31 @@
+{
+  "predictions_folder": "/Users/SML161/Downloads/HawkEars_Embedding_-_1_files_-_7272025_10843_AM",
+  "class_list": ["American Robin", "Common Loon", "Wood Frog", "Spring Peeper"],
+  "stratification": {
+    "by_subfolder": false
+  },
+  "filtering": {
+    "score_threshold_enabled": true,
+    "score_threshold": -5.0
+  },
+  "extraction": {
+    "random_clips": {
+      "enabled": true,
+      "count": 5
+    },
+    "score_bin_stratified": {
+      "enabled": false,
+      "count_per_bin": 3,
+      "percentile_bins": "[[0,75],[75,90],[90,95],[95,100]]"
+    },
+    "highest_scoring": {
+      "enabled": true,
+      "count": 3
+    }
+  },
+  "output_dir": "/Users/SML161/training_gui/backend/test_annotation_output",
+  "export_audio_clips": false,
+  "clip_duration": 5.0,
+  "annotation_mode": "multiclass",
+  "log_file_path": "/Users/SML161/training_gui/backend/test_annotation_output/annotation_log.txt"
+}

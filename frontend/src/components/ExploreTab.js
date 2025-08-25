@@ -142,10 +142,10 @@ function ExploreTab() {
       if (files && files.length > 0) {
         const filePath = files[0];
         setSelectedFile(filePath);
-        
+
         // Check row count first
         const rowCount = await checkRowCount(filePath);
-        
+
         if (rowCount > 5000) {
           // Show custom dialog with three options
           setLargeFileInfo({ filePath, rowCount });
@@ -185,14 +185,21 @@ function ExploreTab() {
 
   const checkRowCount = async (filePath) => {
     try {
-      const processId = Date.now().toString();
-      const result = await window.electronAPI.runPythonScript(
-        'load_scores.py',
-        [filePath, '--count-only'],
-        processId
-      );
-      const data = JSON.parse(result.stdout);
-      return data.row_count || 0;
+      const response = await fetch('http://localhost:8000/files/count-rows', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ file_path: filePath }),
+      });
+
+      const data = await response.json();
+      if (data.status === 'success') {
+        return data.row_count || 0;
+      } else {
+        console.warn('Failed to count rows:', data.error);
+        return 0;
+      }
     } catch (err) {
       console.warn('Failed to count rows:', err);
       return 0;
@@ -204,19 +211,20 @@ function ExploreTab() {
     setError('');
 
     try {
-      const processId = Date.now().toString();
-      const args = [filePath];
+      const requestBody = { file_path: filePath };
       if (maxRows) {
-        args.push('--max-rows', maxRows.toString());
+        requestBody.max_rows = maxRows;
       }
-      
-      const result = await window.electronAPI.runPythonScript(
-        'load_scores.py',
-        args,
-        processId
-      );
 
-      const data = JSON.parse(result.stdout);
+      const response = await fetch('http://localhost:8000/load_scores', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
       if (data.error) {
         setError(data.error);
       } else {
@@ -317,21 +325,14 @@ function ExploreTab() {
         if (!isNaN(score)) {
           scores[species].push(score);
         } else {
-          scores[species].push(0);
+          scores[species].push(NaN); // Preserve NaN for non-detections
         }
       });
     });
 
-    // Calculate min/max scores
-    const allScores = Object.values(scores).flat();
-    const minScore = Math.min(...allScores);
-    const maxScore = Math.max(...allScores);
-
     return {
       scores,
       file_info: fileInfo,
-      min_score: minScore,
-      max_score: maxScore,
       shape: [dataLines.length, speciesColumns.length]
     };
   };
@@ -341,10 +342,13 @@ function ExploreTab() {
     setScoreData(data);
 
     // Calculate detection counts for all species to find top 6
-    const speciesDetectionCounts = Object.entries(data.scores).map(([species, scores]) => {
-      const detections = scores.filter(score => score >= scoreThreshold).length;
-      return { species, detections };
-    });
+    const speciesDetectionCounts = Object.entries(data.scores)
+      .filter(([species, scores]) => Array.isArray(scores))
+      .map(([species, scores]) => {
+        const validScores = scores.filter(score => score != null && !isNaN(score));
+        const detections = validScores.filter(score => score >= scoreThreshold).length;
+        return { species, detections };
+      });
 
     // Sort by detection count and take top 6 as default
     const topSpecies = speciesDetectionCounts
@@ -358,6 +362,23 @@ function ExploreTab() {
     setSelectedSpecies(topSpecies);
     setCurrentPage(0); // Reset to first page when new data is loaded
     generateDetectionSummary(data);
+  };
+
+  // Calculate dynamic score range from all valid scores
+  const getScoreRange = () => {
+    if (!scoreData || !scoreData.scores) return { min: -10, max: 15 };
+    
+    const allValidScores = Object.values(scoreData.scores)
+      .filter(scores => Array.isArray(scores))
+      .flat()
+      .filter(score => score != null && !isNaN(score));
+    
+    if (allValidScores.length === 0) return { min: -10, max: 15 };
+    
+    return {
+      min: Math.min(...allValidScores),
+      max: Math.max(...allValidScores)
+    };
   };
 
   // Memoized filtered species list based on selection
@@ -404,16 +425,21 @@ function ExploreTab() {
     const summary = {};
 
     Object.entries(data.scores).forEach(([species, scores]) => {
-      const detections = scores.filter(score => score >= threshold);
-      const maxScore = Math.max(...scores);
-      const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+      if (!Array.isArray(scores)) {
+        console.warn(`Scores for ${species} is not an array:`, scores);
+        return;
+      }
+      
+      // Filter out NaN and null values (non-detections) and apply threshold
+      const validScores = scores.filter(score => score != null && !isNaN(score));
+      const detections = validScores.filter(score => score >= threshold);
 
       summary[species] = {
         totalClips: scores.length,
+        validClips: validScores.length,
         detections: detections.length,
-        detectionRate: (detections.length / scores.length * 100).toFixed(1),
-        maxScore: maxScore.toFixed(3),
-        avgScore: avgScore.toFixed(3),
+        detectionRate: (validScores.length / scores.length * 100).toFixed(1),
+        thresholdDetectionRate: (detections.length / scores.length * 100).toFixed(1),
         scores: scores
       };
     });
@@ -497,21 +523,47 @@ function ExploreTab() {
   };
 
   const createHistogram = (speciesName) => {
-    if (!scoreData || !scoreData.scores[speciesName]) return null;
+    if (!scoreData || !scoreData.scores || !scoreData.scores[speciesName]) return null;
 
     const scores = scoreData.scores[speciesName];
+    if (!Array.isArray(scores)) {
+      console.warn(`Scores for ${speciesName} is not an array:`, scores);
+      return null;
+    }
+    
+    // Filter out NaN and null values for histogram calculation
+    const validScores = scores.filter(score => score != null && !isNaN(score));
+    
+    if (validScores.length === 0) return null;
+    
     const bins = 20;
-    const minScore = Math.min(...scores);
-    const maxScore = Math.max(...scores);
-    const binSize = (maxScore - minScore) / bins;
+    const minScore = Math.min(...validScores);
+    const maxScore = Math.max(...validScores);
+    
+    // Handle edge case where all scores are the same
+    const binSize = maxScore === minScore ? 1 : (maxScore - minScore) / bins;
 
     const histogram = Array(bins).fill(0);
     const binClips = Array(bins).fill().map(() => []); // Store clip indices for each bin
 
     scores.forEach((score, clipIndex) => {
-      const binIndex = Math.min(Math.floor((score - minScore) / binSize), bins - 1);
-      histogram[binIndex]++;
-      binClips[binIndex].push(clipIndex);
+      if (score != null && !isNaN(score)) {
+        let binIndex;
+        if (maxScore === minScore) {
+          // All scores are the same, put everything in the first bin
+          binIndex = 0;
+        } else {
+          binIndex = Math.floor((score - minScore) / binSize);
+          // Ensure binIndex is within bounds
+          binIndex = Math.max(0, Math.min(binIndex, bins - 1));
+        }
+        
+        // Double check that binIndex is valid
+        if (binIndex >= 0 && binIndex < bins && binClips[binIndex]) {
+          histogram[binIndex]++;
+          binClips[binIndex].push(clipIndex);
+        }
+      }
     });
 
     const maxCount = Math.max(...histogram);
@@ -540,7 +592,20 @@ function ExploreTab() {
     };
 
     const getHighestScoringClip = () => {
-      const maxIndex = scores.findIndex(score => score === Math.max(...scores));
+      // Find highest valid (non-NaN, non-null) score
+      const validScores = scores.filter(score => score != null && !isNaN(score));
+      if (validScores.length === 0) {
+        return {
+          file_path: scoreData.file_info[0]?.file || 'Unknown',
+          start_time: scoreData.file_info[0]?.start_time || 0,
+          end_time: scoreData.file_info[0]?.end_time || 0,
+          species: speciesName,
+          score: 'No detections'
+        };
+      }
+      
+      const maxScore = Math.max(...validScores);
+      const maxIndex = scores.findIndex(score => score === maxScore);
       return {
         file_path: scoreData.file_info[maxIndex]?.file || 'Unknown',
         start_time: scoreData.file_info[maxIndex]?.start_time || 0,
@@ -604,13 +669,13 @@ function ExploreTab() {
       <div className="section">
         <h3>Load Detection Results</h3>
         <p className="description">
-          Load a CSV file containing detection results. The file should have species scores in columns, with
-          each row representing a clip. The first 3 coluns should be 'file', 'start_time', and 'end_time'.
-
+          Load a CSV or PKL file containing detection results. CSV files should have species scores in columns with
+          'file', 'start_time', and 'end_time' columns. PKL files should contain sparse predictions with multi-index
+          ('file', 'start_time', 'end_time') where NaN values represent non-detections.
         </p>
         <div className="button-group">
           <button onClick={handleLoadCSV} disabled={loading}>
-            {loading ? 'Loading...' : 'Load CSV File'}
+            {loading ? 'Loading...' : 'Load Predictions File'}
           </button>
           {selectedFile && (
             <span className="selected-file">
@@ -623,7 +688,7 @@ function ExploreTab() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".csv"
+          accept=".csv,.pkl"
           onChange={handleFileInputChange}
           style={{ display: 'none' }}
         />
@@ -640,7 +705,7 @@ function ExploreTab() {
             <div className="modal-content">
               <h3>Large CSV File Detected</h3>
               <p>
-                This CSV file contains <strong>{largeFileInfo.rowCount.toLocaleString()} rows</strong>, 
+                This CSV file contains <strong>{largeFileInfo.rowCount.toLocaleString()} rows</strong>,
                 which may slow down the interface.
               </p>
               <p>What would you like to do?</p>
@@ -726,8 +791,8 @@ function ExploreTab() {
               </label>
               <StyledSlider
                 size="small"
-                min={scoreData.min_score}
-                max={scoreData.max_score}
+                min={getScoreRange().min}
+                max={getScoreRange().max}
                 step={0.01}
                 value={isThresholdDragging ? tempThreshold : scoreThreshold}
                 valueLabelDisplay="auto"

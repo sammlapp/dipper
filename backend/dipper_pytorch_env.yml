@@ -9,7 +9,7 @@ dependencies:
   - pip
 
   # Core ML libraries
-  - pytorch==2.7.1 # avoids opso later changing version
+  - pytorch==2.7.1 # avoids pip install opso later changing version
   - torchvision>=0.9.0
   - torchaudio>=0.9.0
   - pandas>=1.3.0

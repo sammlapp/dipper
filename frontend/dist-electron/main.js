@@ -57,24 +57,26 @@ function getBundledPythonPath() {
 
 // Helper function to get the best way to run a Python script
 function getPythonCommand(scriptName) {
-  // Try to get PyInstaller executable first
-  const executablePath = getBundledPythonExecutable(scriptName);
+  // For the new architecture, we primarily use the lightweight_server HTTP API
+  // This function is kept for compatibility but should only be used for the server itself
   
-  if (executablePath && !executablePath.includes('python-env')) {
-    // Use PyInstaller executable
-    return {
-      command: executablePath,
-      needsScript: false
-    };
-  } else {
-    // Fallback to Python + script
-    const pythonPath = getCondaPythonPath();
-    return {
-      command: pythonPath,
-      needsScript: true,
-      scriptPath: path.join(getBackendScriptsPath(), `${scriptName}.py`)
-    };
+  if (scriptName === 'lightweight_server') {
+    const executablePath = getBundledPythonExecutable('lightweight_server');
+    if (executablePath) {
+      return {
+        command: executablePath,
+        needsScript: false
+      };
+    }
   }
+  
+  // Fall back to system Python with script path for any remaining direct script calls
+  const pythonPath = getCondaPythonPath();
+  return {
+    command: pythonPath,
+    needsScript: true,
+    scriptPath: path.join(getBackendScriptsPath(), `${scriptName}.py`)
+  };
 }
 
 // Python path detection
@@ -119,11 +121,14 @@ function getCondaPythonPath() {
   return 'python3'; // Ultimate fallback
 }
 
-function createWindow() {
+async function createWindow() {
   console.log('=== ELECTRON STARTUP ===');
   console.log('NODE_ENV:', process.env.NODE_ENV);
   console.log('isDev:', isDev);
   console.log('app.isPackaged:', app.isPackaged);
+  
+  // Start HTTP server for audio processing first
+  await startHttpServer();
   
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -150,9 +155,6 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
-
-  // Start HTTP server for audio processing
-  startHttpServer();
 }
 
 app.on('ready', createWindow);
@@ -170,34 +172,97 @@ app.on('activate', () => {
 });
 
 
+// Wait for HTTP server to be ready
+async function waitForServer(maxRetries = 30) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(`http://localhost:${HTTP_SERVER_PORT}/health`);
+      if (response.ok) {
+        console.log('HTTP server is ready!');
+        return true;
+      }
+    } catch (error) {
+      // Server not ready yet, wait and retry
+    }
+    console.log(`Waiting for HTTP server... (${i + 1}/${maxRetries})`);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+  }
+  console.error('HTTP server failed to start within timeout period');
+  return false;
+}
+
+// Check if HTTP server is already running
+async function checkServerRunning(port) {
+  return new Promise((resolve) => {
+    const http = require('http');
+    const req = http.request({
+      hostname: 'localhost',
+      port: port,
+      path: '/health',
+      method: 'GET',
+      timeout: 2000
+    }, (res) => {
+      resolve(true);
+    });
+    
+    req.on('error', () => {
+      resolve(false);
+    });
+    
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+    
+    req.end();
+  });
+}
+
 // Start HTTP server for audio processing
-function startHttpServer() {
+async function startHttpServer() {
   if (httpServerProcess) {
     console.log('HTTP server already running');
     return;
   }
+  
+  // Check if server is already running (e.g., started directly with Python)
+  const serverRunning = await checkServerRunning(HTTP_SERVER_PORT);
+  if (serverRunning) {
+    console.log(`HTTP server already running on port ${HTTP_SERVER_PORT} (external)`);
+    return;
+  }
+  
   try {
-    // Try to use PyInstaller executable first (minimal server for testing)
-    const minimalServerExecutable = getBundledPythonExecutable('minimal_server');
     let command, args;
     
-    if (minimalServerExecutable) {
-      // Use minimal PyInstaller executable for testing
-      command = minimalServerExecutable;
-      args = ['--port', HTTP_SERVER_PORT.toString()];
-      console.log(`Starting minimal HTTP server (PyInstaller): ${command} ${args.join(' ')}`);
-    } else {
-      // Fallback to Python + script
+    if (isDev) {
+      // In development, always use Python script directly for faster startup
       const pythonPath = getCondaPythonPath();
-      const serverScriptPath = path.join(getBackendScriptsPath(), 'http_server.py');
+      const serverScriptPath = path.join(process.cwd(), 'backend', 'lightweight_server.py');
       command = pythonPath;
       args = [serverScriptPath, '--port', HTTP_SERVER_PORT.toString()];
-      console.log(`Starting HTTP server (Python): ${command} ${args.join(' ')}`);
+      console.log(`Starting HTTP server (Python dev): ${command} ${args.join(' ')}`);
+    } else {
+      // In production, try PyInstaller executable first
+      const lightweightServerExecutable = getBundledPythonExecutable('lightweight_server');
+      if (lightweightServerExecutable) {
+        // Use lightweight PyInstaller executable 
+        command = lightweightServerExecutable;
+        args = ['--port', HTTP_SERVER_PORT.toString()];
+        console.log(`Starting lightweight HTTP server (PyInstaller): ${command} ${args.join(' ')}`);
+      } else {
+        // Fallback to Python + script
+        const pythonPath = getCondaPythonPath();
+        const serverScriptPath = path.join(process.cwd(), 'backend', 'lightweight_server.py');
+        command = pythonPath;
+        args = [serverScriptPath, '--port', HTTP_SERVER_PORT.toString()];
+        console.log(`Starting HTTP server (Python fallback): ${command} ${args.join(' ')}`);
+      }
     }
     
     httpServerProcess = spawn(command, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      cwd: getBackendScriptsPath()
+      cwd: path.join(process.cwd(), 'backend')
     });
     
     httpServerProcess.stdout.on('data', (data) => {
@@ -212,6 +277,10 @@ function startHttpServer() {
       console.log(`HTTP server process exited with code ${code}`);
       httpServerProcess = null;
     });
+    
+    // Wait for server to be ready
+    console.log('Waiting for HTTP server to start...');
+    await waitForServer();
     
   } catch (error) {
     console.error('Failed to start HTTP server:', error);
@@ -257,17 +326,70 @@ ipcMain.handle('select-csv-files', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
     filters: [
+      { name: 'Prediction Files', extensions: ['csv', 'pkl'] },
       { name: 'CSV Files', extensions: ['csv'] },
+      { name: 'PKL Files', extensions: ['pkl'] },
       { name: 'All Files', extensions: ['*'] }
     ]
   });
   return result.filePaths;
 });
 
+ipcMain.handle('select-text-files', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'Text Files', extensions: ['txt', 'csv'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+  return result.filePaths;
+});
+
+ipcMain.handle('select-json-files', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'JSON Files', extensions: ['json'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+  return result.filePaths;
+});
+
+ipcMain.handle('select-model-files', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+  return result.filePaths;
+});
+
+ipcMain.handle('generate-unique-folder-name', async (event, basePath, folderName) => {
+  // Generate a unique folder name by adding numeric suffix if needed
+  let uniqueName = folderName;
+  let counter = 1;
+  
+  while (fs.existsSync(path.join(basePath, uniqueName))) {
+    uniqueName = `${folderName}_${counter}`;
+    counter++;
+  }
+  
+  return uniqueName;
+});
+
 ipcMain.handle('save-file', async (event, defaultName) => {
+  // Determine file type from extension
+  const isJsonFile = defaultName && defaultName.toLowerCase().includes('.json');
+  
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName,
-    filters: [
+    filters: isJsonFile ? [
+      { name: 'JSON Files', extensions: ['json'] },
+      { name: 'All Files', extensions: ['*'] }
+    ] : [
       { name: 'CSV Files', extensions: ['csv'] },
       { name: 'All Files', extensions: ['*'] }
     ]
@@ -412,6 +534,50 @@ ipcMain.handle('write-file', async (event, filePath, content) => {
   try {
     fs.writeFileSync(filePath, content, 'utf8');
     return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Environment path management
+ipcMain.handle('get-environment-path', async (event, envName) => {
+  try {
+    const userDataPath = app.getPath('userData');
+    const envPath = path.join(userDataPath, 'envs', envName);
+    
+    // Ensure the envs directory exists
+    const envsDir = path.join(userDataPath, 'envs');
+    if (!fs.existsSync(envsDir)) {
+      fs.mkdirSync(envsDir, { recursive: true });
+    }
+    
+    return { success: true, path: envPath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-archive-path', async (event, archiveName) => {
+  try {
+    const userDataPath = app.getPath('userData');
+    const archivePath = path.join(userDataPath, 'archives', archiveName);
+    
+    // Ensure the archives directory exists
+    const archivesDir = path.join(userDataPath, 'archives');
+    if (!fs.existsSync(archivesDir)) {
+      fs.mkdirSync(archivesDir, { recursive: true });
+    }
+    
+    return { success: true, path: archivePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-user-data-path', async () => {
+  try {
+    const userDataPath = app.getPath('userData');
+    return { success: true, path: userDataPath };
   } catch (error) {
     return { success: false, error: error.message };
   }

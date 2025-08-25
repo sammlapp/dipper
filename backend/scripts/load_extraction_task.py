@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Load annotation task CSV file for the Review tab.
-This script reads a CSV file containing annotation tasks and outputs the data as JSON.
+Load extraction task CSV file for the Review tab.
+This script reads a CSV file containing extraction tasks and outputs the data as JSON.
 """
 
 import sys
@@ -25,9 +25,9 @@ def multihot_to_class_list(series, classes, threshold=0):
     return labels[labels > threshold].index.to_list()
 
 
-def load_annotation_csv(csv_path, threshold=0):
+def load_extraction_csv(csv_path, threshold=0):
     """
-    Load annotation CSV file and return clip data.
+    Load extraction CSV file and return clip data.
 
     Expected columns:
     - file: Path to audio file
@@ -242,7 +242,7 @@ def main():
     csv_path = sys.argv[1]
 
     # Load and process the CSV
-    result = load_annotation_csv(csv_path)
+    result = load_extraction_csv(csv_path)
 
     # Output JSON result to stdout
     print(json.dumps(result, indent=None, separators=(",", ":")))

@@ -326,7 +326,9 @@ ipcMain.handle('select-csv-files', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
     filters: [
+      { name: 'Prediction Files', extensions: ['csv', 'pkl'] },
       { name: 'CSV Files', extensions: ['csv'] },
+      { name: 'PKL Files', extensions: ['pkl'] },
       { name: 'All Files', extensions: ['*'] }
     ]
   });

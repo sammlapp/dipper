@@ -16,7 +16,8 @@ export const TASK_STATUS = {
 
 export const TASK_TYPE = {
   INFERENCE: 'inference',
-  TRAINING: 'training'
+  TRAINING: 'training',
+  EXTRACTION: 'extraction'
 };
 
 class TaskManager {
@@ -55,6 +56,11 @@ class TaskManager {
   }
 
   determineTaskType(config) {
+    // Check task type from config
+    if (config.task_type === 'extraction') {
+      return TASK_TYPE.EXTRACTION;
+    }
+
     // Check if config has training-specific properties
     if (config.class_list !== undefined ||
       config.fully_annotated_files !== undefined ||
@@ -155,9 +161,14 @@ class TaskManager {
       });
 
       // Execute based on task type
-      const result = task.type === TASK_TYPE.TRAINING
-        ? await this.runTraining(task)
-        : await this.runInference(task);
+      let result;
+      if (task.type === TASK_TYPE.TRAINING) {
+        result = await this.runTraining(task);
+      } else if (task.type === TASK_TYPE.EXTRACTION) {
+        result = await this.runExtraction(task);
+      } else {
+        result = await this.runInference(task);
+      }
 
       // Check if task was cancelled
       if (result && result.cancelled) {
@@ -212,7 +223,6 @@ class TaskManager {
 
       // Determine output file based on sparse threshold setting
       const isSparseOutput = config.sparse_save_threshold !== null && config.sparse_save_threshold !== undefined;
-      const outputFile = jobFolder ? `${jobFolder}/${isSparseOutput ? 'sparse_predictions.pkl' : 'predictions.csv'}` : '';
 
       const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
       const logFilePath = jobFolder ? `${jobFolder}/inference_log.txt` : '';
@@ -226,7 +236,6 @@ class TaskManager {
         file_globbing_patterns: config.file_globbing_patterns || [],
         file_list: config.file_list || '',
         output_dir: config.output_dir,
-        output_file: outputFile,
         sparse_save_threshold: config.sparse_save_threshold || null,
         job_folder: jobFolder,
         config_output_path: configJsonPath,
@@ -307,7 +316,7 @@ class TaskManager {
         if (finalResult.status === 'completed') {
           return {
             success: true,
-            output_path: configData.output_file,
+            output_dir: configData.output_dir,
             job_folder: configData.job_folder,
             config_path: configData.config_output_path,
             total_files: config.files.length || config.file_globbing_patterns.length || (config.file_list ? 1 : 0),
@@ -594,6 +603,197 @@ class TaskManager {
     });
   }
 
+  async runExtraction(task) {
+    const config = task.config;
+
+    // Generate unique process ID for this task
+    const processId = `extraction_${task.id}_${Date.now()}`;
+
+    // Update task with process ID
+    this.updateTask(task.id, { processId });
+
+    try {
+      // Update progress
+      this.updateTask(task.id, { progress: 'Preparing annotation configuration...' });
+
+      // Create job folder and output paths with unique name
+      const jobFolderName = await this.generateUniqueJobFolderName(config.output_dir, task.name);
+      const jobFolder = config.output_dir ? `${config.output_dir}/${jobFolderName}` : '';
+      const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
+      const logFilePath = jobFolder ? `${jobFolder}/annotation_log.txt` : '';
+
+      // Create temporary config file
+      const tempConfigPath = `/tmp/annotation_config_${processId}.json`;
+      const configData = {
+        predictions_folder: config.predictions_folder,
+        class_list: config.class_list || [],
+        stratification: config.stratification,
+        filtering: config.filtering,
+        extraction: config.extraction,
+        output_dir: config.output_dir,
+        export_audio_clips: config.export_audio_clips || false,
+        clip_duration: config.clip_duration || 5.0,
+        annotation_mode: config.annotation_mode || 'binary',
+        job_folder: jobFolder,
+        config_output_path: configJsonPath,
+        log_file_path: logFilePath
+      };
+
+      // Save temporary config file using HTTP API
+      const saveResponse = await fetch('http://localhost:8000/config/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config_data: configData,
+          output_path: tempConfigPath
+        })
+      });
+
+      const saveResult = await saveResponse.json();
+      if (saveResult.status !== 'success') {
+        throw new Error(`Failed to save configuration: ${saveResult.error}`);
+      }
+
+      // Update progress
+      this.updateTask(task.id, { progress: 'Setting up ML environment...' });
+
+      // Get environment paths - use custom environment if specified
+      let envPath, archivePath;
+      if (config.use_custom_python_env && config.custom_python_env_path) {
+        envPath = config.custom_python_env_path;
+        archivePath = ''; // No archive needed for custom environments
+      } else {
+        // Use default environment
+        const envPathResult = await window.electronAPI.getEnvironmentPath('dipper_pytorch_env');
+        const archivePathResult = await window.electronAPI.getArchivePath('dipper_pytorch_env.tar.gz');
+
+        if (!envPathResult.success || !archivePathResult.success) {
+          throw new Error('Failed to get environment paths');
+        }
+
+        envPath = envPathResult.path;
+        archivePath = archivePathResult.path;
+      }
+
+      // Update progress
+      this.updateTask(task.id, { progress: 'Creating annotation task...' });
+
+      // Start annotation via HTTP API (returns immediately with job ID)
+      const extractionResponse = await fetch('http://localhost:8000/extraction/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config_path: tempConfigPath,
+          env_path: envPath,
+          archive_path: archivePath,
+          job_id: processId
+        })
+      });
+
+      const startResult = await extractionResponse.json();
+
+      if (startResult.status === 'started') {
+        const jobId = startResult.job_id;
+        this.updateTask(task.id, { progress: 'Clip selection task running...', processId: jobId });
+
+        // Poll for completion
+        const finalResult = await this.pollExtractionStatus(jobId, task.id);
+
+        if (finalResult.status === 'completed') {
+          return {
+            success: true,
+            annotation_files: finalResult.annotation_files || [],
+            job_folder: configData.job_folder,
+            config_path: configData.config_output_path,
+            total_classes: configData.class_list.length,
+            message: 'Clip extraction task completed successfully',
+            job_id: jobId
+          };
+        } else if (finalResult.status === 'cancelled') {
+          return {
+            success: false,
+            cancelled: true,
+            message: 'Clip extraction task was cancelled by user',
+            job_id: jobId
+          };
+        } else {
+          // Show detailed error information
+          let errorMessage = finalResult.error || 'Clip extraction task failed';
+
+          if (finalResult.stderr) {
+            errorMessage += '\n\nError output:\n' + finalResult.stderr;
+          }
+
+          if (finalResult.stdout) {
+            errorMessage += '\n\nStandard output:\n' + finalResult.stdout;
+          }
+
+          throw new Error(errorMessage);
+        }
+      } else {
+        throw new Error(startResult.error || 'Failed to start annotation task');
+      }
+    } catch (error) {
+      throw new Error(`Clip extraction task failed: ${error.message}`);
+    }
+  }
+
+  async pollExtractionStatus(jobId, taskId, pollInterval = 2000) {
+    /**
+     * Poll extraction status until completion or failure
+     * @param {string} jobId - Backend job ID 
+     * @param {string} taskId - Frontend task ID
+     * @param {number} pollInterval - Polling interval in milliseconds
+     * @returns {Promise} Final result when extraction completes
+     */
+    return new Promise((resolve, reject) => {
+      const poll = async () => {
+        try {
+          const response = await fetch(`http://localhost:8000/extraction/status/${jobId}`);
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+
+          // Update task progress based on status
+          if (result.status === 'running') {
+            // Store system PID if available
+            const updates = { progress: 'Clip extraction task running...' };
+            if (result.system_pid) {
+              updates.systemPid = result.system_pid;
+            }
+            this.updateTask(taskId, updates);
+            // Continue polling
+            setTimeout(poll, pollInterval);
+          } else if (result.status === 'completed') {
+            this.updateTask(taskId, { progress: 'Clip extraction task completed' });
+            resolve(result);
+          } else if (result.status === 'failed') {
+            this.updateTask(taskId, { progress: 'Clip extraction task failed' });
+            resolve(result); // Resolve with failed status, let caller handle error
+          } else if (result.status === 'cancelled') {
+            this.updateTask(taskId, { progress: 'Cancelled by user' });
+            resolve(result); // Resolve with cancelled status - stop polling
+          } else {
+            // Unknown status, treat as error
+            reject(new Error(`Unknown annotation status: ${result.status}`));
+          }
+        } catch (error) {
+          reject(new Error(`Failed to check annotation status: ${error.message}`));
+        }
+      };
+
+      // Start polling
+      poll();
+    });
+  }
+
   async cancelTask(taskId) {
     const task = this.getTask(taskId);
     if (!task) return false;
@@ -602,9 +802,14 @@ class TaskManager {
       // Cancel the running process via backend API
       if (task.processId) {
         try {
-          const endpoint = task.type === TASK_TYPE.TRAINING
-            ? `http://localhost:8000/training/cancel/${task.processId}`
-            : `http://localhost:8000/inference/cancel/${task.processId}`;
+          let endpoint;
+          if (task.type === TASK_TYPE.TRAINING) {
+            endpoint = `http://localhost:8000/training/cancel/${task.processId}`;
+          } else if (task.type === TASK_TYPE.EXTRACTION) {
+            endpoint = `http://localhost:8000/extraction/cancel/${task.processId}`;
+          } else {
+            endpoint = `http://localhost:8000/inference/cancel/${task.processId}`;
+          }
 
           const response = await fetch(endpoint, {
             method: 'POST',
@@ -654,7 +859,7 @@ class TaskManager {
   async generateUniqueJobFolderName(baseDir, taskName) {
     // Clean the task name for use as folder name
     const cleanedName = taskName.replace(/[^a-zA-Z0-9\-_\s]/g, '').replace(/\s+/g, '_');
-    
+
     // Use Electron API to generate unique folder name
     if (window.electronAPI && window.electronAPI.generateUniqueFolderName) {
       try {
@@ -663,7 +868,7 @@ class TaskManager {
         console.warn('Failed to generate unique folder name via Electron API, using fallback:', error);
       }
     }
-    
+
     // Fallback: just return the cleaned name (original behavior)
     return cleanedName;
   }
@@ -674,7 +879,7 @@ class TaskManager {
     if (config.model_source === 'bmz') {
       // Use model name from BMZ config
       modelName = config.model || 'Unknown';
-    } else{
+    } else {
       modelName = "Local Model"
     }
     const timestamp = new Date().toLocaleString();
@@ -685,6 +890,12 @@ class TaskManager {
         (config.class_list ? config.class_list.split(/[,\n]/).filter(c => c.trim()).length : 0);
       const classDescription = classCount > 0 ? `${classCount} classes` : 'no classes';
       return `Training ${modelName} - ${classDescription} - ${timestamp}`;
+    } else if (taskType === TASK_TYPE.EXTRACTION) {
+      // Generate annotation task name
+      const classCount = Array.isArray(config.class_list) ? config.class_list.length : 0;
+      const classDescription = classCount > 0 ? `${classCount} classes` : 'no classes';
+      const modeDescription = config.annotation_mode === 'binary' ? 'Binary' : 'Multiclass';
+      return `Extraction ${modeDescription} - ${classDescription} - ${timestamp}`;
     } else {
       // Generate inference task names
       let fileDescription = '';

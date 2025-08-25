@@ -32,6 +32,56 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def get_last_error_from_log(log_file_path, max_lines=10):
+    """
+    Read the last few lines from a log file to extract error information.
+    Returns a brief error summary for display in the task panel.
+    """
+    if not log_file_path or not os.path.exists(log_file_path):
+        return None
+    
+    try:
+        with open(log_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+            
+        if not lines:
+            return None
+            
+        # Get last few lines to look for errors
+        last_lines = lines[-max_lines:] if len(lines) > max_lines else lines
+        
+        # Look for common error patterns
+        error_keywords = ['ERROR', 'Error', 'error', 'FAILED', 'Failed', 'failed', 
+                         'Exception', 'Traceback', 'RuntimeError', 'ValueError', 'ImportError']
+        
+        error_lines = []
+        for line in last_lines:
+            line = line.strip()
+            if any(keyword in line for keyword in error_keywords):
+                error_lines.append(line)
+        
+        if error_lines:
+            # Return the last error line, truncated if too long
+            last_error = error_lines[-1]
+            if len(last_error) > 150:
+                last_error = last_error[:147] + "..."
+            return last_error
+        else:
+            # If no explicit error found, return last non-empty line
+            for line in reversed(last_lines):
+                line = line.strip()
+                if line and len(line) > 10:  # Skip very short lines
+                    if len(line) > 150:
+                        line = line[:147] + "..."
+                    return line
+    
+    except Exception as e:
+        logger.warning(f"Could not read log file {log_file_path}: {e}")
+        return None
+    
+    return None
+
+
 # Config Management Functions
 def save_inference_config(config_data, output_path):
     """Save inference configuration to JSON file"""
@@ -280,6 +330,7 @@ def start_inference_process(job_id, config_path, env_python_path):
             "system_pid": process.pid,
             "command": " ".join(cmd),
             "message": "Inference process started successfully",
+            "log_file_path": log_file_path,
         }
 
     except Exception as e:
@@ -336,9 +387,23 @@ def check_inference_status(process, job_info=None):
                     "exit_code": return_code,
                 }
             else:
+                # Try to get the actual error from log file
+                error_message = f"Inference failed with exit code {return_code}"
+                log_file_path = None
+                
+                # Try to get log file path from job_info
+                if job_info and 'log_file_path' in job_info:
+                    log_file_path = job_info['log_file_path']
+                
+                # Try to get actual error from log file
+                if log_file_path:
+                    last_error = get_last_error_from_log(log_file_path)
+                    if last_error:
+                        error_message = f"{last_error} (see log file for full error message)"
+                
                 return {
                     "status": "failed",
-                    "error": f"Inference failed with exit code {return_code}",
+                    "error": error_message,
                     "exit_code": return_code,
                     "stdout": stdout or "Output redirected to log file",
                     "stderr": stderr or "Error output redirected to log file",
@@ -425,6 +490,91 @@ def start_training_process(job_id, config_path, env_python_path):
             "system_pid": process.pid,
             "command": " ".join(cmd),
             "message": "Training process started successfully",
+            "log_file_path": log_file_path,
+        }
+
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+def start_extraction_process(job_id, config_path, env_python_path):
+    """Start extraction process in background and return immediately"""
+    try:
+        # Resolve paths to absolute paths
+        config_path = resolve_path(config_path)
+        env_python_path = resolve_path(env_python_path)
+
+        logger.info(f"Starting extraction job {job_id} with config: {config_path}")
+        logger.info(f"Using Python environment: {env_python_path}")
+
+        # Verify environment exists
+        if not os.path.exists(env_python_path):
+            return {
+                "status": "error",
+                "error": f"Python environment not found: {env_python_path}",
+            }
+
+        # Verify config file exists
+        if not os.path.exists(config_path):
+            return {"status": "error", "error": f"Config file not found: {config_path}"}
+
+        # Load config to get log file path
+        log_file_path = None
+        try:
+            import json
+
+            with open(config_path, "r") as f:
+                config_data = json.load(f)
+                log_file_path = config_data.get("log_file_path")
+        except Exception as e:
+            logger.warning(f"Could not read log_file_path from config: {e}")
+
+        # Run create_extraction_task.py with the specified Python environment
+        extraction_script = os.path.join(
+            os.path.dirname(__file__), "scripts", "create_extraction_task.py"
+        )
+        cmd = [env_python_path, extraction_script, config_path]
+
+        logger.info(f"Running command: {' '.join(cmd)}")
+        if log_file_path:
+            logger.info(f"Redirecting output to: {log_file_path}")
+
+        # Prepare output redirection
+        if log_file_path:
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+            # Open log file for writing
+            log_file = open(log_file_path, "w")
+            stdout_target = log_file
+            stderr_target = (
+                subprocess.STDOUT
+            )  # Redirect stderr to stdout (which goes to log file)
+        else:
+            # Fallback to PIPE if no log file specified
+            stdout_target = subprocess.PIPE
+            stderr_target = subprocess.PIPE
+
+        # Start the process (non-blocking)
+        process = subprocess.Popen(
+            cmd,
+            stdout=stdout_target,
+            stderr=stderr_target,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
+
+        # Store log file handle with process if we opened one
+        if log_file_path:
+            process._log_file = log_file
+
+        return {
+            "status": "started",
+            "job_id": job_id,
+            "process": process,
+            "system_pid": process.pid,
+            "command": " ".join(cmd),
+            "message": "Extraction process started successfully",
+            "log_file_path": log_file_path,
         }
 
     except Exception as e:
@@ -478,9 +628,112 @@ def check_training_status(process, job_info=None):
                     "exit_code": return_code,
                 }
             else:
+                # Try to get the actual error from log file
+                error_message = f"Training failed with exit code {return_code}"
+                log_file_path = None
+                
+                # Try to get log file path from job_info
+                if job_info and 'log_file_path' in job_info:
+                    log_file_path = job_info['log_file_path']
+                
+                # Try to get actual error from log file
+                if log_file_path:
+                    last_error = get_last_error_from_log(log_file_path)
+                    if last_error:
+                        error_message = f"{last_error} (see log file for full error message)"
+                
                 return {
                     "status": "failed",
-                    "error": f"Training failed with exit code {return_code}",
+                    "error": error_message,
+                    "exit_code": return_code,
+                    "stdout": stdout or "Output redirected to log file",
+                    "stderr": stderr or "Error output redirected to log file",
+                }
+
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+def check_extraction_status(process, job_info=None):
+    """Check status of running extraction process"""
+    try:
+        if process is None:
+            return {"status": "error", "error": "No process to check"}
+
+        # Check if process is still running
+        return_code = process.poll()
+
+        if return_code is None:
+            # Process is still running
+            return {
+                "status": "running",
+                "message": "Extraction process is still running",
+            }
+        else:
+            # Process has completed
+            # Close log file if it was opened
+            if hasattr(process, "_log_file"):
+                try:
+                    process._log_file.close()
+                except:
+                    pass
+
+            # Get output - may be None if redirected to file
+            stdout, stderr = process.communicate()
+
+            logger.info(f"Extraction process completed with exit code: {return_code}")
+            if stdout:
+                logger.info(f"Stdout: {stdout[:500]}...")  # Log first 500 chars
+            if stderr:
+                logger.error(f"Stderr: {stderr[:500]}...")  # Log first 500 chars
+
+            # Check if job was cancelled before checking exit code
+            if job_info and job_info.get("status") == "cancelled":
+                return {
+                    "status": "cancelled",
+                    "message": "Extraction was cancelled by user",
+                    "exit_code": return_code,
+                }
+            elif return_code == 0:
+                # Try to parse extraction files from stdout if available
+                extraction_files = []
+                if stdout and "SUCCESS:" in stdout:
+                    # Extract any created files info from stdout
+                    try:
+                        lines = stdout.split("\n")
+                        for line in lines:
+                            if "extraction_task_" in line and ".csv" in line:
+                                extraction_files.append(line.strip())
+                    except:
+                        pass
+
+                return {
+                    "status": "completed",
+                    "message": "Extraction completed successfully",
+                    "output": stdout or "Output redirected to log file",
+                    "stdout": stdout or "Output redirected to log file",
+                    "stderr": stderr if stderr else "",
+                    "exit_code": return_code,
+                    "extraction_files": extraction_files,
+                }
+            else:
+                # Try to get the actual error from log file
+                error_message = f"Extraction failed with exit code {return_code}"
+                log_file_path = None
+                
+                # Try to get log file path from job_info
+                if job_info and 'log_file_path' in job_info:
+                    log_file_path = job_info['log_file_path']
+                
+                # Try to get actual error from log file
+                if log_file_path:
+                    last_error = get_last_error_from_log(log_file_path)
+                    if last_error:
+                        error_message = f"{last_error} (see log file for full error message)"
+                
+                return {
+                    "status": "failed",
+                    "error": error_message,
                     "exit_code": return_code,
                     "stdout": stdout or "Output redirected to log file",
                     "stderr": stderr or "Error output redirected to log file",
@@ -649,6 +902,24 @@ class LightweightServer:
         self.setup_routes()
         self.setup_cors()
 
+    def json_response_with_nan_handling(self, data, **kwargs):
+        """Create JSON response with proper NaN handling"""
+        import json
+        import math
+        
+        def convert_nan(obj):
+            if isinstance(obj, dict):
+                return {key: convert_nan(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_nan(item) for item in obj]
+            elif isinstance(obj, float) and math.isnan(obj):
+                return None
+            else:
+                return obj
+        
+        clean_data = convert_nan(data)
+        return web.json_response(clean_data, **kwargs)
+
     def setup_cors(self):
         """Setup CORS for frontend communication"""
         cors = cors_setup(
@@ -658,7 +929,7 @@ class LightweightServer:
                     allow_credentials=True,
                     expose_headers="*",
                     allow_headers="*",
-                    allow_methods="*",
+                    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
                 )
             },
         )
@@ -693,10 +964,21 @@ class LightweightServer:
         self.app.router.add_get("/training/status/{job_id}", self.get_training_status)
         self.app.router.add_post("/training/cancel/{job_id}", self.cancel_training)
 
+        # Extraction routes
+        self.app.router.add_post(
+            "/extraction/scan-predictions", self.scan_predictions_folder
+        )
+        self.app.router.add_post("/extraction/run", self.run_extraction)
+        self.app.router.add_get(
+            "/extraction/status/{job_id}", self.get_extraction_status
+        )
+        self.app.router.add_post("/extraction/cancel/{job_id}", self.cancel_extraction)
+
         # File counting routes
         self.app.router.add_post("/files/count-glob", self.count_files_glob)
         self.app.router.add_post("/files/count-list", self.count_files_list)
         self.app.router.add_post("/files/get-csv-columns", self.get_csv_columns)
+        self.app.router.add_post("/files/count-rows", self.count_file_rows)
 
     async def root_handler(self, request):
         """Root endpoint to handle HEAD requests from wait-on"""
@@ -717,6 +999,7 @@ class LightweightServer:
                     "env_management",
                     "inference_runner",
                     "training_runner",
+                    "extraction_runner",
                 ],
             }
         )
@@ -772,6 +1055,7 @@ class LightweightServer:
         try:
             data = await request.json()
             file_path = data.get("file_path")
+            max_rows = data.get("max_rows")
 
             if not file_path or not os.path.exists(file_path):
                 raise ValueError("Invalid file path")
@@ -780,14 +1064,46 @@ class LightweightServer:
             sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
             import load_scores as ls
 
-            # Call function
-            result = ls.load_scores_from_file(file_path)
+            # Call function with optional max_rows parameter
+            result = ls.load_scores(file_path, max_rows=max_rows)
 
-            return web.json_response(result)
+            return self.json_response_with_nan_handling(result)
 
         except Exception as e:
             logger.error(f"Error loading scores: {e}")
             return web.json_response({"error": str(e), "scores": {}}, status=500)
+
+    async def count_file_rows(self, request):
+        """Count rows in a CSV or PKL file"""
+        try:
+            data = await request.json()
+            file_path = data.get("file_path")
+
+            if not file_path:
+                return web.json_response(
+                    {"status": "error", "error": "No file_path provided"}, status=400
+                )
+
+            if not os.path.exists(file_path):
+                return web.json_response(
+                    {"status": "error", "error": f"File not found: {file_path}"},
+                    status=400,
+                )
+
+            # Import load_scores script
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
+            import load_scores as ls
+
+            # Call row count function
+            row_count = ls.count_file_rows(file_path)
+
+            return web.json_response(
+                {"status": "success", "row_count": row_count, "file_path": file_path}
+            )
+
+        except Exception as e:
+            logger.error(f"Error counting file rows: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def clip_single(self, request):
         """Process single audio clip from query parameters"""
@@ -1007,6 +1323,7 @@ class LightweightServer:
                     "system_pid": result["system_pid"],
                     "command": result["command"],
                     "started_at": asyncio.get_event_loop().time(),
+                    "log_file_path": result.get("log_file_path"),
                 }
 
                 return web.json_response(
@@ -1181,6 +1498,7 @@ class LightweightServer:
                     "command": result["command"],
                     "started_at": asyncio.get_event_loop().time(),
                     "job_type": "training",
+                    "log_file_path": result.get("log_file_path"),
                 }
 
                 return web.json_response(
@@ -1312,6 +1630,217 @@ class LightweightServer:
 
         except Exception as e:
             logger.error(f"Error in cancel_training: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    # Annotation Process Management Routes
+    async def scan_predictions_folder(self, request):
+        """Scan folder for prediction files and extract available classes"""
+        try:
+            data = await request.json()
+            folder_path = data.get("folder_path")
+
+            if not folder_path:
+                return web.json_response(
+                    {"error": "folder_path is required"}, status=400
+                )
+
+            # Import the extraction script functions
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "scripts"))
+            import create_extraction_task as cet
+
+            # Call the scan function from the extraction script
+            result = cet.scan_predictions_folder(folder_path)
+
+            return web.json_response({"status": "success", **result})
+
+        except Exception as e:
+            logger.error(f"Error scanning predictions folder: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def run_extraction(self, request):
+        """Start extraction process and return immediately with job ID"""
+        try:
+            data = await request.json()
+            config_path = data.get("config_path")
+            env_path = data.get("env_path")
+            archive_path = data.get("archive_path")
+            job_id = data.get(
+                "job_id",
+                f"extraction_job_{int(asyncio.get_event_loop().time() * 1000)}",
+            )
+
+            logger.info(f"Annotation request received:")
+            logger.info(f"  job_id: {job_id}")
+            logger.info(f"  config_path: {config_path}")
+            logger.info(f"  env_path: {env_path}")
+            logger.info(f"  archive_path: {archive_path}")
+
+            if not config_path or not env_path:
+                return web.json_response(
+                    {"error": "config_path and env_path required"}, status=400
+                )
+
+            # First check/setup environment
+            env_result = setup_environment(env_path, archive_path)
+            if env_result["status"] != "ready":
+                logger.error(f"Environment setup failed: {env_result}")
+                return web.json_response(env_result, status=500)
+
+            # Start extraction process (non-blocking)
+            result = start_extraction_process(
+                job_id, config_path, env_result["python_path"]
+            )
+
+            if result["status"] == "started":
+                # Store job info for status tracking
+                self.running_jobs[job_id] = {
+                    "process": result["process"],
+                    "status": "running",
+                    "job_id": job_id,
+                    "system_pid": result["system_pid"],
+                    "command": result["command"],
+                    "started_at": asyncio.get_event_loop().time(),
+                    "job_type": "extraction",
+                    "log_file_path": result.get("log_file_path"),
+                }
+
+                return web.json_response(
+                    {
+                        "status": "started",
+                        "job_id": job_id,
+                        "message": "Extraction started successfully. Use /extraction/status/{job_id} to check progress.",
+                    }
+                )
+            else:
+                return web.json_response(result, status=500)
+
+        except Exception as e:
+            logger.error(f"Error starting extraction: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def get_extraction_status(self, request):
+        """Get status of running extraction job"""
+        try:
+            job_id = request.match_info["job_id"]
+
+            if job_id not in self.running_jobs:
+                return web.json_response(
+                    {"status": "error", "error": f"Annotation job {job_id} not found"},
+                    status=404,
+                )
+
+            job_info = self.running_jobs[job_id]
+            process = job_info["process"]
+
+            # Check if job is already in a final state
+            if job_info["status"] in ["cancelled", "completed", "failed"]:
+                # Job is already finished, don't check process status again
+                if job_info["status"] == "cancelled":
+                    status_result = {
+                        "status": "cancelled",
+                        "message": "Job was cancelled by user",
+                    }
+                elif job_info["status"] == "completed":
+                    status_result = {
+                        "status": "completed",
+                        "message": "Annotation completed successfully",
+                        "extraction_files": job_info.get("extraction_files", []),
+                    }
+                else:  # failed
+                    status_result = {"status": "failed", "message": "Annotation failed"}
+            else:
+                # Check current status
+                status_result = check_extraction_status(process, job_info)
+
+                # Update job info
+                job_info["status"] = status_result["status"]
+
+                # Store extraction files if completed
+                if (
+                    status_result["status"] == "completed"
+                    and "extraction_files" in status_result
+                ):
+                    job_info["extraction_files"] = status_result["extraction_files"]
+
+            job_info["last_checked"] = asyncio.get_event_loop().time()
+
+            # If completed, failed, or cancelled, add final results and optionally clean up
+            if status_result["status"] in ["completed", "failed", "cancelled"]:
+                job_info.update(status_result)
+                # Keep job info for a while so frontend can retrieve results
+                # Could add cleanup logic here if needed
+
+            return web.json_response(
+                {
+                    "job_id": job_id,
+                    "system_pid": job_info.get("system_pid"),
+                    "job_type": "extraction",
+                    "started_at": job_info["started_at"],
+                    "last_checked": job_info["last_checked"],
+                    **status_result,
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error checking extraction status: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def cancel_extraction(self, request):
+        """Cancel a running extraction job"""
+        try:
+            job_id = request.match_info["job_id"]
+
+            if job_id not in self.running_jobs:
+                return web.json_response(
+                    {"status": "error", "error": f"Annotation job {job_id} not found"},
+                    status=404,
+                )
+
+            job_info = self.running_jobs[job_id]
+            process = job_info["process"]
+
+            try:
+                # Terminate the process
+                process.terminate()
+                # Give it a moment to terminate gracefully
+                import time
+
+                time.sleep(0.5)
+
+                # If still running, force kill
+                if process.poll() is None:
+                    process.kill()
+
+                # Close log file if it was opened
+                if hasattr(process, "_log_file"):
+                    try:
+                        process._log_file.close()
+                    except:
+                        pass
+
+                # Update job status
+                job_info["status"] = "cancelled"
+                job_info["cancelled_at"] = asyncio.get_event_loop().time()
+
+                logger.info(f"Annotation job {job_id} cancelled successfully")
+
+                return web.json_response(
+                    {
+                        "status": "cancelled",
+                        "job_id": job_id,
+                        "message": "Annotation job cancelled successfully",
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"Error cancelling extraction job {job_id}: {e}")
+                return web.json_response(
+                    {"status": "error", "error": f"Failed to cancel job: {str(e)}"},
+                    status=500,
+                )
+
+        except Exception as e:
+            logger.error(f"Error in cancel_extraction: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def count_files_glob(self, request):
@@ -1474,7 +2003,7 @@ class LightweightServer:
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def get_csv_columns(self, request):
-        """Get column names from a CSV file"""
+        """Get column names from a CSV or PKL file"""
         try:
             data = await request.json()
             file_path = data.get("file_path")
@@ -1486,31 +2015,37 @@ class LightweightServer:
 
             if not os.path.exists(file_path):
                 return web.json_response(
-                    {"status": "error", "error": f"CSV file not found: {file_path}"},
+                    {"status": "error", "error": f"Predictions file not found: {file_path}"},
                     status=400,
                 )
 
-            logger.info(f"Reading CSV columns from: {file_path}")
+            file_ext = os.path.splitext(file_path)[1].lower()
+            logger.info(f"Reading columns from {file_ext} file: {file_path}")
 
             try:
-                # Read just the header row to get column names
-                df = pd.read_csv(file_path, nrows=0)
-                columns = df.columns.tolist()
-
-                logger.info(f"CSV columns: {columns}")
+                if file_ext == '.pkl':
+                    # Read pickle file and get column names
+                    df = pd.read_pickle(file_path)
+                    columns = df.columns.tolist()
+                    logger.info(f"PKL columns: {columns}")
+                else:
+                    # Read just the header row to get column names for CSV
+                    df = pd.read_csv(file_path, nrows=0)
+                    columns = df.columns.tolist()
+                    logger.info(f"CSV columns: {columns}")
 
                 return web.json_response(
-                    {"status": "success", "columns": columns, "file_path": file_path}
+                    {"status": "success", "columns": columns, "file_path": file_path, "file_type": file_ext}
                 )
 
             except Exception as e:
                 return web.json_response(
-                    {"status": "error", "error": f"Failed to read CSV file: {str(e)}"},
+                    {"status": "error", "error": f"Failed to read predictions file: {str(e)}"},
                     status=400,
                 )
 
         except Exception as e:
-            logger.error(f"Error getting CSV columns: {e}")
+            logger.error(f"Error getting file columns: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def start_server(self):

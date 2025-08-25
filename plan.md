@@ -14,6 +14,9 @@ The app will be built for desktop guis on Mac, Linux, and Windows. Python enviro
 
 streamlit_inference.py is provided as a reference for understanding and porting basic functionality, but not as a final product. 
 
+## minimal changes:
+allow tasks to run on parallel if user clicks run in parallel
+
 # Build pipeline checklist
 - pyinstaller build of lightweight env is working
 - running app using pyinstaller for lightweight backend: works well
@@ -111,8 +114,95 @@ User will select an annotation task. The interface will be very similar to that 
 - any time the user changes page or goes to previous/next clip in focus mode, auto-saves if auto-save is on
 - if save location has not been set, opens a File Save As dialogue to select the file
 
+
+## requested / complete:
+
+### Extraction tab
+We will have a separate script that creates and runs the extraction task from the config file, in a background process using the pytorch python environment. 
+
+- User selects a folder containing inference outputs (predictions.csv or .pkl)
+CSVs should all have the same set of columns: 'file','start_time','end_time', then one column per class
+- User selects class list with a multi-select populated by the score file columns
+- User selects type(s) of stratification:
+The idea of stratification is that for each unique combination of each value, a fixed number of clips are chosen for annotation
+EG if you stratify by 4 date windows and subfolders (say there are 5), and you choose N=1 clip per stratification, you get 4x5x1=20 clips to review for each species. 
+  - stratify by subfolder
+  - (more types of stratification by date windows, time windows, and folder metadata to be implemented later)
+- user selects type(s) of filtering:
+  - filter by score threshold: remove any scores beneath a threshold
+  - (later we will implement date and time window filtering)
+- User selects type of extraction for each unique comination of the stratification values:
+
+  - random N clips
+  - score-bin stratified: N clips for each score bin
+      - text field allows specification for score percentile bins
+      - default: [[0,75],[75,90],[90-95],[95,100]]
+      - these values represent score percentiles, NOT raw scores
+      - percentiles should be calculated after applying the score threshold
+  - highest scoring: fixed N clips with the highest scores
+  Multiple strategies can be chosen, rather than just one. Clips selected from each
+  strategies are added to a single annotation task csv. 
+
+
+Select an output directory
+
+Check box for `export associated audio clips`
+- if selected, can specify total clip duration to extract
+- extracted clip is centered on the `start_time,end_time` interval of the selected clip. Eg for 5 seconds with start_time=10,end-time=13, select 9-14
+- clips are extracted to `output_directory/clips/`
+
+Select 'binary annotation' or 'multiclass annotation' mode:
+Binary annotation: Clicking `Run extraction task` creates one csv file per species in `out_dir/{species_name}_annotation_task_{timestamp}.csv` with columns `file,start_time,end_time,annotation,score`. 
+Multi-class annotation: Clicking `Run extraction task` creates one csv file `annotation_task_{timestamp}.csv` for all species, with same columns as loaded score files. 
+
+The contents of the 'file' column in the created csv files depends on whether audio clips are extracted:
+- if audio clips are extracted, put clips in `out_dir/clips/` and use the relative path in the file column. Start time and end time will be relative to the extracted clip. eg `"clips/clip1.wav",0,3,5.2,-1.5,...` for one of the clips. 
+- if audio clips are not extracted, keep the same `file` `start_time` and `end_time` values as the original df
+
+Extraction:
+- Clips can be efficiently extracted with `opensoundscape.Audio.from_file(file,offset=,duration=).save(clip_save_path)`
+- if the same audio clip is selected for multiple species, do not extract multiple copies of it: instead refer back to the same clip name
+- attempt to include the correct root audio dir to use for the Review tab in the config file. Correct root audio dir is output_dir if extracting audio clips, or the same root audio dir as the inference config file if not extracting clips
+
+Test out the script on /Users/SML161/Downloads/HawkEars_Embedding_-_1_files_-_7272025_10843_AM/predictions.csv
+
 # Incomplete items:
 improve paging display for review tab: should show previous specs then replace with new ones, rather than briefly showing the 'loading spectrograms' on a white page.
+
+get xeno-canto recordings for a species to supplement training data?!
+
+## Extraction improvements:
+Stratification by folder metadata (eg 'primary period', 'secondary period','site', 'treatment group')
+
+#### For stratify by folder metadata:
+user selects a csv file with `folder` column and other columns
+form populates with multi-select of the other columns
+user selects which other columns to use for stratification
+form displays the number of unique values for each selected stratification column
+
+
+#### For stratify by date window: 
+display a panel with a table of MUI date range pickers. Starts with no rows.
+Provide 'delete' buttons for each added row, and an 'add' button below the table to add a new date range. 
+Example of DateRangePicker from MUI:
+```
+import * as React from 'react';
+import { DemoContainer } from '@mui/x-date-pickers/internals/demo';
+import { LocalizationProvider } from '@mui/x-date-pickers-pro/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs';
+import { DateRangePicker } from '@mui/x-date-pickers-pro/DateRangePicker';
+
+export default function BasicDateRangePicker() {
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <DemoContainer components={['DateRangePicker']}>
+        <DateRangePicker />
+      </DemoContainer>
+    </LocalizationProvider>
+  );
+}
+```
+  
 
 ## Review tab Focus view refinements
 - the spectrogram should be resized to fit focus-spectrogram-container
@@ -178,55 +268,21 @@ within stratification bins, selection based on score:
 
 alternatively, could run backend on remote, run frontend locally, connect to backend via GUI on frontend. This seems more complicated overall because it requires more custom IPC.
 
-## Training
-Logging: now the output of train_model.py and inference.py are logged to a file in the output directory specified in the config file. We should be able to read this output log using the main backend process / task management system, to check on the status of the running job. Or in train_model.py we can write the status to a separate "status.txt" file in the output directory, or there could be another solution for task monitoring of training/inference tasks running int he background. checks this log for progress updates such as "downloading and initializing model", "loading training data", "running training"
-
-Implement a Training tab with a Configure Training Run panel and task monitoring of training runs, similar to the Inference tab and Inference task tracking system. 
-
-We will use a model configuration panel to load and save model configuration parameters to a config file. 
-
-Completed Inference tab 
-
-Config: 
-- select a model from bioacoustics model zoo
-- specify class list (comma or return delimited) in text box
-- select one or more annotation_files:
-    - fully_annotated: csvs of labeled audio for all classes with file,start_time,end_time,and col for each class. OR csv with cols: file,start_time,end_time,labels,complete (EG result of using Review tab in multi-class classification mode)
-    - single_class_annotations: csvs of clips annotated for a single species. cols: file,start_time,end_time,annotation. EG result of using Review tab in binary classification mode. For each of these, the user should specify which class was annotated from a dropdown populated with class list from above. 
-- optionally select dataframe of "background" samples
-- select root audio folder (if dataframes use relative paths)
-- optionally select an evaluation task (annotated dataframe with same format as training dfs: file,start_time,end_time,and col for each class)
-- select save location for trained model
-- training settings: batch size, N parallel preprocessing workers, freeze feature extractor (True/False), 
-
-training script example: (don't worry about the TODO's for first iteration)
-backend/scripts/train_model.py
-
-
-training form tweaks:
-- class list: put this field after annotation loading fields. If empty, automatically populate from the first file selected in fully annotated files selection, using the columns (not including the first 3: file, start_time, end_time). 
 
 ### Training wishlist
 - convert Raven annotations to training data
-- num classifier layers (default 1, options 1,2,3,4)
+- create labels from subfolder structure (wrote this in a python notebook)
+- Weldy style noise augmentation (wrote this in a python notebook)
 
 ## embedding: 
 add toggle in inference script to embed instead or in addition to classification
 
 
-# TODO fixes and tweaks
-buggy behavior of calculating species detection rates in Explore tab: the displayed contents are "1 step behind": when changing the value on the slider with click and drag, the calculated rates are actually for the previous threshold instead of the new threshold; the displayed threshold is correct rather than lagging behind. 
-
-For this score slider and for the 
-
 # updates for review tab
-- shortcuts help: add a button in the top bar with keyboard icon, when clicked displays a pop-up panel listing all keyboard shortcuts
 
 - reference frequency line not showing. To create the reference frequency line, should make the pixels maximal value at the relevant row of the spectrogram. 
 
 - there is small black line at bottom of every spectrogram, but only when resizing is enabled. Seems to be an issue with the backend spectrogram creation creating a row of zeros 
-
-- bottom status bar and top button bar: currenlty they can scroll out of view but they should always be visible. Should not be in an outer div that doesn't scroll with the content.
 
 consolidate the global theming options into a simple config or css file, so that I can make edits to the set of colors, fonts, font weights, font sizes, overall spacing values in one place for the entire app. 
 
@@ -261,7 +317,28 @@ The running task continues when the app quits.
   Potential improvements:
   - Add process ID tracking to reconnect on restart
 
+
+## Annotation task creation panel
+Improvements:
+- rename this panel from Annotation to Extract. Rename first two panels to 'Predict' and 'Train'. 
+- Review tab binary classification: check box in settings to show f"{class} : {classifier_score:0.2f}" in the clip display panel (just below audio file display position)
+- include additional columns in the exported csv for any stratification levels used (subfolder, )
+- each job should create a job folder within the user-specified output directory and store all outputs within the job folder 
+
+Implement a new tab for creating annotation tasks
+It will select subsets of clips from ML predictions.csv files, and create an annotation task from the results.
+
+- all settings are saved and can be loaded from a json config file
+
+
+
+
 ## inference tab updates:
+for completed tasks, add a button to create an annotation task
+
+Too many subfolders in job folder: after creating job folder for inference/train with unique name, should be flat file structure with config.json, logs, and any outputs such as inference predictions.csv or saved model objects. 
+
+Add a button for each task in the task manager to "load config" -> loads that task's config to the configuration form, switching to train/inference tab as appropriate. 
 
 ### wish list
 for completed tasks, add buttons to
@@ -278,7 +355,7 @@ I've implemented this in inference.py using config['sparse_save_threshold']. Upd
 - output_file of the config should be predictions.csv if sparse_save_threshold is None and sparse_predictions.pkl if the threshold is used
 
 
-- Eventually, explore tab should support loading sparse predictions, but this will require using python backend to run `sparse_df_loaded = pd.read_pickle("sparse_df.pkl")`. the sparse values are np.nan and should always be treated as non-detections. 
+- explore tab should support loading sparse predictions (.pkl) as well as csv files (.csv). This will require using python backend to run `sparse_df_loaded = pd.read_pickle("sparse_df.pkl")`. the sparse values are np.nan and should always be treated as non-detections. The unpickled df will be a dataframe with the multi-index 'file','start_time','end_time'.
 
 TODO:
 - allow setting threshold when loading an annotation task in Review mode

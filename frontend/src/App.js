@@ -17,12 +17,14 @@ import SchoolIcon from '@mui/icons-material/School';
 import ExploreIcon from '@mui/icons-material/Explore';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import HelpIcon from '@mui/icons-material/Help';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import './App.css';
 import ExploreTab from './components/ExploreTab';
 import ReviewTab from './components/ReviewTab';
 import HelpTab from './components/HelpTab';
 import TaskCreationForm from './components/TaskCreationForm';
 import TrainingTaskCreationForm from './components/TrainingTaskCreationForm';
+import ExtractionTaskCreationForm from './components/ExtractionTaskCreationForm';
 import TaskMonitor from './components/TaskMonitor';
 import taskManager from './utils/TaskManager';
 
@@ -94,6 +96,7 @@ function App() {
   const tabs = [
     { id: 'inference', name: 'Inference', icon: <PlayArrowIcon /> },
     { id: 'training', name: 'Training', icon: <SchoolIcon /> },
+    { id: 'extraction', name: 'Extraction', icon: <AssignmentIcon /> },
     { id: 'explore', name: 'Explore', icon: <ExploreIcon /> },
     { id: 'review', name: 'Review', icon: <RateReviewIcon /> },
     { id: 'help', name: 'Help', icon: <HelpIcon /> }
@@ -286,6 +289,20 @@ function App() {
 
             <div className="section">
               <h3>Training Task Management</h3>
+              <TaskMonitor taskManager={taskManager} />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'extraction' && (
+          <div className="tab-content">
+            <ExtractionTaskCreationForm
+              onTaskCreate={handleTaskCreate}
+              onTaskCreateAndRun={handleTaskCreateAndRun}
+            />
+
+            <div className="section">
+              <h3>Extraction Task Management</h3>
               <TaskMonitor taskManager={taskManager} />
             </div>
           </div>
