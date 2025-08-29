@@ -27,7 +27,7 @@ const DEFAULT_VALUES = {
     output_dir: '',
     export_audio_clips: false,
     clip_duration: 5.0,
-    annotation_mode: 'binary' // 'binary' or 'multiclass'
+    extraction_mode: 'binary' // 'binary' or 'multiclass'
   }
 };
 
@@ -186,7 +186,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           output_dir: config.output_dir,
           export_audio_clips: config.export_audio_clips,
           clip_duration: config.clip_duration,
-          extraction_mode: config.annotation_mode
+          extraction_mode: config.extraction_mode
         };
 
         const response = await fetch('http://localhost:8000/config/save', {
@@ -246,7 +246,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             output_dir: configData.output_dir || '',
             export_audio_clips: configData.export_audio_clips || false,
             clip_duration: configData.clip_duration || 5.0,
-            annotation_mode: configData.extraction_mode || configData.annotation_mode || 'binary'
+            extraction_mode: configData.extraction_mode || configData.annotation_mode || 'binary'
           }));
 
           // Re-scan predictions folder if it was loaded
@@ -606,21 +606,21 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           <div className="segmented-control">
             <button
               type="button"
-              className={`segment ${config.annotation_mode === 'binary' ? 'active' : ''}`}
-              onClick={() => setConfig(prev => ({ ...prev, annotation_mode: 'binary' }))}
+              className={`segment ${config.extraction_mode === 'binary' ? 'active' : ''}`}
+              onClick={() => setConfig(prev => ({ ...prev, extraction_mode: 'binary' }))}
             >
               Binary Annotation
             </button>
             <button
               type="button"
-              className={`segment ${config.annotation_mode === 'multiclass' ? 'active' : ''}`}
-              onClick={() => setConfig(prev => ({ ...prev, annotation_mode: 'multiclass' }))}
+              className={`segment ${config.extraction_mode === 'multiclass' ? 'active' : ''}`}
+              onClick={() => setConfig(prev => ({ ...prev, extraction_mode: 'multiclass' }))}
             >
               Multiclass Annotation
             </button>
           </div>
           <div className="help-text">
-            {config.annotation_mode === 'binary' ?
+            {config.extraction_mode === 'binary' ?
               'Creates one CSV file per species for yes/no annotation' :
               'Creates one CSV file for all species with multi-label annotation'
             }

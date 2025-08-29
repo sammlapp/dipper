@@ -217,44 +217,80 @@ def apply_filtering(
 def extract_random_clips(
     group_df: pd.DataFrame, class_list: List[str], config: Dict[str, Any]
 ) -> List[Dict]:
-    """Extract random N clips for each class"""
+    """Extract random N clips across all classes (for multiclass) or per class (for binary)"""
     extraction_config = config["extraction"]["random_clips"]
     count = extraction_config.get("count", 10)
+    extraction_mode = config.get("extraction_mode", "binary")
 
     selected_clips = []
 
-    for class_name in class_list:
-        if class_name not in group_df.columns:
-            logging.warning(f"Class {class_name} not found in data")
-            continue
+    if extraction_mode == "multiclass":
+        # For multiclass: select N clips total across all classes
+        # Get rows that have predictions for any of the selected classes
+        mask = pd.Series(False, index=group_df.index)
+        for class_name in class_list:
+            if class_name in group_df.columns:
+                mask |= group_df[class_name].notna()
 
-        # Get all predictions for this class (any positive score)
-        class_predictions = group_df[group_df[class_name] > -np.inf].copy()
+        valid_predictions = group_df[mask].copy()
 
-        if len(class_predictions) == 0:
-            logging.warning(f"No predictions found for class {class_name}")
-            continue
+        if len(valid_predictions) == 0:
+            logging.warning("No predictions found for any selected classes")
+            return selected_clips
 
-        # Sample random clips
-        n_sample = min(count, len(class_predictions))
-        sampled = class_predictions.sample(n=n_sample, random_state=42)
+        # Sample random clips across all classes
+        n_sample = min(count, len(valid_predictions))
+        sampled = valid_predictions.sample(n=n_sample, random_state=42)
 
         for _, row in sampled.iterrows():
-            selected_clips.append(
-                {
+            # Create clip data with individual class scores
+            clip_data = {
+                "file": row["file"],
+                "start_time": row["start_time"],
+                "end_time": row["end_time"],
+                "method": "random",
+            }
+
+            # Add individual class scores
+            for class_name in class_list:
+                if class_name in row:
+                    clip_data[class_name] = row[class_name]
+
+            selected_clips.append(clip_data)
+
+    else:  # binary mode
+        # For binary: select N clips per class (original behavior)
+        for class_name in class_list:
+            if class_name not in group_df.columns:
+                logging.warning(f"Class {class_name} not found in data")
+                continue
+
+            # Get all predictions for this class (any positive score)
+            class_predictions = group_df[group_df[class_name] > -np.inf].copy()
+
+            if len(class_predictions) == 0:
+                logging.warning(f"No predictions found for class {class_name}")
+                continue
+
+            # Sample random clips
+            n_sample = min(count, len(class_predictions))
+            sampled = class_predictions.sample(n=n_sample, random_state=42)
+
+            for _, row in sampled.iterrows():
+                clip_data = {
                     "file": row["file"],
                     "start_time": row["start_time"],
                     "end_time": row["end_time"],
                     "class": class_name,
-                    "score": row[class_name],
                     "method": "random",
-                    "all_scores": (
-                        row[class_list].to_dict()
-                        if all(c in row for c in class_list)
-                        else {}
-                    ),
                 }
-            )
+
+                # Add individual class scores
+                for class_name in class_list:
+                    if class_name in row:
+                        clip_data[class_name] = row[class_name]
+
+                selected_clips.append(clip_data)
 
     logging.info(f"Random extraction: selected {len(selected_clips)} clips")
     return selected_clips
@@ -269,6 +305,7 @@ def extract_score_bin_stratified(
     percentile_bins_str = extraction_config.get(
         "percentile_bins", "[[0,75],[75,90],[90,95],[95,100]]"
     )
+    extraction_mode = config.get("extraction_mode", "binary")
 
     try:
         percentile_bins = json.loads(percentile_bins_str)
@@ -308,22 +345,30 @@ def extract_score_bin_stratified(
             sampled = bin_predictions.sample(n=n_sample, random_state=42)
 
             for _, row in sampled.iterrows():
-                selected_clips.append(
-                    {
-                        "file": row["file"],
-                        "start_time": row["start_time"],
-                        "end_time": row["end_time"],
-                        "class": class_name,
-                        "score": row[class_name],
-                        "method": f"score_bin_{bin_start}-{bin_end}",
-                        "percentile_bin": [bin_start, bin_end],
-                        "all_scores": (
-                            row[class_list].to_dict()
-                            if all(c in row for c in class_list)
-                            else {}
-                        ),
-                    }
-                )
+                clip_data = {
+                    "file": row["file"],
+                    "start_time": row["start_time"],
+                    "end_time": row["end_time"],
+                    "method": f"score_bin_{bin_start}-{bin_end}",
+                    "percentile_bin": [bin_start, bin_end],
+                }
+
+                if extraction_mode == "binary":
+                    # For binary mode, keep original format
+                    clip_data["class"] = class_name
+                    clip_data["score"] = row[class_name]
+                    clip_data["all_scores"] = (
+                        row[class_list].to_dict()
+                        if all(c in row for c in class_list)
+                        else {}
+                    )
+                else:
+                    # For multiclass mode, store individual class scores directly
+                    for class_name_inner in class_list:
+                        if class_name_inner in row:
+                            clip_data[class_name_inner] = row[class_name_inner]
+
+                selected_clips.append(clip_data)
 
     logging.info(f"Score-bin extraction: selected {len(selected_clips)} clips")
     return selected_clips
@@ -335,6 +380,7 @@ def extract_highest_scoring(
     """Extract highest scoring N clips for each class"""
     extraction_config = config["extraction"]["highest_scoring"]
     count = extraction_config.get("count", 10)
+    extraction_mode = config.get("extraction_mode", "binary")
 
     selected_clips = []
 
@@ -354,21 +400,29 @@ def extract_highest_scoring(
         top_clips = class_predictions.head(n_sample)
 
         for _, row in top_clips.iterrows():
-            selected_clips.append(
-                {
-                    "file": row["file"],
-                    "start_time": row["start_time"],
-                    "end_time": row["end_time"],
-                    "class": class_name,
-                    "score": row[class_name],
-                    "method": "highest_scoring",
-                    "all_scores": (
-                        row[class_list].to_dict()
-                        if all(c in row for c in class_list)
-                        else {}
-                    ),
-                }
-            )
+            clip_data = {
+                "file": row["file"],
+                "start_time": row["start_time"],
+                "end_time": row["end_time"],
+                "method": "highest_scoring",
+            }
+
+            if extraction_mode == "binary":
+                # For binary mode, keep original format
+                clip_data["class"] = class_name
+                clip_data["score"] = row[class_name]
+                clip_data["all_scores"] = (
+                    row[class_list].to_dict()
+                    if all(c in row for c in class_list)
+                    else {}
+                )
+            else:
+                # For multiclass mode, store individual class scores directly
+                for class_name_inner in class_list:
+                    if class_name_inner in row:
+                        clip_data[class_name_inner] = row[class_name_inner]
+
+            selected_clips.append(clip_data)
 
     logging.info(f"Highest scoring extraction: selected {len(selected_clips)} clips")
     return selected_clips
@@ -516,7 +570,7 @@ def create_extraction_csvs(
     Returns:
         List of created CSV file paths
     """
-    extraction_mode = config.get("extraction_mode", "binary")
+    extraction_mode = config.get("extraction_mode")
     save_dir = Path(config["job_folder"])
 
     created_files = []
@@ -563,15 +617,19 @@ def create_extraction_csvs(
                     clip_start = clip["start_time"]
                     clip_end = clip["end_time"]
 
-                csv_data.append(
-                    {
-                        "file": file_path,
-                        "start_time": clip_start,
-                        "end_time": clip_end,
-                        "annotation": "",  # Empty for user to fill
-                        "score": clip["score"],
-                    }
-                )
+                row_data = {
+                    "file": file_path,
+                    "start_time": clip_start,
+                    "end_time": clip_end,
+                    "annotation": "",  # Empty for user to fill
+                    "score": clip.get("score", ""),
+                }
+
+                # Add subfolder column if stratification by subfolder is enabled
+                if config.get("stratification", {}).get("by_subfolder", False):
+                    row_data["subfolder"] = clip.get("group", "")
+
+                csv_data.append(row_data)
 
             # Create DataFrame and save
             df = pd.DataFrame(csv_data)
@@ -585,9 +643,16 @@ def create_extraction_csvs(
         csv_filename = f"selected_clips.csv"
         csv_path = save_dir / csv_filename
 
+        # For multiclass mode, selected_clips is a DataFrame, not a list of dicts
+        # Convert to list of dicts if needed
+        if isinstance(selected_clips, pd.DataFrame):
+            clips_list = selected_clips.to_dict("records")
+        else:
+            clips_list = selected_clips
+
         # Get all unique clips (same clip might be selected for multiple classes)
         unique_clips = {}
-        for clip in selected_clips:
+        for clip in clips_list:
             original_key = f"{clip['file']}_{clip['start_time']}_{clip['end_time']}"
             if original_key not in unique_clips:
                 unique_clips[original_key] = clip
@@ -615,12 +680,21 @@ def create_extraction_csvs(
                 clip_start = clip["start_time"]
                 clip_end = clip["end_time"]
 
-            # Create row with all class columns
+            # Create row with basic columns
             row = {"file": file_path, "start_time": clip_start, "end_time": clip_end}
 
-            # Add columns for each class (empty for user extraction)
+            # Add subfolder column if stratification by subfolder is enabled
+            if config.get("stratification", {}).get("by_subfolder", False):
+                row["subfolder"] = clip.get("group", "")
+
+            # Add columns for each class with actual scores (not empty strings)
             for class_name in all_classes:
-                row[class_name] = ""
+                if class_name in clip and clip[class_name] is not None:
+                    # Use the actual classifier score for this class
+                    row[class_name] = clip[class_name]
+                else:
+                    # Empty string for user annotation if no score available
+                    row[class_name] = ""
 
             csv_data.append(row)
 

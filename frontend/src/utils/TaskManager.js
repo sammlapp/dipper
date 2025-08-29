@@ -633,7 +633,7 @@ class TaskManager {
         output_dir: config.output_dir,
         export_audio_clips: config.export_audio_clips || false,
         clip_duration: config.clip_duration || 5.0,
-        annotation_mode: config.annotation_mode || 'binary',
+        extraction_mode: config.extraction_mode || 'binary',
         job_folder: jobFolder,
         config_output_path: configJsonPath,
         log_file_path: logFilePath
@@ -894,7 +894,7 @@ class TaskManager {
       // Generate annotation task name
       const classCount = Array.isArray(config.class_list) ? config.class_list.length : 0;
       const classDescription = classCount > 0 ? `${classCount} classes` : 'no classes';
-      const modeDescription = config.annotation_mode === 'binary' ? 'Binary' : 'Multiclass';
+      const modeDescription = config.extraction_mode === 'binary' ? 'Binary' : 'Multiclass';
       return `Extraction ${modeDescription} - ${classDescription} - ${timestamp}`;
     } else {
       // Generate inference task names

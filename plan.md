@@ -115,7 +115,25 @@ User will select an annotation task. The interface will be very similar to that 
 - if save location has not been set, opens a File Save As dialogue to select the file
 
 
-## requested / complete:
+# requested / complete:
+
+## clip extraction / annotation task creation
+
+from a "wizard" or from Explore tab
+
+start by creating or providing a table of audio file | location | start_timestamp | end timestamp
+
+filter to:
+- dates
+- times of day
+
+stratification by: metadata columns, date
+
+within stratification bins, selection based on score:
+- score range / threshold -> random sample
+- stratified score bins -> random sample
+- score-weighted or z-score weighted sampling
+- highest scoring N clips
 
 ### Extraction tab
 We will have a separate script that creates and runs the extraction task from the config file, in a background process using the pytorch python environment. 
@@ -166,10 +184,20 @@ Extraction:
 
 Test out the script on /Users/SML161/Downloads/HawkEars_Embedding_-_1_files_-_7272025_10843_AM/predictions.csv
 
-# Incomplete items:
+# Incomplete items / TODO /feature request
+
+## general feature request list 
+
 improve paging display for review tab: should show previous specs then replace with new ones, rather than briefly showing the 'loading spectrograms' on a white page.
 
 get xeno-canto recordings for a species to supplement training data?!
+
+
+potentially allow parallel as well as sequential tasks
+
+denoising and/or bandpassing for audio playback / review
+
+wandb integration with training & inference for logging progress and model evaluation: login on global settings page, specify user/project/run name/notes in configuration panel; if used, provide link to wandb page in task panels
 
 ## Extraction improvements:
 Stratification by folder metadata (eg 'primary period', 'secondary period','site', 'treatment group')
@@ -204,14 +232,6 @@ export default function BasicDateRangePicker() {
 ```
   
 
-## Review tab Focus view refinements
-- the spectrogram should be resized to fit focus-spectrogram-container
-- default size should be the size that focus-spectrogram-container currently defaults to (most of page width)
-- instead of specifying size in pixels for focus view settings, user can select 'large' 'medium' or 'small', and the focus-spectrogram-container is sized according to the page (large: takes up the whole available width)
-
-## Review tab grid view updates:
-- resizing is not working properly, because the spectrogram is sometimes not fully displayed in the panel. The spectrogram should always fit within the displayed panel. 
-
 ## app-wide updates
 - the multi-selects for filtering should use the same type of selector as the annotation panels, react-select
 
@@ -219,40 +239,12 @@ review tab "undo" functionality? I think this would require tracking the full-pa
 
 toolbar in review tab: if too wide for current window, should float the tools onto another line like line-wrapping in a textbox. 
 
-# feature requests and TODO
 
-Inference and training tabs: at the end of the form, add a checkbox to run a small test job on a subset of clips/files. 
-
-potentially allow parallel as well as sequential tasks
-
-denoising and/or bandpassing for audio playback / review
-
-wandb integration with training & inference for logging progress and model evaluation: login on global settings page, specify user/project/run name/notes in configuration panel; if used, provide link to wandb page in task panels
-
-# HAWKEARS Low band is broken in v0.12.0: 
+## HAWKEARS Low band is broken in v0.12.0: 
 need to update BMZ version then update dependency
 
 ## rewind
 - throughout the application, when providing click-to-play spectrograms, make it so that clicking on the left 20% of the spectrogram rewinds the clip to the beginning instead of performing the play/pause action. Show a rewind icon when hovering over the left 20% of the spectrogram. 
-
-## create inference or annotation tasks via filtering and stratification: 
-from a "wizard" or from Explore tab
-
-start by creating or providing a table of audio file | location | start_timestamp | end timestamp
-
-filter to:
-- dates
-- times of day
-
-stratification by: metadata columns, date
-
-within stratification bins, selection based on score:
-- score range / threshold -> random sample
-- stratified score bins -> random sample
-- score-weighted or z-score weighted sampling
-- highest scoring N clips
-
-## preprocessing "wizard"
 
 ## Remote mode
 - install on a remote machine accessed via SSH
@@ -273,10 +265,12 @@ alternatively, could run backend on remote, run frontend locally, connect to bac
 - convert Raven annotations to training data
 - create labels from subfolder structure (wrote this in a python notebook)
 - Weldy style noise augmentation (wrote this in a python notebook)
+- preprocessing "wizard": started notebook for prototype
 
 ## embedding: 
 add toggle in inference script to embed instead or in addition to classification
 
+## HOPLITE embedding, query, and shallow classification
 
 # updates for review tab
 
@@ -318,20 +312,16 @@ The running task continues when the app quits.
   - Add process ID tracking to reconnect on restart
 
 
-## Annotation task creation panel
-Improvements:
-- rename this panel from Annotation to Extract. Rename first two panels to 'Predict' and 'Train'. 
-- Review tab binary classification: check box in settings to show f"{class} : {classifier_score:0.2f}" in the clip display panel (just below audio file display position)
-- include additional columns in the exported csv for any stratification levels used (subfolder, )
-- each job should create a job folder within the user-specified output directory and store all outputs within the job folder 
+## Annotation task creation panel Improvements:
+- Review tab binary classification: check box in settings to show f"Score : {row['score']:0.2f}" in the clip display panel (just below audio file display position)
 
-Implement a new tab for creating annotation tasks
-It will select subsets of clips from ML predictions.csv files, and create an annotation task from the results.
-
-- all settings are saved and can be loaded from a json config file
-
-
-
+## Classifier-guided listening
+annotation pane: if using early stopping mode:
+- annotation csv has column for 'group name': combines any stratification eg by date window, point name
+- create a state variable tracking group_name:status, where status is (a) 'unverified candidate detection' (>=1 clips in group, no verified detections, >=1 unannotated or uncertain clips), (b) 'verified detection' (>=1 yes annotation), (c) 'verified non-detection' (all clips in group labeled no), or (d) 'no candidate detection'. 
+- filter to clips in groups with status 'unverified candidate detection'
+- order clips by group
+- display group in clip panel
 
 ## inference tab updates:
 for completed tasks, add a button to create an annotation task
@@ -340,7 +330,7 @@ Too many subfolders in job folder: after creating job folder for inference/train
 
 Add a button for each task in the task manager to "load config" -> loads that task's config to the configuration form, switching to train/inference tab as appropriate. 
 
-### wish list
+
 for completed tasks, add buttons to
 - open results in Explore tab
 - create annotation task (we need to implement a wizard/panel for this)
