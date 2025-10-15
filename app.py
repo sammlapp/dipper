@@ -10,7 +10,6 @@ import json
 import asyncio
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-import threading
 
 from nicegui import ui, app, events
 import numpy as np
@@ -20,10 +19,6 @@ import pandas as pd
 backend_scripts_path = Path(__file__).parent / 'backend' / 'scripts'
 sys.path.insert(0, str(backend_scripts_path))
 
-# Add backend to path
-backend_path = Path(__file__).parent / 'backend'
-sys.path.insert(0, str(backend_path))
-
 # Import tabs
 from tabs.inference_tab import InferenceTab
 from tabs.training_tab import TrainingTab
@@ -31,27 +26,6 @@ from tabs.extraction_tab import ExtractionTab
 from tabs.explore_tab import ExploreTab
 from tabs.review_tab import ReviewTab
 from tabs.help_tab import HelpTab
-
-
-def start_backend_server():
-    """Start the backend lightweight server in a separate thread"""
-    try:
-        from backend.lightweight_server import LightweightServer
-        import logging
-        
-        # Configure logging for backend server
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        
-        server = LightweightServer(port=8000)
-        print('Starting backend server on port 8000...')
-        asyncio.run(server.start_server())
-    except Exception as e:
-        print(f'Error starting backend server: {e}')
-        import traceback
-        traceback.print_exc()
 
 
 class BioacousticsApp:
@@ -123,14 +97,6 @@ def index():
 
 
 if __name__ in {"__main__", "__mp_main__"}:
-    # Start backend server in a separate thread
-    backend_thread = threading.Thread(target=start_backend_server, daemon=True)
-    backend_thread.start()
-    
-    # Give backend server time to start
-    import time
-    time.sleep(2)
-    
     # Run the app
     ui.run(
         title='Bioacoustics Training GUI',

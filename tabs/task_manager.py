@@ -1,12 +1,13 @@
-"""Task Management for NiceGUI App"""
+"""Task Management for NiceGUI App - Direct Subprocess Execution"""
 
 import asyncio
 import json
 import uuid
+import subprocess
+import threading
 from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
-import httpx
 from nicegui import ui
 
 
@@ -21,14 +22,13 @@ class TaskStatus:
 
 
 class TaskManager:
-    """Manages inference/training/extraction tasks"""
+    """Manages inference/training/extraction tasks via direct subprocess execution"""
     
-    def __init__(self, server_url='http://localhost:8000'):
-        self.server_url = server_url
+    def __init__(self):
         self.tasks: Dict[str, dict] = {}
         self.current_task = None
         self.queue = []
-        self.monitoring_task = None
+        self.processes: Dict[str, subprocess.Popen] = {}
         
     def create_task(self, task_type: str, config: dict, name: str = None) -> dict:
         """Create a new task"""
@@ -102,7 +102,7 @@ class TaskManager:
         await self.execute_task(task_id)
     
     async def execute_task(self, task_id: str):
-        """Execute a task"""
+        """Execute a task via subprocess"""
         task = self.get_task(task_id)
         if not task:
             return
@@ -123,6 +123,9 @@ class TaskManager:
                 await self.run_extraction(task)
             
         except Exception as e:
+            print(f'Task execution error: {e}')
+            import traceback
+            traceback.print_exc()
             self.update_task(task_id, {
                 'status': TaskStatus.FAILED,
                 'completed': datetime.now().isoformat(),
@@ -135,25 +138,24 @@ class TaskManager:
             await self.process_queue()
     
     async def run_inference(self, task: dict):
-        """Run inference task"""
+        """Run inference task via direct subprocess"""
         config = task['config']
         
         # Create job folder name
         job_folder_name = f"{task['name']}_{task['id'][:8]}"
-        job_folder = f"{config.get('output_dir', '/tmp')}/{job_folder_name}"
+        output_dir = config.get('output_dir', '/tmp')
+        job_folder = Path(output_dir) / job_folder_name
+        job_folder.mkdir(parents=True, exist_ok=True)
         
-        # Prepare config for backend
-        backend_config = {
+        # Prepare config for inference script
+        inference_config = {
             'model_source': config.get('model_source', 'bmz'),
             'model': config.get('model', 'BirdSetEfficientNetB1'),
             'files': config.get('files', []),
             'file_globbing_patterns': config.get('file_globbing_patterns', []),
             'file_list': config.get('file_list', ''),
-            'output_dir': config.get('output_dir', ''),
+            'output_dir': str(job_folder),
             'sparse_save_threshold': config.get('sparse_save_threshold'),
-            'job_folder': job_folder,
-            'config_output_path': f'{job_folder}/{task["name"]}_config.json',
-            'log_file_path': f'{job_folder}/inference_log.txt',
             'split_by_subfolder': config.get('split_by_subfolder', False),
             'subset_size': config.get('subset_size') if config.get('testing_mode_enabled') else None,
             'inference_settings': {
@@ -163,148 +165,165 @@ class TaskManager:
             }
         }
         
+        # Save config file
+        config_path = job_folder / f'{task["name"]}_config.json'
+        config_path.write_text(json.dumps(inference_config, indent=2))
+        
+        # Log file path
+        log_file_path = job_folder / 'inference_log.txt'
+        
         # Determine Python environment
         if config.get('use_custom_python_env') and config.get('custom_python_env_path'):
-            python_env = config['custom_python_env_path']
+            python_path = Path(config['custom_python_env_path'])
+            if python_path.is_dir():
+                # If it's a directory, assume it's a conda/venv environment
+                python_exe = python_path / 'bin' / 'python'
+            else:
+                python_exe = python_path
         else:
-            python_env = '/usr/bin/python3'  # Default system Python
+            python_exe = Path('/usr/bin/python3')  # Default system Python
+        
+        # Path to inference script
+        script_path = Path(__file__).parent.parent / 'backend' / 'scripts' / 'inference.py'
         
         try:
-            # Save config to temp file
-            temp_config_path = f'/tmp/inference_config_{task["id"]}.json'
-            Path(temp_config_path).write_text(json.dumps(backend_config, indent=2))
+            # Build command
+            cmd = [str(python_exe), str(script_path), '--config', str(config_path)]
             
-            # Start inference via backend server
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f'{self.server_url}/inference/run',
-                    json={
-                        'job_id': task['id'],
-                        'config_path': temp_config_path,
-                        'python_env_path': python_env
-                    }
-                )
-                
-                result = response.json()
-                
-                if result.get('status') == 'started':
+            print(f'Starting inference task: {" ".join(cmd)}')
+            
+            # Start subprocess
+            log_file = open(log_file_path, 'w')
+            process = subprocess.Popen(
+                cmd,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=str(script_path.parent)
+            )
+            
+            # Store process
+            self.processes[task['id']] = process
+            
+            self.update_task(task['id'], {
+                'system_pid': process.pid,
+                'progress': f'Running inference (PID: {process.pid})...',
+                'log_file': str(log_file_path)
+            })
+            
+            # Monitor process in background thread
+            def monitor_process():
+                try:
+                    return_code = process.wait()
+                    log_file.close()
+                    
+                    if return_code == 0:
+                        self.update_task(task['id'], {
+                            'status': TaskStatus.COMPLETED,
+                            'completed': datetime.now().isoformat(),
+                            'progress': 'Completed successfully',
+                            'result': {'exit_code': return_code}
+                        })
+                        ui.notify(f'Task "{task["name"]}" completed successfully', type='positive')
+                    else:
+                        # Read last lines of log file for error
+                        try:
+                            with open(log_file_path, 'r') as f:
+                                log_lines = f.readlines()
+                                error_msg = ''.join(log_lines[-10:]) if log_lines else f'Exit code: {return_code}'
+                        except:
+                            error_msg = f'Exit code: {return_code}'
+                        
+                        self.update_task(task['id'], {
+                            'status': TaskStatus.FAILED,
+                            'completed': datetime.now().isoformat(),
+                            'progress': 'Failed',
+                            'result': {'error': error_msg, 'exit_code': return_code}
+                        })
+                        ui.notify(f'Task "{task["name"]}" failed', type='negative')
+                    
+                    # Remove from processes dict
+                    if task['id'] in self.processes:
+                        del self.processes[task['id']]
+                    
+                except Exception as e:
+                    print(f'Error monitoring process: {e}')
                     self.update_task(task['id'], {
-                        'job_id': result.get('job_id'),
-                        'system_pid': result.get('system_pid'),
-                        'progress': 'Inference running...'
+                        'status': TaskStatus.FAILED,
+                        'completed': datetime.now().isoformat(),
+                        'progress': 'Failed',
+                        'result': {'error': str(e)}
                     })
-                    
-                    # Start monitoring
-                    await self.monitor_task(task['id'], 'inference')
-                else:
-                    raise Exception(result.get('error', 'Failed to start inference'))
-                    
+            
+            # Start monitoring thread
+            monitor_thread = threading.Thread(target=monitor_process, daemon=True)
+            monitor_thread.start()
+            
         except Exception as e:
+            print(f'Failed to start inference: {e}')
+            import traceback
+            traceback.print_exc()
             self.update_task(task['id'], {
                 'status': TaskStatus.FAILED,
                 'completed': datetime.now().isoformat(),
-                'progress': 'Failed',
+                'progress': 'Failed to start',
                 'result': {'error': str(e)}
             })
+            raise
     
     async def run_training(self, task: dict):
         """Run training task"""
-        # Similar to run_inference but for training
+        # TODO: Implement training similar to inference
         ui.notify('Training not yet implemented', type='warning')
+        self.update_task(task['id'], {
+            'status': TaskStatus.FAILED,
+            'completed': datetime.now().isoformat(),
+            'progress': 'Not implemented',
+            'result': {'error': 'Training not yet implemented'}
+        })
     
     async def run_extraction(self, task: dict):
         """Run extraction task"""
-        # Similar to run_inference but for extraction
+        # TODO: Implement extraction similar to inference
         ui.notify('Extraction not yet implemented', type='warning')
-    
-    async def monitor_task(self, task_id: str, task_type: str):
-        """Monitor task status"""
-        task = self.get_task(task_id)
-        if not task or not task.get('job_id'):
-            return
-        
-        endpoint = f'/{task_type}/status'
-        max_attempts = 3600  # 1 hour max (checking every second)
-        attempt = 0
-        
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                while attempt < max_attempts:
-                    if task['status'] in [TaskStatus.CANCELLED, TaskStatus.COMPLETED, TaskStatus.FAILED]:
-                        break
-                    
-                    try:
-                        response = await client.get(
-                            f'{self.server_url}{endpoint}',
-                            params={'job_id': task['job_id']}
-                        )
-                        
-                        result = response.json()
-                        status = result.get('status')
-                        
-                        if status == 'running':
-                            self.update_task(task_id, {
-                                'progress': result.get('message', 'Running...')
-                            })
-                        elif status == 'completed':
-                            self.update_task(task_id, {
-                                'status': TaskStatus.COMPLETED,
-                                'completed': datetime.now().isoformat(),
-                                'progress': 'Completed successfully',
-                                'result': result
-                            })
-                            break
-                        elif status in ['failed', 'error']:
-                            self.update_task(task_id, {
-                                'status': TaskStatus.FAILED,
-                                'completed': datetime.now().isoformat(),
-                                'progress': 'Failed',
-                                'result': result
-                            })
-                            break
-                        elif status == 'cancelled':
-                            self.update_task(task_id, {
-                                'status': TaskStatus.CANCELLED,
-                                'completed': datetime.now().isoformat(),
-                                'progress': 'Cancelled',
-                                'result': result
-                            })
-                            break
-                        
-                    except Exception as e:
-                        print(f'Error monitoring task: {e}')
-                    
-                    await asyncio.sleep(1)
-                    attempt += 1
-                    
-        except Exception as e:
-            print(f'Monitor task error: {e}')
+        self.update_task(task['id'], {
+            'status': TaskStatus.FAILED,
+            'completed': datetime.now().isoformat(),
+            'progress': 'Not implemented',
+            'result': {'error': 'Extraction not yet implemented'}
+        })
     
     async def cancel_task(self, task_id: str):
-        """Cancel a running task"""
+        """Cancel a running task by terminating the subprocess"""
         task = self.get_task(task_id)
-        if not task or not task.get('job_id'):
+        if not task:
             return False
         
-        try:
-            endpoint = f'/{task["type"]}/cancel'
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(
-                    f'{self.server_url}{endpoint}',
-                    json={'job_id': task['job_id']}
-                )
+        # Get the process
+        process = self.processes.get(task_id)
+        if process and process.poll() is None:  # Process is still running
+            try:
+                process.terminate()
+                # Give it a moment to terminate gracefully
+                await asyncio.sleep(0.5)
+                if process.poll() is None:
+                    # Force kill if still running
+                    process.kill()
                 
-                result = response.json()
-                if result.get('status') == 'cancelled':
-                    self.update_task(task_id, {
-                        'status': TaskStatus.CANCELLED,
-                        'completed': datetime.now().isoformat(),
-                        'progress': 'Cancelled by user'
-                    })
-                    return True
-                    
-        except Exception as e:
-            print(f'Cancel task error: {e}')
+                self.update_task(task_id, {
+                    'status': TaskStatus.CANCELLED,
+                    'completed': datetime.now().isoformat(),
+                    'progress': 'Cancelled by user'
+                })
+                
+                if task_id in self.processes:
+                    del self.processes[task_id]
+                
+                ui.notify(f'Task "{task["name"]}" cancelled', type='warning')
+                return True
+            except Exception as e:
+                print(f'Error cancelling task: {e}')
+                return False
         
         return False
     

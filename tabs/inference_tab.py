@@ -623,6 +623,8 @@ class InferenceTab:
                                 ui.label(f"Status: {task['status']}").classes(f'text-{status_color}-500 text-caption')
                                 if task['progress']:
                                     ui.label(task['progress']).classes('text-caption')
+                                if task.get('system_pid'):
+                                    ui.label(f"PID: {task['system_pid']}").classes('text-caption text-gray-500')
                             
                             if task['status'] == TaskStatus.RUNNING:
                                 ui.button(
