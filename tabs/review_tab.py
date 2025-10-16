@@ -196,7 +196,7 @@ class FocusViewClip:
     """Focus view component for reviewing a single large clip"""
     
     def __init__(self, clip_data: dict, on_annotation_change, on_next, on_prev, 
-                 review_mode='binary', show_comments=False, available_classes=None):
+                 review_mode='binary', show_comments=False, available_classes=None, spectrogram_settings=None):
         self.clip_data = clip_data
         self.on_annotation_change = on_annotation_change
         self.on_next = on_next
@@ -204,12 +204,14 @@ class FocusViewClip:
         self.review_mode = review_mode
         self.show_comments = show_comments
         self.available_classes = available_classes or []
+        self.spectrogram_settings = spectrogram_settings or {}
         
         self.spectrogram_base64 = None
         self.audio_base64 = None
         self.audio_element = None
         self.annotation = clip_data.get('annotation', 'unlabeled')
         self.comment = clip_data.get('comments', '')
+        self.is_loaded = False
         
         # UI elements
         self.spec_container = None
@@ -227,8 +229,11 @@ class FocusViewClip:
             
             # Container for spectrogram
             with ui.column().classes('w-full items-center') as self.spec_container:
-                if not self.spectrogram_base64:
-                    ui.button('Load Clip', icon='play_circle', on_click=self.load_clip).classes('mb-4')
+                # Auto-load on render (no manual Load button) - same as grid mode
+                if not self.is_loaded:
+                    ui.label('Loading...').classes('text-caption text-gray-500')
+                    # Auto-load after render
+                    ui.timer(0.1, self.load_clip, once=True)
                 else:
                     self._render_spectrogram()
             
@@ -308,22 +313,28 @@ class FocusViewClip:
     def load_clip(self):
         """Load the audio clip and spectrogram"""
         try:
+            # Merge default settings with spectrogram settings
+            settings = {
+                'image_width': 900,
+                'image_height': 400,
+                **self.spectrogram_settings
+            }
+            
             spec_base64, audio_base64, sr = create_spectrogram(
                 self.clip_data.get('file'),
                 self.clip_data.get('start_time', 0),
                 self.clip_data.get('end_time', 3),
-                settings={'image_width': 900, 'image_height': 400}
+                settings=settings
             )
             
             self.spectrogram_base64 = spec_base64
             self.audio_base64 = audio_base64
+            self.is_loaded = True
             
             # Clear the container and re-render
             self.spec_container.clear()
             with self.spec_container:
                 self._render_spectrogram()
-            
-            ui.notify('Clip loaded - click to play', type='positive')
             
         except Exception as e:
             ui.notify(f'Error loading clip: {e}', type='negative')
@@ -375,6 +386,7 @@ class ReviewTab:
     
     def __init__(self):
         self.data: Optional[pd.DataFrame] = None
+        self.filtered_data: Optional[pd.DataFrame] = None  # Filtered subset
         self.current_index = 0
         self.current_page = 0
         self.review_mode = 'binary'
@@ -387,6 +399,11 @@ class ReviewTab:
         self.settings_drawer_open = False
         self.loaded_file_path = None
         
+        # Filtering settings
+        self.filter_enabled = False
+        self.filter_annotations = []  # List of annotations to filter (e.g., ['yes', 'no'])
+        self.filter_labels = []  # List of labels to filter (multiclass)
+        
         # Spectrogram settings (matching ReviewSettings.js)
         self.spec_window_size = 512
         self.spectrogram_colormap = 'viridis'
@@ -397,6 +414,9 @@ class ReviewTab:
         self.resize_images = True
         self.image_width = 400
         self.image_height = 200
+        
+        # Save status indicator
+        self.save_status_badge = None
         
     def render(self):
         """Render the review tab UI"""
@@ -424,11 +444,18 @@ class ReviewTab:
                     
                     ui.space()
                     
+                    # Save status indicator
+                    self.save_status_badge = ui.badge('Unsaved', color='warning').props('outline').bind_visibility_from(self, 'annotations_changed')
+                    saved_badge = ui.badge('Saved', color='positive').props('outline')
+                    saved_badge.bind_visibility_from(self, 'annotations_changed', lambda changed: not changed)
+                    
+                    ui.space()
+                    
                     # Progress indicator
                     if self.view_mode == 'focus':
                         ui.label().bind_text_from(
                             self, 'current_index',
-                            lambda i: f'Clip {i + 1} of {len(self.data) if self.data is not None else 0}'
+                            lambda i: f'Clip {i + 1} of {len(self.get_display_data()) if self.get_display_data() is not None else 0}'
                         ).classes('text-h6')
                     else:
                         ui.label().bind_text_from(
@@ -441,6 +468,21 @@ class ReviewTab:
                     # Settings toggle
                     ui.button(icon='settings', on_click=self.toggle_settings).props('flat')
                     ui.button('Save', icon='save', on_click=self.save_annotations).props('color=primary')
+                
+                # Bulk annotation controls (grid mode only)
+                with ui.card().classes('w-full p-2 mb-4').bind_visibility_from(self, 'view_mode', lambda mode: mode == 'grid'):
+                    ui.label('Bulk Annotations').classes('text-subtitle2 mb-2')
+                    with ui.row().classes('w-full gap-2'):
+                        ui.label('Mark all on page:').classes('text-caption')
+                        ui.button('Yes', icon='check', on_click=lambda: self.bulk_annotate_page('yes')).props('size=sm color=positive flat')
+                        ui.button('No', icon='close', on_click=lambda: self.bulk_annotate_page('no')).props('size=sm color=negative flat')
+                        ui.button('Uncertain', on_click=lambda: self.bulk_annotate_page('uncertain')).props('size=sm color=warning flat')
+                        ui.button('Unlabeled', on_click=lambda: self.bulk_annotate_page('unlabeled')).props('size=sm flat')
+                    with ui.row().classes('w-full gap-2 mt-2'):
+                        ui.label('Mark unlabeled on page:').classes('text-caption')
+                        ui.button('Yes', icon='check', on_click=lambda: self.bulk_annotate_unlabeled('yes')).props('size=sm color=positive flat')
+                        ui.button('No', icon='close', on_click=lambda: self.bulk_annotate_unlabeled('no')).props('size=sm color=negative flat')
+                        ui.button('Uncertain', on_click=lambda: self.bulk_annotate_unlabeled('uncertain')).props('size=sm color=warning flat')
                 
                 # Content container
                 self.content_container = ui.column().classes('w-full')
@@ -463,6 +505,33 @@ class ReviewTab:
                     ).bind_value(self, 'review_mode').classes('w-full mb-2')
                     
                     ui.checkbox('Show Comments Field', value=False).bind_value(self, 'show_comments').classes('mb-2')
+                
+                # Filtering settings
+                with ui.expansion('Filters', icon='filter_alt', value=False).classes('w-full mb-2'):
+                    ui.checkbox('Enable Filtering', value=False).bind_value(self, 'filter_enabled').classes('mb-2')
+                    
+                    # Binary annotation filter
+                    with ui.column().classes('w-full').bind_visibility_from(self, 'review_mode', lambda mode: mode == 'binary'):
+                        ui.label('Filter by Annotation:').classes('text-caption mb-1')
+                        ui.select(
+                            options=['yes', 'no', 'uncertain', 'unlabeled'],
+                            label='Annotations to show',
+                            multiple=True,
+                            value=[]
+                        ).bind_value(self, 'filter_annotations').classes('w-full mb-2')
+                    
+                    # Multiclass label filter
+                    with ui.column().classes('w-full').bind_visibility_from(self, 'review_mode', lambda mode: mode == 'multiclass'):
+                        ui.label('Filter by Labels:').classes('text-caption mb-1')
+                        ui.select(
+                            options=[],
+                            label='Labels to show',
+                            multiple=True,
+                            value=[]
+                        ).bind_value(self, 'filter_labels').classes('w-full mb-2').bind_options_from(self, 'available_classes')
+                    
+                    ui.button('Apply Filters', icon='filter_list', on_click=self.apply_filters).props('color=primary flat').classes('w-full')
+                    ui.button('Clear Filters', icon='filter_alt_off', on_click=self.clear_filters).props('flat').classes('w-full')
                 
                 # Grid layout settings
                 with ui.expansion('Grid Layout', icon='grid_view', value=True).classes('w-full mb-2'):
@@ -590,10 +659,11 @@ class ReviewTab:
     
     def get_total_pages(self):
         """Get total number of pages for grid view"""
-        if self.data is None:
+        display_data = self.get_display_data()
+        if display_data is None:
             return 0
         items_per_page = self.grid_rows * self.grid_columns
-        return max(1, (len(self.data) + items_per_page - 1) // items_per_page)
+        return max(1, (len(display_data) + items_per_page - 1) // items_per_page)
     
     def load_annotation_file(self):
         """Load annotation file"""
@@ -642,7 +712,8 @@ class ReviewTab:
     
     def render_content(self):
         """Render the main content area based on view mode"""
-        if self.data is None or len(self.data) == 0:
+        display_data = self.get_display_data()
+        if display_data is None or len(display_data) == 0:
             return
         
         self.content_container.clear()
@@ -655,36 +726,49 @@ class ReviewTab:
     
     def render_grid_view(self):
         """Render grid view with multiple clips"""
+        display_data = self.get_display_data()
         items_per_page = self.grid_rows * self.grid_columns
         start_idx = self.current_page * items_per_page
-        end_idx = min(start_idx + items_per_page, len(self.data))
+        end_idx = min(start_idx + items_per_page, len(display_data))
         
-        page_data = self.data.iloc[start_idx:end_idx]
+        page_data = display_data.iloc[start_idx:end_idx]
         
-        # Grid layout
-        grid_html = f'grid-cols-{self.grid_columns} gap-4'
-        with ui.grid(columns=self.grid_columns).classes('w-full gap-4'):
-            for idx, (_, row) in enumerate(page_data.iterrows()):
-                clip_data = {
-                    'file': row.get('file', ''),
-                    'start_time': row.get('start_time', 0),
-                    'end_time': row.get('end_time', 3),
-                    'annotation': row.get('annotation', 'unlabeled'),
-                    'labels': row.get('labels', ''),
-                    'comments': row.get('comments', ''),
-                    'species': row.get('species', row.get('class', 'Unknown'))
-                }
-                
-                card = ClickableSpectrogramCard(
-                    clip_data,
-                    start_idx + idx,
-                    self.update_annotation,
-                    self.review_mode,
-                    self.show_comments,
-                    self.available_classes,
-                    self.get_spectrogram_settings()
-                )
-                card.render()
+        # Grid layout - properly handle dynamic columns
+        with ui.column().classes('w-full'):
+            # Create rows manually to avoid NiceGUI grid issues with dynamic columns
+            for row_idx in range(self.grid_rows):
+                with ui.row().classes('w-full gap-4'):
+                    for col_idx in range(self.grid_columns):
+                        global_idx = row_idx * self.grid_columns + col_idx
+                        if global_idx < len(page_data):
+                            row_data = page_data.iloc[global_idx]
+                            original_idx = page_data.index[global_idx]
+                            
+                            clip_data = {
+                                'file': row_data.get('file', ''),
+                                'start_time': row_data.get('start_time', 0),
+                                'end_time': row_data.get('end_time', 3),
+                                'annotation': row_data.get('annotation', 'unlabeled'),
+                                'labels': row_data.get('labels', ''),
+                                'comments': row_data.get('comments', ''),
+                                'species': row_data.get('species', row_data.get('class', 'Unknown'))
+                            }
+                            
+                            # Use a container to control width
+                            with ui.column().classes('flex-grow'):
+                                card = ClickableSpectrogramCard(
+                                    clip_data,
+                                    original_idx,
+                                    self.update_annotation,
+                                    self.review_mode,
+                                    self.show_comments,
+                                    self.available_classes,
+                                    self.get_spectrogram_settings()
+                                )
+                                card.render()
+                        else:
+                            # Empty space for incomplete rows
+                            ui.column().classes('flex-grow')
         
         # Pagination controls
         with ui.row().classes('w-full justify-center gap-4 mt-4'):
@@ -707,28 +791,32 @@ class ReviewTab:
     
     def render_focus_view(self):
         """Render focus view with single large clip"""
-        if self.current_index >= len(self.data):
+        display_data = self.get_display_data()
+        if self.current_index >= len(display_data):
             self.current_index = 0
         
-        row = self.data.iloc[self.current_index]
+        row_data = display_data.iloc[self.current_index]
+        original_idx = display_data.index[self.current_index]
+        
         clip_data = {
-            'file': row.get('file', ''),
-            'start_time': row.get('start_time', 0),
-            'end_time': row.get('end_time', 3),
-            'annotation': row.get('annotation', 'unlabeled'),
-            'labels': row.get('labels', ''),
-            'comments': row.get('comments', ''),
-            'species': row.get('species', row.get('class', 'Unknown'))
+            'file': row_data.get('file', ''),
+            'start_time': row_data.get('start_time', 0),
+            'end_time': row_data.get('end_time', 3),
+            'annotation': row_data.get('annotation', 'unlabeled'),
+            'labels': row_data.get('labels', ''),
+            'comments': row_data.get('comments', ''),
+            'species': row_data.get('species', row_data.get('class', 'Unknown'))
         }
         
         focus_view = FocusViewClip(
             clip_data,
-            on_annotation_change=lambda v: self.update_annotation(self.current_index, v),
+            on_annotation_change=lambda v: self.update_annotation(original_idx, v),
             on_next=self.next_clip,
             on_prev=self.prev_clip,
             review_mode=self.review_mode,
             show_comments=self.show_comments,
-            available_classes=self.available_classes
+            available_classes=self.available_classes,
+            spectrogram_settings=self.get_spectrogram_settings()
         )
         focus_view.render()
     
@@ -742,13 +830,14 @@ class ReviewTab:
     
     def next_clip(self):
         """Go to next clip (focus mode)"""
-        if self.data is not None and self.current_index < len(self.data) - 1:
+        display_data = self.get_display_data()
+        if display_data is not None and self.current_index < len(display_data) - 1:
             self.current_index += 1
             self.render_content()
     
     def prev_clip(self):
         """Go to previous clip (focus mode)"""
-        if self.data is not None and self.current_index > 0:
+        if self.current_index > 0:
             self.current_index -= 1
             self.render_content()
     
@@ -763,6 +852,108 @@ class ReviewTab:
         if self.current_page > 0:
             self.current_page -= 1
             self.render_content()
+    
+    def get_display_data(self):
+        """Get the data to display (filtered or all)"""
+        if self.filter_enabled and self.filtered_data is not None:
+            return self.filtered_data
+        return self.data
+    
+    def apply_filters(self):
+        """Apply filters to the data"""
+        if self.data is None:
+            return
+        
+        if not self.filter_enabled:
+            self.filtered_data = None
+            self.current_page = 0
+            self.current_index = 0
+            self.render_content()
+            ui.notify('Filters disabled', type='info')
+            return
+        
+        # Start with all data
+        filtered = self.data.copy()
+        
+        if self.review_mode == 'binary' and self.filter_annotations:
+            # Filter by annotation values
+            filtered = filtered[filtered['annotation'].isin(self.filter_annotations)]
+        elif self.review_mode == 'multiclass' and self.filter_labels:
+            # Filter by labels (check if any of the clip's labels match)
+            import json
+            def has_matching_label(labels_str):
+                if not labels_str:
+                    return False
+                try:
+                    if isinstance(labels_str, str):
+                        labels = json.loads(labels_str) if labels_str.startswith('[') else labels_str.split(',')
+                    else:
+                        labels = labels_str
+                    return any(label.strip() in self.filter_labels for label in labels)
+                except:
+                    return False
+            
+            filtered = filtered[filtered['labels'].apply(has_matching_label)]
+        
+        self.filtered_data = filtered
+        self.current_page = 0
+        self.current_index = 0
+        self.render_content()
+        ui.notify(f'Filters applied - showing {len(filtered)} of {len(self.data)} clips', type='positive')
+    
+    def clear_filters(self):
+        """Clear all filters"""
+        self.filter_enabled = False
+        self.filter_annotations = []
+        self.filter_labels = []
+        self.filtered_data = None
+        self.current_page = 0
+        self.current_index = 0
+        self.render_content()
+        ui.notify('Filters cleared', type='info')
+    
+    def bulk_annotate_page(self, annotation: str):
+        """Annotate all clips on current page"""
+        if self.data is None:
+            return
+        
+        display_data = self.get_display_data()
+        items_per_page = self.grid_rows * self.grid_columns
+        start_idx = self.current_page * items_per_page
+        end_idx = min(start_idx + items_per_page, len(display_data))
+        
+        # Update annotations for all clips on page
+        count = 0
+        for i in range(start_idx, end_idx):
+            original_idx = display_data.index[i]
+            self.data.at[original_idx, 'annotation'] = annotation
+            count += 1
+        
+        self.annotations_changed = True
+        self.render_content()
+        ui.notify(f'Marked {count} clips as {annotation}', type='positive')
+    
+    def bulk_annotate_unlabeled(self, annotation: str):
+        """Annotate only unlabeled clips on current page"""
+        if self.data is None:
+            return
+        
+        display_data = self.get_display_data()
+        items_per_page = self.grid_rows * self.grid_columns
+        start_idx = self.current_page * items_per_page
+        end_idx = min(start_idx + items_per_page, len(display_data))
+        
+        # Update annotations for unlabeled clips on page
+        count = 0
+        for i in range(start_idx, end_idx):
+            original_idx = display_data.index[i]
+            if self.data.at[original_idx, 'annotation'] == 'unlabeled':
+                self.data.at[original_idx, 'annotation'] = annotation
+                count += 1
+        
+        self.annotations_changed = True
+        self.render_content()
+        ui.notify(f'Marked {count} unlabeled clips as {annotation}', type='positive')
     
     def save_annotations(self):
         """Save annotations to file"""
