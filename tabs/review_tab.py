@@ -11,13 +11,14 @@ class ClickableSpectrogramCard:
     """A card with clickable spectrogram and annotation controls"""
     
     def __init__(self, clip_data: dict, index: int, on_annotation_change, review_mode='binary', 
-                 show_comments=False, available_classes=None):
+                 show_comments=False, available_classes=None, spectrogram_settings=None):
         self.clip_data = clip_data
         self.index = index
         self.on_annotation_change = on_annotation_change
         self.review_mode = review_mode
         self.show_comments = show_comments
         self.available_classes = available_classes or []
+        self.spectrogram_settings = spectrogram_settings or {}
         
         self.spectrogram_base64 = None
         self.audio_base64 = None
@@ -30,6 +31,7 @@ class ClickableSpectrogramCard:
         self.card_container = None
         self.annotation_badge = None
         self.label_select = None
+        self.spec_container = None
         
     def render(self):
         """Render the spectrogram card"""
@@ -44,8 +46,11 @@ class ClickableSpectrogramCard:
             
             # Container for spectrogram that will be updated
             with ui.column().classes('w-full mt-2') as self.spec_container:
+                # Auto-load on render (no manual Load button)
                 if not self.is_loaded:
-                    ui.button('Load', icon='play_circle', on_click=self.load_clip).classes('w-full')
+                    ui.label('Loading...').classes('text-caption text-gray-500')
+                    # Auto-load after render
+                    ui.timer(0.1, self.load_clip, once=True)
                 else:
                     self._render_spectrogram()
             
@@ -108,11 +113,18 @@ class ClickableSpectrogramCard:
     def load_clip(self):
         """Load the audio clip and spectrogram"""
         try:
+            # Merge default settings with spectrogram settings
+            settings = {
+                'image_width': 400,
+                'image_height': 200,
+                **self.spectrogram_settings
+            }
+            
             spec_base64, audio_base64, sr = create_spectrogram(
                 self.clip_data.get('file'),
                 self.clip_data.get('start_time', 0),
                 self.clip_data.get('end_time', 3),
-                settings={'image_width': 400, 'image_height': 200}
+                settings=settings
             )
             
             self.spectrogram_base64 = spec_base64
@@ -373,6 +385,18 @@ class ReviewTab:
         self.available_classes = []
         self.annotations_changed = False
         self.settings_drawer_open = False
+        self.loaded_file_path = None
+        
+        # Spectrogram settings (matching ReviewSettings.js)
+        self.spec_window_size = 512
+        self.spectrogram_colormap = 'viridis'
+        self.dB_range = [-80, -20]
+        self.use_bandpass = False
+        self.bandpass_range = [500, 8000]
+        self.normalize_audio = True
+        self.resize_images = True
+        self.image_width = 400
+        self.image_height = 200
         
     def render(self):
         """Render the review tab UI"""
@@ -423,33 +447,116 @@ class ReviewTab:
                 with self.content_container:
                     ui.label('Load a file to start reviewing').classes('text-caption text-gray-500')
             
-            # Settings drawer (collapsible side panel)
-            with ui.column().classes('w-80 p-4 bg-gray-100').bind_visibility_from(self, 'settings_drawer_open'):
-                ui.label('Display Settings').classes('text-h6 mb-4')
+            # Settings drawer (collapsible side panel with all settings)
+            with ui.column().classes('w-96 p-4 bg-gray-100 overflow-y-auto').bind_visibility_from(self, 'settings_drawer_open'):
+                with ui.row().classes('w-full items-center mb-4'):
+                    ui.label('Settings').classes('text-h5')
+                    ui.space()
+                    ui.button(icon='close', on_click=self.toggle_settings).props('flat dense')
                 
-                ui.select(
-                    ['binary', 'multiclass'],
-                    label='Review Mode',
-                    value='binary'
-                ).bind_value(self, 'review_mode').classes('w-full mb-2')
+                # Review mode settings
+                with ui.expansion('Review Mode', icon='assignment', value=True).classes('w-full mb-2'):
+                    ui.select(
+                        ['binary', 'multiclass'],
+                        label='Review Mode',
+                        value='binary'
+                    ).bind_value(self, 'review_mode').classes('w-full mb-2')
+                    
+                    ui.checkbox('Show Comments Field', value=False).bind_value(self, 'show_comments').classes('mb-2')
                 
-                ui.number(
-                    label='Grid Rows',
-                    value=3,
-                    min=1,
-                    max=10
-                ).bind_value(self, 'grid_rows').classes('w-full mb-2')
+                # Grid layout settings
+                with ui.expansion('Grid Layout', icon='grid_view', value=True).classes('w-full mb-2'):
+                    ui.number(
+                        label='Grid Rows',
+                        value=3,
+                        min=1,
+                        max=10
+                    ).bind_value(self, 'grid_rows').classes('w-full mb-2')
+                    
+                    ui.number(
+                        label='Grid Columns',
+                        value=4,
+                        min=1,
+                        max=6
+                    ).bind_value(self, 'grid_columns').classes('w-full mb-2')
                 
-                ui.number(
-                    label='Grid Columns',
-                    value=4,
-                    min=1,
-                    max=6
-                ).bind_value(self, 'grid_columns').classes('w-full mb-2')
+                # Spectrogram settings
+                with ui.expansion('Spectrogram Settings', icon='graphic_eq', value=False).classes('w-full mb-2'):
+                    ui.number(
+                        label='Window Size',
+                        value=512,
+                        min=128,
+                        max=2048,
+                        step=128
+                    ).bind_value(self, 'spec_window_size').classes('w-full mb-2')
+                    
+                    ui.select(
+                        options=['viridis', 'plasma', 'inferno', 'magma', 'greys_r', 'greys', 'hot', 'cool'],
+                        label='Colormap',
+                        value='viridis'
+                    ).bind_value(self, 'spectrogram_colormap').classes('w-full mb-2')
+                    
+                    with ui.row().classes('w-full gap-2'):
+                        ui.number(
+                            label='dB Min',
+                            value=-80,
+                            min=-120,
+                            max=0
+                        ).bind_value(self, 'dB_range', forward=lambda v: [v, self.dB_range[1]], 
+                                    backward=lambda r: r[0]).classes('flex-1')
+                        
+                        ui.number(
+                            label='dB Max',
+                            value=-20,
+                            min=-80,
+                            max=0
+                        ).bind_value(self, 'dB_range', forward=lambda v: [self.dB_range[0], v],
+                                    backward=lambda r: r[1]).classes('flex-1')
+                    
+                    ui.checkbox('Use Bandpass Filter', value=False).bind_value(self, 'use_bandpass').classes('mb-2')
+                    
+                    with ui.row().classes('w-full gap-2').bind_visibility_from(self, 'use_bandpass'):
+                        ui.number(
+                            label='Low (Hz)',
+                            value=500,
+                            min=0,
+                            max=20000
+                        ).bind_value(self, 'bandpass_range', forward=lambda v: [v, self.bandpass_range[1]],
+                                    backward=lambda r: r[0]).classes('flex-1')
+                        
+                        ui.number(
+                            label='High (Hz)',
+                            value=8000,
+                            min=0,
+                            max=20000
+                        ).bind_value(self, 'bandpass_range', forward=lambda v: [self.bandpass_range[0], v],
+                                    backward=lambda r: r[1]).classes('flex-1')
+                    
+                    ui.checkbox('Normalize Audio', value=True).bind_value(self, 'normalize_audio').classes('mb-2')
                 
-                ui.checkbox('Show Comments', value=False).bind_value(self, 'show_comments').classes('mb-2')
+                # Image size settings
+                with ui.expansion('Image Size', icon='photo_size_select_large', value=False).classes('w-full mb-2'):
+                    ui.checkbox('Resize Images', value=True).bind_value(self, 'resize_images').classes('mb-2')
+                    
+                    with ui.row().classes('w-full gap-2').bind_visibility_from(self, 'resize_images'):
+                        ui.number(
+                            label='Width',
+                            value=400,
+                            min=200,
+                            max=1200
+                        ).bind_value(self, 'image_width').classes('flex-1')
+                        
+                        ui.number(
+                            label='Height',
+                            value=200,
+                            min=100,
+                            max=600
+                        ).bind_value(self, 'image_height').classes('flex-1')
                 
-                ui.button('Apply', icon='check', on_click=self.apply_settings).props('color=primary').classes('w-full')
+                # Apply and reset buttons
+                with ui.row().classes('w-full gap-2 mt-4'):
+                    ui.button('Apply Settings', icon='check', on_click=self.apply_settings).props('color=primary').classes('flex-1')
+                    ui.button('Reset', icon='refresh', on_click=self.reset_settings).props('flat').classes('flex-1')
     
     def toggle_settings(self):
         """Toggle settings drawer"""
@@ -463,7 +570,23 @@ class ReviewTab:
     def apply_settings(self):
         """Apply settings and re-render"""
         self.render_content()
-        ui.notify('Settings applied', type='positive')
+        ui.notify('Settings applied - re-rendering spectrograms', type='positive')
+    
+    def reset_settings(self):
+        """Reset settings to defaults"""
+        self.spec_window_size = 512
+        self.spectrogram_colormap = 'viridis'
+        self.dB_range = [-80, -20]
+        self.use_bandpass = False
+        self.bandpass_range = [500, 8000]
+        self.normalize_audio = True
+        self.resize_images = True
+        self.image_width = 400
+        self.image_height = 200
+        self.grid_rows = 3
+        self.grid_columns = 4
+        self.show_comments = False
+        ui.notify('Settings reset to defaults', type='info')
     
     def get_total_pages(self):
         """Get total number of pages for grid view"""
@@ -478,6 +601,7 @@ class ReviewTab:
         
         try:
             self.data = pd.read_csv(file_path)
+            self.loaded_file_path = file_path
             ui.notify(f'Loaded {len(self.data)} clips for review', type='positive')
             
             # Initialize annotations if not present
@@ -489,6 +613,8 @@ class ReviewTab:
             # Extract available classes for multiclass mode
             if 'species' in self.data.columns:
                 self.available_classes = sorted(self.data['species'].dropna().unique().tolist())
+            elif 'class' in self.data.columns:
+                self.available_classes = sorted(self.data['class'].dropna().unique().tolist())
             
             # Start with first clip/page
             self.current_index = 0
@@ -497,6 +623,22 @@ class ReviewTab:
             
         except Exception as e:
             ui.notify(f'Error loading file: {e}', type='negative')
+            import traceback
+            print(f"Error loading annotation file: {traceback.format_exc()}")
+    
+    def get_spectrogram_settings(self):
+        """Get current spectrogram settings as dict"""
+        return {
+            'spec_window_size': self.spec_window_size,
+            'spectrogram_colormap': self.spectrogram_colormap,
+            'dB_range': self.dB_range,
+            'use_bandpass': self.use_bandpass,
+            'bandpass_range': self.bandpass_range,
+            'normalize_audio': self.normalize_audio,
+            'resize_images': self.resize_images,
+            'image_width': self.image_width,
+            'image_height': self.image_height
+        }
     
     def render_content(self):
         """Render the main content area based on view mode"""
@@ -539,7 +681,8 @@ class ReviewTab:
                     self.update_annotation,
                     self.review_mode,
                     self.show_comments,
-                    self.available_classes
+                    self.available_classes,
+                    self.get_spectrogram_settings()
                 )
                 card.render()
         
@@ -624,10 +767,27 @@ class ReviewTab:
     def save_annotations(self):
         """Save annotations to file"""
         if self.data is None:
+            ui.notify('No data to save', type='warning')
             return
         
-        # Save to same file with _annotated suffix
-        output_path = Path('annotations_reviewed.csv')
-        self.data.to_csv(output_path, index=False)
-        ui.notify(f'Annotations saved to {output_path}', type='positive')
-        self.annotations_changed = False
+        try:
+            # Determine output path
+            if self.loaded_file_path:
+                # Save with _annotated suffix next to original file
+                input_path = Path(self.loaded_file_path)
+                output_path = input_path.parent / f"{input_path.stem}_annotated{input_path.suffix}"
+            else:
+                # Default name
+                output_path = Path('annotations_reviewed.csv')
+            
+            # Save to CSV
+            self.data.to_csv(output_path, index=False)
+            ui.notify(f'✓ Annotations saved to {output_path.name}', type='positive')
+            self.annotations_changed = False
+            
+            print(f"Saved annotations to: {output_path}")
+            
+        except Exception as e:
+            ui.notify(f'Error saving annotations: {e}', type='negative')
+            import traceback
+            print(f"Error saving annotations: {traceback.format_exc()}")
