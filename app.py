@@ -102,6 +102,6 @@ if __name__ in {"__main__", "__mp_main__"}:
         title="Bioacoustics Training GUI",
         port=8080,
         reload=False,
-        native=True,
+        native=False,  # Use web browser mode (native mode requires pywebview)
         show=False,  # Don't auto-open browser in headless env
     )

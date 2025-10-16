@@ -685,45 +685,69 @@ class InferenceTab:
         # Filter to only show inference tasks
         inference_tasks = [t for t in tasks if t["type"] == "inference"]
 
-        # Only show running and queued tasks
-        active_tasks = [
-            t
-            for t in inference_tasks
-            if t["status"] in [TaskStatus.RUNNING, TaskStatus.QUEUED]
-        ]
-
         self.task_container.clear()
 
         with self.task_container:
-            if not active_tasks:
-                ui.label("No active tasks").classes("text-caption text-gray-500")
+            if not inference_tasks:
+                ui.label("No tasks").classes("text-caption text-gray-500")
             else:
-                for task in active_tasks:
-                    with ui.card().classes("w-full p-2 mb-2"):
+                for task in inference_tasks:
+                    # Determine card and status colors based on status
+                    status_colors = {
+                        TaskStatus.UNSTARTED: ("grey", "grey-3"),
+                        TaskStatus.QUEUED: ("purple", "purple-1"),
+                        TaskStatus.RUNNING: ("blue", "blue-1"),
+                        TaskStatus.COMPLETED: ("green", "green-1"),
+                        TaskStatus.FAILED: ("red", "red-1"),
+                        TaskStatus.CANCELLED: ("orange", "orange-1"),
+                    }
+                    text_color, bg_color = status_colors.get(
+                        task["status"], ("grey", "grey-3")
+                    )
+
+                    with ui.card().classes(f"w-full p-2 mb-2 bg-{bg_color}"):
                         with ui.row().classes("w-full items-center justify-between"):
-                            with ui.column().classes("gap-1"):
+                            with ui.column().classes("gap-1 flex-grow"):
                                 ui.label(task["name"]).classes("font-bold")
-                                status_color = (
-                                    "blue"
-                                    if task["status"] == TaskStatus.RUNNING
-                                    else "purple"
-                                )
                                 ui.label(f"Status: {task['status']}").classes(
-                                    f"text-{status_color}-500 text-caption"
+                                    f"text-{text_color}-700 text-caption font-bold"
                                 )
                                 if task["progress"]:
                                     ui.label(task["progress"]).classes("text-caption")
                                 if task.get("system_pid"):
                                     ui.label(f"PID: {task['system_pid']}").classes(
-                                        "text-caption text-gray-500"
+                                        "text-caption text-gray-700"
+                                    )
+                                # Show job folder for completed tasks
+                                if task["status"] == TaskStatus.COMPLETED and task.get(
+                                    "job_folder"
+                                ):
+                                    ui.label(f"Results: {task['job_folder']}").classes(
+                                        "text-caption text-gray-700 font-mono"
                                     )
 
-                            if task["status"] == TaskStatus.RUNNING:
-                                ui.button(
-                                    "Cancel",
-                                    icon="cancel",
-                                    on_click=lambda t=task: self.cancel_task(t["id"]),
-                                ).props("flat color=negative size=sm")
+                            # Action buttons based on status
+                            with ui.column().classes("gap-1"):
+                                if task["status"] == TaskStatus.UNSTARTED:
+                                    ui.button(
+                                        "Start",
+                                        icon="play_arrow",
+                                        on_click=lambda t=task: self.start_task(t["id"]),
+                                    ).props("flat color=positive size=sm")
+                                elif task["status"] == TaskStatus.RUNNING:
+                                    ui.button(
+                                        "Cancel",
+                                        icon="cancel",
+                                        on_click=lambda t=task: self.cancel_task(
+                                            t["id"]
+                                        ),
+                                    ).props("flat color=negative size=sm")
+
+    async def start_task(self, task_id: str):
+        """Start an unstarted task"""
+        await self.task_manager.queue_task(task_id)
+        self.update_task_display()
+        ui.notify("Task started", type="positive")
 
     async def cancel_task(self, task_id: str):
         """Cancel a running task"""

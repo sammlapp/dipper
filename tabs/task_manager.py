@@ -156,6 +156,12 @@ class TaskManager:
         job_folder.mkdir(parents=True, exist_ok=True)
 
         # Prepare config for inference script
+        # Handle sparse_save_threshold: "none" when disabled, otherwise the numeric value
+        if config.get("sparse_outputs_enabled", False):
+            sparse_threshold = config.get("sparse_save_threshold", -3.0)
+        else:
+            sparse_threshold = "none"
+        
         inference_config = {
             "model_source": config.get("model_source", "bmz"),
             "mode": "classification",  # 'classification', 'embed_to_hoplite', and 'classify_from_hoplite'
@@ -164,7 +170,7 @@ class TaskManager:
             "file_globbing_patterns": config.get("file_globbing_patterns", []),
             "file_list": config.get("file_list", ""),
             "job_folder": str(job_folder),
-            "sparse_save_threshold": config.get("sparse_save_threshold"),
+            "sparse_save_threshold": sparse_threshold,
             "split_by_subfolder": config.get("split_by_subfolder", False),
             "subset_size": (
                 config.get("subset_size")
@@ -231,6 +237,7 @@ class TaskManager:
                     "system_pid": process.pid,
                     "progress": f"Running inference (PID: {process.pid})...",
                     "log_file": str(log_file_path),
+                    "job_folder": str(job_folder),
                 },
             )
 
