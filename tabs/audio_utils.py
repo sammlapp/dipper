@@ -25,7 +25,7 @@ def create_spectrogram(
     if settings is None:
         settings = {
             "spec_window_size": 512,
-            "spectrogram_colormap": "Greys_r",
+            "spectrogram_colormap": "Greys",
             "dB_range": [-80, -20],
             "use_bandpass": False,
             "bandpass_range": [500, 8000],
@@ -71,7 +71,7 @@ def create_spectrogram(
     spec_image_base64 = spec_to_image(
         spectrogram,
         range=settings.get("dB_range", [-80, -20]),
-        colormap=settings.get("spectrogram_colormap", "Greys_r"),
+        colormap=settings.get("spectrogram_colormap", "Greys"),
         shape=(settings.get("image_height", 200), settings.get("image_width", 400)),
     )
 
@@ -84,7 +84,7 @@ def create_spectrogram(
 def spec_to_image(
     spectrogram: np.ndarray,
     range: list = None,
-    colormap: str = "Greys_r",
+    colormap: str = "Greys",
     channels: int = 3,
     shape: tuple = None,
 ) -> str:
