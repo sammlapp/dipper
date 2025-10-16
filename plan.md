@@ -14,6 +14,35 @@ The app will be built for desktop guis on Mac, Linux, and Windows. Python enviro
 
 streamlit_inference.py is provided as a reference for understanding and porting basic functionality, but not as a final product. 
 
+## TODOs for NiceGUI version
+
+Inference:
+- implement embed to hoplite db
+- native file system integration when not in browser mode? 
+- fix default python environment set up / usage
+- add progress monitoring to task pane; the inference output log's last line has a percentage from tqdm
+- improve config load/save: currently doesn't allow user to specify a file
+
+Inference Tab:
+- completed/failed/canceled/unstarted tasks should display in the tasks panel, not just running tasks (color code these)
+- the "create task" button should create a task in the task pane with a button to Start the task
+- completed tasks should show the job_folder in their task pane panel
+- if Save sparse outputs is not checked, the config should have sparse_threshold:none so that the inference script knows not to use the sparse thresholding approach
+
+Review Tab:
+- in multiclass mode, need to be able to modify the class list (return-delimited text field)
+- settings panel displays at bottom of page when in grid mode. Should always display on the right side, extends over top of the grid layout 
+- bug in display layout: sometimes an audio clip panel renders as full width instead of within the grid layout
+- implement keyboard shortcuts: 
+    focus mode: ASDF yes/no/uncertain/unlabeled, J/K prev/next clip, spacebar play/pause, ESC to switch to grid mode
+    grid mode: P/N previous/next page, ESC to switch to Focus mode, Shift+A/S/D/F annotate all on page
+- in settings, add checkbox for auto-play in focus mode and implement this functionality
+- in focus mode, if in binary annotation mode: when an annotation is selected, automatically advance to next clip
+- in focus mode, comments are not saving/persisting after switching clips and coming back 
+
+App layout
+- move tab navigation to a narrow left bar with icons
+
 ## minimal changes:
 allow tasks to run on parallel if user clicks run in parallel
 
