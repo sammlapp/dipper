@@ -329,7 +329,7 @@ def main():
         logger.info("Loading and initializing model from configuration")
         model = load_model(config_data, logger)
 
-        logger.info(f"Output directory: {config_data.get('output_dir')}")
+        logger.info(f"Saving outputs to: {config_data.get('job_folder')}")
 
         # missing_files = [f for f in files if not os.path.exists(f)]
         # if missing_files:

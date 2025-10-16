@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
-import Select from 'react-select';
+import { Autocomplete, TextField, Box } from '@mui/material';
 // import { useRenderProfiler } from './PerformanceProfiler';
 
 const AnnotationCard = memo(function AnnotationCard({
@@ -94,8 +94,7 @@ const AnnotationCard = memo(function AnnotationCard({
   // Parse annotation based on review mode
   const getAnnotationValue = () => {
     if (reviewMode === 'binary') {
-      // Return the actual annotation value, or null for unlabeled
-      return annotation || null;
+      return annotation || 'unlabeled';
     } else {
       // Multi-class: use labels column instead of annotation column
       const labelsToUse = labels || '';
@@ -143,15 +142,8 @@ const AnnotationCard = memo(function AnnotationCard({
     { value: 'unlabeled', label: 'Reset', symbol: 'restart_alt', color: 'rgb(223, 223, 223)' }
   ];
 
-  // Multi-class options for react-select
-  const multiclassOptions = availableClasses.map(cls => ({
-    value: cls,
-    label: cls
-  }));
-
-  const multiclassValue = reviewMode === 'multiclass'
-    ? annotationValue.map(cls => ({ value: cls, label: cls }))
-    : [];
+  // Multi-class support for Material UI Autocomplete
+  // (Options are now passed directly to the Autocomplete component)
 
   // Get card styling based on annotation
   const getCardStyle = () => {
@@ -175,66 +167,31 @@ const AnnotationCard = memo(function AnnotationCard({
 
   const handleBinaryAnnotationChange = useCallback((value) => {
     if (onAnnotationChange) {
-      // For unlabeled, pass null to represent NaN in dataframe
-      onAnnotationChange(value === 'unlabeled' ? null : value);
+      onAnnotationChange(clipData.id, value === 'unlabeled' ? '' : value);
     }
-  }, [onAnnotationChange]);
+  }, [onAnnotationChange, clipData.id]);
 
   const handleMulticlassAnnotationChange = useCallback((selectedOptions) => {
     const classes = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
     if (onAnnotationChange) {
       // Convert to string format for storage
       const annotationString = classes.length > 0 ? JSON.stringify(classes) : '[]';
-      onAnnotationChange(annotationString);
+      onAnnotationChange(clipData.id, annotationString);
     }
-  }, [onAnnotationChange]);
+  }, [onAnnotationChange, clipData.id]);
 
   const handleAnnotationStatusChange = useCallback((value) => {
     if (onAnnotationChange) {
-      // For multiclass mode, pass the current labels string, not the parsed array
-      if (reviewMode === 'multiclass') {
-        // Use the original labels string to preserve current selections
-        onAnnotationChange(labels || '', value);
-      } else {
-        // For binary mode, pass the annotation value
-        onAnnotationChange(annotationValue, value);
-      }
+      // Call annotation change with current annotation value and the new status
+      onAnnotationChange(clipData.id, annotationValue, value);
     }
-  }, [onAnnotationChange, annotationValue, labels, reviewMode]);
-
-  // Local state for comment to prevent re-renders on every keystroke
-  const [localComment, setLocalComment] = useState(comments || '');
-  const commentTimeoutRef = useRef(null);
-
-  // Update local comment when external comments change
-  useEffect(() => {
-    setLocalComment(comments || '');
-  }, [comments]);
+  }, [onAnnotationChange, annotationValue, clipData.id]);
 
   const handleCommentChange = (event) => {
-    const newComment = event.target.value;
-    setLocalComment(newComment);
-
-    // Debounce the callback to parent to prevent excessive re-renders
-    if (commentTimeoutRef.current) {
-      clearTimeout(commentTimeoutRef.current);
+    if (onCommentChange) {
+      onCommentChange(clipData.id, event.target.value);
     }
-
-    commentTimeoutRef.current = setTimeout(() => {
-      if (onCommentChange) {
-        onCommentChange(newComment);
-      }
-    }, 500); // Wait 500ms after user stops typing
   };
-
-  // Clean up timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (commentTimeoutRef.current) {
-        clearTimeout(commentTimeoutRef.current);
-      }
-    };
-  }, []);
 
 
   // Auto-load spectrogram when props change (proper implementation)
@@ -381,76 +338,65 @@ const AnnotationCard = memo(function AnnotationCard({
       return (
         <div className="binary-annotation-control">
           <div className="segmented-control">
-            {binaryOptions.map(option => {
-              // For unlabeled button, show as active only when explicitly unlabeled
-              // For other buttons, show as active when annotation matches
-              const isActive = option.value === 'unlabeled' 
-                ? false  // Never show unlabeled as active - it just resets
-                : annotationValue === option.value;
-              
-              return (
-                <button
-                  key={option.value}
-                  className={`segment ${isActive ? 'active' : ''}`}
-                  style={{
-                    backgroundColor: isActive ? option.color : 'transparent',
-                    borderColor: option.color,
-                    color: isActive ? 'white' : option.color
-                  }}
-                  onClick={() => handleBinaryAnnotationChange(option.value)}
-                  title={option.label}
-                >
-                  <span className="material-symbols-outlined">{option.symbol}</span>
-                </button>
-              );
-            })}
+            {binaryOptions.map(option => (
+              <button
+                key={option.value}
+                className={`segment ${annotationValue === option.value ? 'active' : ''}`}
+                style={{
+                  backgroundColor: annotationValue === option.value ? option.color : 'transparent',
+                  borderColor: option.color,
+                  color: annotationValue === option.value ? 'white' : option.color
+                }}
+                onClick={() => handleBinaryAnnotationChange(option.value)}
+                title={option.label}
+              >
+                <span className="material-symbols-outlined">{option.symbol}</span>
+              </button>
+            ))}
           </div>
         </div>
       );
     } else {
       // Multi-class
-      const customStyles = {
-        control: (provided) => ({
-          ...provided,
-          minHeight: '38px',
-          fontSize: '0.9rem'
-        }),
-        multiValue: (provided) => ({
-          ...provided,
-          backgroundColor: '#10b981',
-          borderRadius: '4px',
-        }),
-        multiValueLabel: (provided) => ({
-          ...provided,
-          color: 'white',
-          fontSize: '0.8rem'
-        }),
-        multiValueRemove: (provided) => ({
-          ...provided,
-          color: 'white',
-          '&:hover': {
-            backgroundColor: '#047857',
-            color: 'white',
-          }
-        })
-      };
-
       return (
         <div className="multiclass-annotation-control">
-          <Select
-            isMulti
-            options={multiclassOptions}
-            value={multiclassValue}
-            onChange={handleMulticlassAnnotationChange}
-            placeholder="Select classes..."
-            styles={customStyles}
-            className="multiclass-select"
-            classNamePrefix="select"
-            isClearable
-            closeMenuOnSelect={false}
-            hideSelectedOptions={false}
-            blurInputOnSelect={false}
-          />
+          <Box sx={{ mb: 1 }}>
+            <Autocomplete
+              multiple
+              options={availableClasses}
+              value={annotationValue}
+              onChange={(_, newValue) => {
+                const selectedOptions = newValue.map(cls => ({ value: cls, label: cls }));
+                handleMulticlassAnnotationChange(selectedOptions);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Select classes..."
+                  variant="outlined"
+                  size="small"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      minHeight: '38px',
+                    },
+                  }}
+                />
+              )}
+              sx={{
+                '& .MuiAutocomplete-tag': {
+                  backgroundColor: 'primary.main',
+                  color: 'primary.contrastText',
+                  borderRadius: 1,
+                  fontSize: '0.8rem',
+                  fontWeight: 500,
+                },
+              }}
+              disableCloseOnSelect
+              clearOnBlur={false}
+              selectOnFocus
+              handleHomeEndKeys
+            />
+          </Box>
 
           {/* Annotation status control */}
           <div className="annotation-status-control">

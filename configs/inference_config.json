@@ -1,0 +1,35 @@
+{
+  "task_name": "",
+  "file_selection_mode": "folder",
+  "selected_extensions": [
+    "wav",
+    "mp3",
+    "flac"
+  ],
+  "glob_patterns_text": "",
+  "config": {
+    "files": [],
+    "file_globbing_patterns": [
+      "/Users/SML161/labeled_datasets/pnre_ecy3329/Recordings/**/*.wav",
+      "/Users/SML161/labeled_datasets/pnre_ecy3329/Recordings/**/*.WAV",
+      "/Users/SML161/labeled_datasets/pnre_ecy3329/Recordings/**/*.mp3",
+      "/Users/SML161/labeled_datasets/pnre_ecy3329/Recordings/**/*.MP3",
+      "/Users/SML161/labeled_datasets/pnre_ecy3329/Recordings/**/*.flac",
+      "/Users/SML161/labeled_datasets/pnre_ecy3329/Recordings/**/*.FLAC"
+    ],
+    "file_list": "",
+    "model_source": "bmz",
+    "model": "HawkEars",
+    "overlap": 0.0,
+    "batch_size": 16.0,
+    "worker_count": 4.0,
+    "output_dir": "/Users/SML161/Downloads/",
+    "sparse_outputs_enabled": false,
+    "sparse_save_threshold": -3.0,
+    "split_by_subfolder": true,
+    "use_custom_python_env": false,
+    "custom_python_env_path": "",
+    "testing_mode_enabled": false,
+    "subset_size": 10
+  }
+}
