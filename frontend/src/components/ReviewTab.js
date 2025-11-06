@@ -362,11 +362,70 @@ function ReviewTab({ drawerOpen = false }) {
   // Sync focus clip index with active clip when entering focus mode
   useEffect(() => {
     if (isFocusMode) {
-      // Calculate absolute index from page and active clip index
-      const absoluteIndex = currentPage * itemsPerPage + activeClipIndexOnPage;
-      // Make sure it's within bounds of filtered data
-      if (absoluteIndex < filteredAnnotationData.length) {
-        setFocusClipIndex(absoluteIndex);
+      if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+        // In CGL mode, get the active clip from the current bin
+        const currentBin = stratifiedBins[currentBinIndex];
+        if (currentBin && currentBin.clips[activeClipIndexOnPage]) {
+          const activeClip = currentBin.clips[activeClipIndexOnPage];
+          const absoluteIndex = filteredAnnotationData.findIndex(clip => clip.id === activeClip.id);
+          if (absoluteIndex !== -1) {
+            setFocusClipIndex(absoluteIndex);
+          }
+        }
+      } else {
+        // Normal mode: Calculate absolute index from page and active clip index
+        const absoluteIndex = currentPage * itemsPerPage + activeClipIndexOnPage;
+        // Make sure it's within bounds of filtered data
+        if (absoluteIndex < filteredAnnotationData.length) {
+          setFocusClipIndex(absoluteIndex);
+        }
+      }
+    }
+  }, [isFocusMode]); // Only run when entering/exiting focus mode
+
+  // Sync currentBinIndex when navigating in focus mode (CGL only)
+  useEffect(() => {
+    if (isFocusMode && classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+      const currentClip = filteredAnnotationData[focusClipIndex];
+      if (currentClip) {
+        // Find which bin contains the current focus clip
+        const binIdx = stratifiedBins.findIndex(bin =>
+          bin.clips.some(clip => clip.id === currentClip.id)
+        );
+        if (binIdx !== -1 && binIdx !== currentBinIndex) {
+          setCurrentBinIndex(binIdx);
+        }
+      }
+    }
+  }, [focusClipIndex, isFocusMode, classifierGuidedMode.enabled, stratifiedBins]);
+
+  // Sync page/active clip when exiting focus mode
+  useEffect(() => {
+    if (!isFocusMode && focusClipIndex >= 0) {
+      if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+        // In CGL mode, find which bin and position the focus clip is at
+        const currentClip = filteredAnnotationData[focusClipIndex];
+        if (currentClip) {
+          const binIdx = stratifiedBins.findIndex(bin =>
+            bin.clips.some(clip => clip.id === currentClip.id)
+          );
+          if (binIdx !== -1) {
+            const bin = stratifiedBins[binIdx];
+            const clipIdxInBin = bin.clips.findIndex(clip => clip.id === currentClip.id);
+            if (clipIdxInBin !== -1) {
+              setCurrentBinIndex(binIdx);
+              setActiveClipIndexOnPage(clipIdxInBin);
+            }
+          }
+        }
+      } else {
+        // Normal mode: Calculate page and active clip index from absolute focus index
+        const newPage = Math.floor(focusClipIndex / itemsPerPage);
+        const newActiveClipIndex = focusClipIndex % itemsPerPage;
+        if (newPage !== currentPage) {
+          setCurrentPage(newPage);
+        }
+        setActiveClipIndexOnPage(newActiveClipIndex);
       }
     }
   }, [isFocusMode]); // Only run when entering/exiting focus mode
@@ -394,12 +453,12 @@ function ReviewTab({ drawerOpen = false }) {
 
   // Auto-advance functionality removed - user will see bin completion status in display above grid
 
-  // Auto-save on page changes (only trigger when page actually changes)
+  // Auto-save on page/bin changes (only trigger when page or bin actually changes)
   useEffect(() => {
     if (annotationData.length > 0 && autoSaveEnabled && hasUnsavedChanges) {
       performAutoSave();
     }
-  }, [currentPage]); // Only trigger on page changes, not when hasUnsavedChanges changes
+  }, [currentPage, currentBinIndex]); // Trigger on page changes (normal mode) or bin changes (CGL mode)
 
   // Auto-save on focus clip navigation (focus mode only)
   useEffect(() => {
@@ -1008,9 +1067,14 @@ function ReviewTab({ drawerOpen = false }) {
         } else {
           // If in focus mode, jump to first clip of this bin in the full filtered data
           const firstClipOfBin = bin.clips[0];
-          const clipIndexInFullData = filteredAnnotationData.findIndex(clip => clip.id === firstClipOfBin.id);
-          if (clipIndexInFullData !== -1) {
-            setFocusClipIndex(clipIndexInFullData);
+          if (firstClipOfBin) {
+            const clipIndexInFullData = filteredAnnotationData.findIndex(clip => clip.id === firstClipOfBin.id);
+            if (clipIndexInFullData !== -1) {
+              setFocusClipIndex(clipIndexInFullData);
+              console.log(`Jumped to incomplete bin ${i + 1}, clip index ${clipIndexInFullData}`);
+            } else {
+              console.warn('Could not find first clip of bin in filtered data');
+            }
           }
         }
         return;
@@ -1039,9 +1103,14 @@ function ReviewTab({ drawerOpen = false }) {
         } else {
           // If in focus mode, jump to first clip of this bin in the full filtered data
           const firstClipOfBin = bin.clips[0];
-          const clipIndexInFullData = filteredAnnotationData.findIndex(clip => clip.id === firstClipOfBin.id);
-          if (clipIndexInFullData !== -1) {
-            setFocusClipIndex(clipIndexInFullData);
+          if (firstClipOfBin) {
+            const clipIndexInFullData = filteredAnnotationData.findIndex(clip => clip.id === firstClipOfBin.id);
+            if (clipIndexInFullData !== -1) {
+              setFocusClipIndex(clipIndexInFullData);
+              console.log(`Jumped to incomplete bin ${i + 1}, clip index ${clipIndexInFullData}`);
+            } else {
+              console.warn('Could not find first clip of bin in filtered data');
+            }
           }
         }
         return;
