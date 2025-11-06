@@ -374,13 +374,13 @@ function FocusView({
             )}
 
             {/* Play/pause overlay */}
-            <div className="focus-play-overlay">
+            {/* <div className="focus-play-overlay">
               <div className={`focus-play-button ${isPlaying ? 'playing' : 'paused'}`}>
                 <span className="material-symbols-outlined">
                   {isPlaying ? 'pause' : 'play_arrow'}
                 </span>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
 
