@@ -781,16 +781,25 @@ function ReviewTab({ drawerOpen = false }) {
     const currentData = currentPageData;
     if (currentData.length === 0) return;
 
-    // Update all clips on current page
+    // For yes/no/uncertain, only update unlabeled clips
+    // For 'unlabeled', update all clips
+    const onlyUpdateUnlabeled = annotationValue !== 'unlabeled';
+
     setAnnotationData(prev => {
       const newArray = [...prev];
       currentData.forEach(clip => {
         const clipIndex = newArray.findIndex(c => c.id === clip.id);
         if (clipIndex !== -1) {
-          newArray[clipIndex] = {
-            ...newArray[clipIndex],
-            annotation: annotationValue === 'unlabeled' ? '' : annotationValue
-          };
+          const currentClip = newArray[clipIndex];
+          const isUnlabeled = !currentClip.annotation || currentClip.annotation === '';
+
+          // Only update if: setting to unlabeled OR clip is currently unlabeled
+          if (!onlyUpdateUnlabeled || isUnlabeled) {
+            newArray[clipIndex] = {
+              ...currentClip,
+              annotation: annotationValue === 'unlabeled' ? '' : annotationValue
+            };
+          }
         }
       });
       return newArray;
@@ -1674,15 +1683,15 @@ function ReviewTab({ drawerOpen = false }) {
                         <h4>Bulk Annotation (Binary Mode)</h4>
                         <div className="shortcut-item">
                           <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>
-                          <span>Mark all clips on page as Yes</span>
+                          <span>Mark unlabeled clips on page as Yes</span>
                         </div>
                         <div className="shortcut-item">
                           <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd>
-                          <span>Mark all clips on page as No</span>
+                          <span>Mark unlabeled clips on page as No</span>
                         </div>
                         <div className="shortcut-item">
                           <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd>
-                          <span>Mark all clips on page as Uncertain</span>
+                          <span>Mark unlabeled clips on page as Uncertain</span>
                         </div>
                         <div className="shortcut-item">
                           <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd>
@@ -1837,42 +1846,47 @@ function ReviewTab({ drawerOpen = false }) {
                 </button>
 
                 {/* Bulk Annotation Controls - Only show in Grid mode for binary mode */}
-                {!isFocusMode && settings.review_mode === 'binary' && currentPageData.length > 0 && (
-                  <div className="toolbar-bulk-controls">
-                    <button
-                      className="toolbar-btn bulk-btn"
-                      onClick={() => handleBulkAnnotation('yes')}
-                      title={`Mark all ${currentPageData.length} clips on this page as Yes`}
-                      style={{ color: 'rgb(145, 180, 135)' }}
-                    >
-                      <span className="material-symbols-outlined">check_circle</span>
-                    </button>
-                    <button
-                      className="toolbar-btn bulk-btn"
-                      onClick={() => handleBulkAnnotation('no')}
-                      title={`Mark all ${currentPageData.length} clips on this page as No`}
-                      style={{ color: 'rgb(207, 122, 107)' }}
-                    >
-                      <span className="material-symbols-outlined">cancel</span>
-                    </button>
-                    <button
-                      className="toolbar-btn bulk-btn"
-                      onClick={() => handleBulkAnnotation('uncertain')}
-                      title={`Mark all ${currentPageData.length} clips on this page as Uncertain`}
-                      style={{ color: 'rgb(237, 223, 177)' }}
-                    >
-                      <span className="material-symbols-outlined">help</span>
-                    </button>
-                    <button
-                      className="toolbar-btn bulk-btn"
-                      onClick={() => handleBulkAnnotation('unlabeled')}
-                      title={`Mark all ${currentPageData.length} clips on this page as Unlabeled`}
-                      style={{ color: 'rgb(223, 223, 223)' }}
-                    >
-                      <span className="material-symbols-outlined">restart_alt</span>
-                    </button>
-                  </div>
-                )}
+                {!isFocusMode && settings.review_mode === 'binary' && currentPageData.length > 0 && (() => {
+                  // Count unlabeled clips on current page
+                  const unlabeledCount = currentPageData.filter(clip => !clip.annotation || clip.annotation === '').length;
+
+                  return (
+                    <div className="toolbar-bulk-controls">
+                      <button
+                        className="toolbar-btn bulk-btn"
+                        onClick={() => handleBulkAnnotation('yes')}
+                        title={`Mark ${unlabeledCount} unlabeled clip${unlabeledCount !== 1 ? 's' : ''} on this page as Yes`}
+                        style={{ color: 'rgb(145, 180, 135)' }}
+                      >
+                        <span className="material-symbols-outlined">check_circle</span>
+                      </button>
+                      <button
+                        className="toolbar-btn bulk-btn"
+                        onClick={() => handleBulkAnnotation('no')}
+                        title={`Mark ${unlabeledCount} unlabeled clip${unlabeledCount !== 1 ? 's' : ''} on this page as No`}
+                        style={{ color: 'rgb(207, 122, 107)' }}
+                      >
+                        <span className="material-symbols-outlined">cancel</span>
+                      </button>
+                      <button
+                        className="toolbar-btn bulk-btn"
+                        onClick={() => handleBulkAnnotation('uncertain')}
+                        title={`Mark ${unlabeledCount} unlabeled clip${unlabeledCount !== 1 ? 's' : ''} on this page as Uncertain`}
+                        style={{ color: 'rgb(237, 223, 177)' }}
+                      >
+                        <span className="material-symbols-outlined">help</span>
+                      </button>
+                      <button
+                        className="toolbar-btn bulk-btn"
+                        onClick={() => handleBulkAnnotation('unlabeled')}
+                        title={`Mark all ${currentPageData.length} clip${currentPageData.length !== 1 ? 's' : ''} on this page as Unlabeled`}
+                        style={{ color: 'rgb(223, 223, 223)' }}
+                      >
+                        <span className="material-symbols-outlined">restart_alt</span>
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {/* Comments Toggle - Only show in Grid mode */}
                 {!isFocusMode && (
