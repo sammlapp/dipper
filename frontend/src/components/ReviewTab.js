@@ -31,6 +31,7 @@ function ReviewTab({ drawerOpen = false }) {
   const [availableClasses, setAvailableClasses] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [loadedPageData, setLoadedPageData] = useState([]);
+  const [displayedPageData, setDisplayedPageData] = useState([]); // What's currently shown - only updates when new page is ready
   const [isPageTransitioning, setIsPageTransitioning] = useState(false);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [rootAudioPath, setRootAudioPath] = useState('');
@@ -152,7 +153,8 @@ function ReviewTab({ drawerOpen = false }) {
     const currentData = getCurrentPageData();
     if (currentData.length > 0) {
       try {
-        setIsPageTransitioning(true);
+        // Don't set transitioning state - keep old content visible until new content is ready
+        // setIsPageTransitioning(true);
 
         // DON'T clear existing data immediately - keep old content visible during loading
         // setLoadedPageData([]);  // Commented out to prevent visual flash
@@ -247,7 +249,10 @@ function ReviewTab({ drawerOpen = false }) {
           console.warn('Some clips failed to generate spectrograms:', failedClips);
         }
 
+        // Update both loaded data and displayed page data atomically
+        // This ensures the display only updates once everything is ready
         setLoadedPageData(loadedClips);
+        setDisplayedPageData(currentData); // Now safe to display these clips
       } catch (error) {
         console.error('Failed to load page spectrograms:', error);
         console.error('Error details:', {
@@ -256,7 +261,8 @@ function ReviewTab({ drawerOpen = false }) {
           clipCount: clipsToLoad.length
         });
       } finally {
-        setIsPageTransitioning(false);
+        // Don't set transitioning state - no overlay shown
+        // setIsPageTransitioning(false);
       }
     }
   }, [rootAudioPath, httpLoader]); // Use rootAudioPath state instead of settings
@@ -381,6 +387,9 @@ function ReviewTab({ drawerOpen = false }) {
       extractAvailableClasses(data);
       setCurrentPage(0);
       setHasUnsavedChanges(false);
+      // Clear displayed page data so it will load fresh
+      setDisplayedPageData([]);
+      setLoadedPageData([]);
       // Clear save path when new annotation file is loaded
       setCurrentSavePath(null);
       localStorage.removeItem('review_autosave_location');
@@ -462,6 +471,9 @@ function ReviewTab({ drawerOpen = false }) {
         extractAvailableClasses(data.clips);
         setCurrentPage(0);
         setHasUnsavedChanges(false);
+        // Clear displayed page data so it will load fresh
+        setDisplayedPageData([]);
+        setLoadedPageData([]);
         // Clear save path when new annotation file is loaded
         setCurrentSavePath(null);
         localStorage.removeItem('review_autosave_location');
@@ -737,6 +749,8 @@ function ReviewTab({ drawerOpen = false }) {
   const applyFilters = useCallback(() => {
     setAppliedFilters(filters);
     setCurrentPage(0); // Reset to first page when filters are applied
+    // Clear displayed data so new filtered content will load fresh
+    setDisplayedPageData([]);
   }, [filters]);
 
   // Clear filters function
@@ -749,6 +763,8 @@ function ReviewTab({ drawerOpen = false }) {
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
     setCurrentPage(0);
+    // Clear displayed data so unfiltered content will load fresh
+    setDisplayedPageData([]);
   }, []);
 
   // Check if filters have changed since last apply
@@ -912,7 +928,8 @@ function ReviewTab({ drawerOpen = false }) {
   // Function to load spectrogram for a specific clip in focus mode
   const loadFocusClipSpectrogram = useCallback(async (clip) => {
     try {
-      setIsPageTransitioning(true);
+      // Don't set transitioning state - keep old content visible until new content is ready
+      // setIsPageTransitioning(true);
 
       const currentRootAudioPath = rootAudioPath || '';
       let fullFilePath = clip.file;
@@ -973,7 +990,8 @@ function ReviewTab({ drawerOpen = false }) {
     } catch (error) {
       console.error('Failed to load focus clip spectrogram:', error);
     } finally {
-      setIsPageTransitioning(false);
+      // Don't set transitioning state - no overlay shown
+      // setIsPageTransitioning(false);
     }
   }, [rootAudioPath, httpLoader]);
 
@@ -1223,7 +1241,8 @@ function ReviewTab({ drawerOpen = false }) {
 
 
   const renderAnnotationGrid = useMemo(() => {
-    const currentData = currentPageData;
+    // Use displayedPageData instead of currentPageData to prevent showing unloaded content
+    const currentData = displayedPageData.length > 0 ? displayedPageData : currentPageData;
 
     if (currentData.length === 0) {
       return (
@@ -1233,8 +1252,8 @@ function ReviewTab({ drawerOpen = false }) {
       );
     }
 
-    // Show loading overlay over existing content instead of replacing it
-    const showLoadingOverlay = httpLoader.isLoading || isPageTransitioning;
+    // Don't show loading overlay - just keep old content visible until new content is ready
+    // const showLoadingOverlay = httpLoader.isLoading || isPageTransitioning;
 
     return (
       <div className="annotation-grid-container" style={{ position: 'relative' }}>
@@ -1263,8 +1282,8 @@ function ReviewTab({ drawerOpen = false }) {
           })}
         </div>
 
-        {/* Loading overlay that appears over existing content */}
-        {showLoadingOverlay && (
+        {/* Loading overlay disabled - old content stays visible until new content loads */}
+        {/* {showLoadingOverlay && (
           <div className="loading-overlay">
             <div className="loading-content">
               <p>Loading spectrograms...</p>
@@ -1278,10 +1297,10 @@ function ReviewTab({ drawerOpen = false }) {
               )}
             </div>
           </div>
-        )}
+        )} */}
       </div>
     );
-  }, [currentPageData, loadedPageData, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridClassName, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, handleAnnotationChange, handleCommentChange]);
+  }, [displayedPageData, currentPageData, loadedPageData, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridClassName, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, handleAnnotationChange, handleCommentChange]);
 
   return (
     <div className="review-tab-layout">
