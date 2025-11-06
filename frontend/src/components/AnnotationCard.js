@@ -70,36 +70,52 @@ const AnnotationCard = memo(function AnnotationCard({
     setCurrentTime(0);
   }, []);
 
+  // Pause function (can be called to stop playback)
+  const pause = useCallback(() => {
+    if (audioRef.current && isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+  }, [isPlaying]);
+
+  // Play function (can be called to start playback)
+  const play = useCallback(async () => {
+    if (!audioUrl || isLoading) return;
+
+    try {
+      if (audioRef.current) {
+        await audioRef.current.play();
+        setIsPlaying(true);
+      }
+    } catch (err) {
+      console.error('Audio playback error:', err);
+      setError('Failed to play audio: ' + err.message);
+    }
+  }, [audioUrl, isLoading]);
+
   // Play/pause functionality (can be called internally or externally)
   const togglePlayPause = useCallback(async () => {
     if (!audioUrl || isLoading) return;
 
     try {
       if (isPlaying) {
-        // Pause audio
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-        setIsPlaying(false);
+        pause();
       } else {
-        // Play audio
-        if (audioRef.current) {
-          await audioRef.current.play();
-          setIsPlaying(true);
-        }
+        await play();
       }
     } catch (err) {
       console.error('Audio playback error:', err);
       setError('Failed to play audio: ' + err.message);
     }
-  }, [audioUrl, isLoading, isPlaying]);
+  }, [audioUrl, isLoading, isPlaying, pause, play]);
 
-  // Expose play/pause to parent via callback
+  // Expose play/pause/pause-only to parent via callback
   useEffect(() => {
     if (onPlayPause && isActive) {
-      onPlayPause(togglePlayPause);
+      // Pass an object with both toggle and pause functions
+      onPlayPause({ togglePlayPause, pause, play });
     }
-  }, [onPlayPause, isActive, togglePlayPause]);
+  }, [onPlayPause, isActive, togglePlayPause, pause, play]);
 
   // Click to play/pause spectrogram
   const handleSpectrogramClick = useCallback(async () => {

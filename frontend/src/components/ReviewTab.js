@@ -39,7 +39,8 @@ function ReviewTab({ drawerOpen = false }) {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [focusClipIndex, setFocusClipIndex] = useState(0);
   const [activeClipIndexOnPage, setActiveClipIndexOnPage] = useState(0); // Index of active clip within current page (0 to itemsPerPage-1)
-  const activeClipPlayPauseRef = useRef(null); // Ref to store active clip's play/pause function
+  const activeClipAudioControlsRef = useRef(null); // Ref to store active clip's audio control functions {togglePlayPause, pause, play}
+  const previousClipAudioControlsRef = useRef(null); // Ref to store previous clip's audio controls for pausing
   const shouldAutoplayNextClip = useRef(false); // Flag to trigger autoplay after annotation
   const [gridModeAutoplay, setGridModeAutoplay] = useState(false); // Auto-play in grid mode when active clip advances
   const [isLeftTrayOpen, setIsLeftTrayOpen] = useState(false);
@@ -323,11 +324,17 @@ function ReviewTab({ drawerOpen = false }) {
 
   // Trigger autoplay when active clip advances after annotation (grid mode only)
   useEffect(() => {
-    if (!isFocusMode && shouldAutoplayNextClip.current && activeClipPlayPauseRef.current) {
+    if (!isFocusMode && shouldAutoplayNextClip.current && activeClipAudioControlsRef.current) {
       // Use setTimeout to ensure the new clip's audio is ready
       const timer = setTimeout(() => {
-        if (activeClipPlayPauseRef.current) {
-          activeClipPlayPauseRef.current();
+        // First, pause the previous clip if it was playing
+        if (previousClipAudioControlsRef.current?.pause) {
+          previousClipAudioControlsRef.current.pause();
+        }
+
+        // Then play the new active clip
+        if (activeClipAudioControlsRef.current?.play) {
+          activeClipAudioControlsRef.current.play();
           shouldAutoplayNextClip.current = false;
         }
       }, 100); // Small delay to ensure audio element is ready
@@ -1005,8 +1012,8 @@ function ReviewTab({ drawerOpen = false }) {
         // Spacebar: play/pause active clip audio
         if (event.key === ' ') {
           event.preventDefault();
-          if (activeClipPlayPauseRef.current) {
-            activeClipPlayPauseRef.current();
+          if (activeClipAudioControlsRef.current?.togglePlayPause) {
+            activeClipAudioControlsRef.current.togglePlayPause();
           }
           return;
         }
@@ -1438,7 +1445,14 @@ function ReviewTab({ drawerOpen = false }) {
                 onAnnotationChange={(annotation, annotationStatus) => handleAnnotationChange(clip.id, annotation, annotationStatus)}
                 onCommentChange={(comment) => handleCommentChange(clip.id, comment)}
                 onCardClick={() => setActiveClipIndexOnPage(indexOnPage)}
-                onPlayPause={isActive ? (playPauseFn) => { activeClipPlayPauseRef.current = playPauseFn; } : undefined}
+                onPlayPause={isActive ? (audioControls) => {
+                  // Store previous clip's controls before updating to new clip
+                  if (activeClipAudioControlsRef.current) {
+                    previousClipAudioControlsRef.current = activeClipAudioControlsRef.current;
+                  }
+                  // Store new active clip's controls
+                  activeClipAudioControlsRef.current = audioControls;
+                } : undefined}
                 disableAutoLoad={true} // Use batch loading instead
               />
             );
