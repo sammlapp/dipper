@@ -8,8 +8,11 @@ const AnnotationCard = memo(function AnnotationCard({
   availableClasses = [],
   showComments = false,
   showFileName = true,
+  isActive = false, // New prop to indicate active clip
   onAnnotationChange,
   onCommentChange,
+  onCardClick, // New prop for click handler
+  onPlayPause, // New prop to trigger play/pause from outside
   className = "",
   disableAutoLoad = false // New prop to disable auto-loading
 }) {
@@ -67,8 +70,8 @@ const AnnotationCard = memo(function AnnotationCard({
     setCurrentTime(0);
   }, []);
 
-  // Click to play/pause spectrogram
-  const handleSpectrogramClick = useCallback(async () => {
+  // Play/pause functionality (can be called internally or externally)
+  const togglePlayPause = useCallback(async () => {
     if (!audioUrl || isLoading) return;
 
     try {
@@ -90,6 +93,18 @@ const AnnotationCard = memo(function AnnotationCard({
       setError('Failed to play audio: ' + err.message);
     }
   }, [audioUrl, isLoading, isPlaying]);
+
+  // Expose play/pause to parent via callback
+  useEffect(() => {
+    if (onPlayPause && isActive) {
+      onPlayPause(togglePlayPause);
+    }
+  }, [onPlayPause, isActive, togglePlayPause]);
+
+  // Click to play/pause spectrogram
+  const handleSpectrogramClick = useCallback(async () => {
+    await togglePlayPause();
+  }, [togglePlayPause]);
 
   // Parse annotation based on review mode
   const getAnnotationValue = () => {
@@ -478,8 +493,29 @@ const AnnotationCard = memo(function AnnotationCard({
     }
   };
 
+  // Handler for card click - clicking anywhere activates the clip
+  const handleCardClick = useCallback((event) => {
+    // Only exclude actual interactive form controls
+    const target = event.target;
+    const isFormControl = target.tagName === 'BUTTON' ||
+                         target.tagName === 'INPUT' ||
+                         target.tagName === 'TEXTAREA' ||
+                         target.closest('button') ||
+                         target.closest('input') ||
+                         target.closest('textarea') ||
+                         target.closest('.react-select'); // Exclude react-select dropdowns
+
+    if (!isFormControl && onCardClick) {
+      onCardClick();
+    }
+  }, [onCardClick]);
+
   return (
-    <div className={`annotation-card ${className}`} style={getCardStyle()}>
+    <div
+      className={`annotation-card ${className} ${isActive ? 'active-clip' : ''}`}
+      style={getCardStyle()}
+      onClick={handleCardClick}
+    >
       {/* Hidden audio element */}
       {audioUrl && (
         <audio

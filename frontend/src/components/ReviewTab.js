@@ -38,6 +38,8 @@ function ReviewTab({ drawerOpen = false }) {
   const [rootAudioPath, setRootAudioPath] = useState('');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [focusClipIndex, setFocusClipIndex] = useState(0);
+  const [activeClipIndexOnPage, setActiveClipIndexOnPage] = useState(0); // Index of active clip within current page (0 to itemsPerPage-1)
+  const activeClipPlayPauseRef = useRef(null); // Ref to store active clip's play/pause function
   const [isLeftTrayOpen, setIsLeftTrayOpen] = useState(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -299,6 +301,23 @@ function ReviewTab({ drawerOpen = false }) {
       loadCurrentPageSpectrograms();
     }
   }, [currentPage, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns]);
+
+  // Reset active clip to first clip when page changes
+  useEffect(() => {
+    setActiveClipIndexOnPage(0);
+  }, [currentPage]);
+
+  // Sync focus clip index with active clip when entering focus mode
+  useEffect(() => {
+    if (isFocusMode) {
+      // Calculate absolute index from page and active clip index
+      const absoluteIndex = currentPage * itemsPerPage + activeClipIndexOnPage;
+      // Make sure it's within bounds of filtered data
+      if (absoluteIndex < filteredAnnotationData.length) {
+        setFocusClipIndex(absoluteIndex);
+      }
+    }
+  }, [isFocusMode]); // Only run when entering/exiting focus mode
 
   // Auto-save on page changes (only trigger when page actually changes)
   useEffect(() => {
@@ -785,6 +804,38 @@ function ReviewTab({ drawerOpen = false }) {
     return JSON.stringify(filters) !== JSON.stringify(appliedFilters);
   }, [filters, appliedFilters]);
 
+  // Annotate active clip and advance to next
+  const handleActiveClipAnnotation = useCallback((annotationValue) => {
+    if (currentPageData.length === 0) return;
+
+    const activeClip = currentPageData[activeClipIndexOnPage];
+    if (!activeClip) return;
+
+    // Annotate the active clip
+    handleAnnotationChange(activeClip.id, annotationValue, undefined);
+
+    // Advance to next clip
+    if (activeClipIndexOnPage < currentPageData.length - 1) {
+      // Move to next clip on current page
+      setActiveClipIndexOnPage(prev => prev + 1);
+    } else {
+      // Last clip on page - go to next page and set first clip as active
+      if (currentPage < totalPages - 1) {
+        setCurrentPage(prev => prev + 1);
+        // activeClipIndexOnPage will be reset to 0 by the useEffect
+      }
+    }
+  }, [currentPageData, activeClipIndexOnPage, handleAnnotationChange, currentPage, totalPages]);
+
+  // Navigate active clip within page
+  const handleActiveClipNavigation = useCallback((direction) => {
+    if (direction === 'next' && activeClipIndexOnPage < currentPageData.length - 1) {
+      setActiveClipIndexOnPage(prev => prev + 1);
+    } else if (direction === 'previous' && activeClipIndexOnPage > 0) {
+      setActiveClipIndexOnPage(prev => prev - 1);
+    }
+  }, [activeClipIndexOnPage, currentPageData.length]);
+
   // Bulk annotation function for current page
   const handleBulkAnnotation = useCallback((annotationValue) => {
     const currentData = currentPageData;
@@ -926,13 +977,69 @@ function ReviewTab({ drawerOpen = false }) {
             break;
         }
       }
+
+      // Grid mode shortcuts WITHOUT Cmd/Ctrl (only in grid mode, not focus mode)
+      if (!isFocusMode && !cmdOrCtrl) {
+        // Spacebar: play/pause active clip audio
+        if (event.key === ' ') {
+          event.preventDefault();
+          if (activeClipPlayPauseRef.current) {
+            activeClipPlayPauseRef.current();
+          }
+          return;
+        }
+
+        // Binary mode: a/s/d/f shortcuts to annotate active clip and advance
+        if (settings.review_mode === 'binary') {
+          switch (event.key.toLowerCase()) {
+            case 'a':
+              // A: Mark active clip as Yes and advance
+              event.preventDefault();
+              handleActiveClipAnnotation('yes');
+              break;
+            case 's':
+              // S: Mark active clip as No and advance
+              event.preventDefault();
+              handleActiveClipAnnotation('no');
+              break;
+            case 'd':
+              // D: Mark active clip as Uncertain and advance
+              event.preventDefault();
+              handleActiveClipAnnotation('uncertain');
+              break;
+            case 'f':
+              // F: Mark active clip as Unlabeled and advance
+              event.preventDefault();
+              handleActiveClipAnnotation('');
+              break;
+            default:
+              break;
+          }
+        }
+
+        // Navigation shortcuts: j/k to move active clip
+        switch (event.key.toLowerCase()) {
+          case 'j':
+            // J: Move active clip to previous clip on page
+            event.preventDefault();
+            handleActiveClipNavigation('previous');
+            break;
+          case 'k':
+            // K: Move active clip to next clip on page
+            event.preventDefault();
+            handleActiveClipNavigation('next');
+            break;
+          default:
+            break;
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange]);
+  }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange, handleActiveClipAnnotation, handleActiveClipNavigation]);
 
   // Load current focus clip spectrogram when in focus mode
   useEffect(() => {
@@ -1288,9 +1395,10 @@ function ReviewTab({ drawerOpen = false }) {
     return (
       <div className="annotation-grid-container" style={{ position: 'relative' }}>
         <div className={getGridClassName()}>
-          {dataToShow.map(clip => {
+          {dataToShow.map((clip, indexOnPage) => {
             // Find the loaded data for this clip
             const loadedClip = loadedPageData.find(loaded => loaded.clip_id === clip.id) || clip;
+            const isActive = indexOnPage === activeClipIndexOnPage;
 
             return (
               <AnnotationCard
@@ -1304,8 +1412,11 @@ function ReviewTab({ drawerOpen = false }) {
                 availableClasses={availableClasses}
                 showComments={settings.show_comments}
                 showFileName={settings.show_file_name}
+                isActive={isActive}
                 onAnnotationChange={(annotation, annotationStatus) => handleAnnotationChange(clip.id, annotation, annotationStatus)}
                 onCommentChange={(comment) => handleCommentChange(clip.id, comment)}
+                onCardClick={() => setActiveClipIndexOnPage(indexOnPage)}
+                onPlayPause={isActive ? (playPauseFn) => { activeClipPlayPauseRef.current = playPauseFn; } : undefined}
                 disableAutoLoad={true} // Use batch loading instead
               />
             );
@@ -1330,7 +1441,7 @@ function ReviewTab({ drawerOpen = false }) {
         )} */}
       </div>
     );
-  }, [currentPage, lastRenderedPage, currentPageData, lastRenderedPageData, loadedPageData, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridClassName, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, handleAnnotationChange, handleCommentChange]);
+  }, [currentPage, lastRenderedPage, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridClassName, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, handleAnnotationChange, handleCommentChange]);
 
   return (
     <div className="review-tab-layout">
