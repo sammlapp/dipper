@@ -1001,7 +1001,18 @@ function ReviewTab({ drawerOpen = false }) {
 
       if (!binCompleteStatus) {
         setCurrentBinIndex(i);
-        setActiveClipIndexOnPage(0); // Reset to first clip in new bin
+
+        // If in grid mode, reset to first clip on page
+        if (!isFocusMode) {
+          setActiveClipIndexOnPage(0);
+        } else {
+          // If in focus mode, jump to first clip of this bin in the full filtered data
+          const firstClipOfBin = bin.clips[0];
+          const clipIndexInFullData = filteredAnnotationData.findIndex(clip => clip.id === firstClipOfBin.id);
+          if (clipIndexInFullData !== -1) {
+            setFocusClipIndex(clipIndexInFullData);
+          }
+        }
         return;
       }
     }
@@ -1021,14 +1032,25 @@ function ReviewTab({ drawerOpen = false }) {
 
       if (!binCompleteStatus) {
         setCurrentBinIndex(i);
-        setActiveClipIndexOnPage(0); // Reset to first clip in new bin
+
+        // If in grid mode, reset to first clip on page
+        if (!isFocusMode) {
+          setActiveClipIndexOnPage(0);
+        } else {
+          // If in focus mode, jump to first clip of this bin in the full filtered data
+          const firstClipOfBin = bin.clips[0];
+          const clipIndexInFullData = filteredAnnotationData.findIndex(clip => clip.id === firstClipOfBin.id);
+          if (clipIndexInFullData !== -1) {
+            setFocusClipIndex(clipIndexInFullData);
+          }
+        }
         return;
       }
     }
 
     // All bins are complete - stay on current bin
     console.log('All bins are complete');
-  }, [classifierGuidedMode, stratifiedBins, currentBinIndex, settings.review_mode]);
+  }, [classifierGuidedMode, stratifiedBins, currentBinIndex, settings.review_mode, isFocusMode, filteredAnnotationData]);
 
   // Bulk annotation function for current page
   const handleBulkAnnotation = useCallback((annotationValue) => {
@@ -1530,34 +1552,45 @@ function ReviewTab({ drawerOpen = false }) {
     const dataToUse = dataToExport || annotationData;
     const settingsToUse = currentSettings || settings;
 
-    // Dynamic headers based on review mode
-    const baseHeaders = ['file', 'start_time', 'end_time'];
-    const annotationHeaders = settingsToUse.review_mode === 'multiclass'
-      ? ['labels', 'annotation_status']
-      : ['annotation'];
-    const headers = [...baseHeaders, ...annotationHeaders, 'comments'];
+    if (dataToUse.length === 0) {
+      return '';
+    }
+
+    // Get all column names from the first clip, preserving order
+    // Standard columns first, then annotation columns, then extra metadata columns
+    const standardCols = ['file', 'start_time', 'end_time'];
+    const annotationCols = settingsToUse.review_mode === 'multiclass'
+      ? ['labels', 'annotation_status', 'comments']
+      : ['annotation', 'comments'];
+    const excludedCols = new Set([...standardCols, ...annotationCols, 'id', 'spectrogram_base64', 'audio_base64', 'clip_id']);
+
+    // Get extra columns (metadata like card, date, grid, scores, etc.)
+    const extraCols = Object.keys(dataToUse[0]).filter(col => !excludedCols.has(col));
+
+    // Final column order: standard, annotation, then extra metadata
+    const headers = [...standardCols, ...annotationCols, ...extraCols];
 
     const rows = dataToUse.map(clip => {
-      const baseRow = [
-        clip.file,
-        clip.start_time,
-        clip.end_time
-      ];
+      return headers.map(header => {
+        const value = clip[header];
 
-      const annotationRow = settingsToUse.review_mode === 'multiclass'
-        ? [
-          clip.labels != null ? clip.labels : '',
-          clip.annotation_status != null ? clip.annotation_status : 'unreviewed'
-        ]
-        : [
-          // For binary mode, treat empty string as truly empty (no annotation)
-          clip.annotation != null && clip.annotation !== '' ? clip.annotation : null
-        ];
+        // Handle null/undefined
+        if (value == null) {
+          return null;
+        }
 
-      // Handle comments: treat empty/NaN/null as truly null
-      const commentsValue = clip.comments != null && clip.comments !== '' && !Number.isNaN(clip.comments) ? clip.comments : null;
+        // Handle empty string annotations in binary mode
+        if (header === 'annotation' && value === '') {
+          return null;
+        }
 
-      return [...baseRow, ...annotationRow, commentsValue];
+        // Handle empty/NaN comments
+        if (header === 'comments' && (value === '' || Number.isNaN(value))) {
+          return null;
+        }
+
+        return value;
+      });
     });
 
     const csvContent = [
@@ -2539,8 +2572,63 @@ function ReviewTab({ drawerOpen = false }) {
                   const clipIndexToShow = (isOnNewClip && !hasLoadedNewClip) ? lastRenderedFocusClipIndex : focusClipIndex;
                   const clipToShow = filteredAnnotationData[clipIndexToShow];
 
+                  // Calculate which bin the current focus clip belongs to (for CGL mode)
+                  let focusBinIndex = currentBinIndex;
+                  let focusBin = null;
+                  let isFocusBinComplete = false;
+
+                  if (classifierGuidedMode.enabled && stratifiedBins.length > 0 && clipToShow) {
+                    // Find which bin contains the current focus clip
+                    const binIdx = stratifiedBins.findIndex(bin =>
+                      bin.clips.some(clip => clip.id === clipToShow.id)
+                    );
+                    if (binIdx !== -1) {
+                      focusBinIndex = binIdx;
+                      focusBin = stratifiedBins[binIdx];
+                      isFocusBinComplete = isBinComplete(
+                        focusBin.clips,
+                        settings.review_mode,
+                        {
+                          strategy: classifierGuidedMode.completionStrategy,
+                          targetCount: classifierGuidedMode.completionTargetCount,
+                          targetLabels: classifierGuidedMode.completionTargetLabels
+                        }
+                      );
+                    }
+                  }
+
                   return (
                     <div className="focus-view-container">
+                      {/* Bin Status Display for Classifier-Guided Mode in Focus View */}
+                      {classifierGuidedMode.enabled && focusBin && (
+                        <div className={`bin-status-display ${isFocusBinComplete ? 'complete' : 'incomplete'}`}>
+                          <div className="bin-status-header">
+                            <div className="bin-status-info">
+                              <span className="bin-status-label">Bin {focusBinIndex + 1} of {stratifiedBins.length}</span>
+                              <span className={`bin-completion-badge ${isFocusBinComplete ? 'complete' : 'incomplete'}`}>
+                                {isFocusBinComplete ? '✓ Complete' : 'In Progress'}
+                              </span>
+                            </div>
+                            <button
+                              className="jump-incomplete-btn"
+                              onClick={handleJumpToNextIncompleteBin}
+                              title="Jump to next incomplete bin (⌘⇧K)"
+                            >
+                              <span className="material-symbols-outlined">fast_forward</span>
+                              Next Incomplete
+                            </button>
+                          </div>
+                          <div className="bin-stratification-values">
+                            {Object.entries(focusBin.values).map(([key, value]) => (
+                              <span key={key} className="bin-value-tag">
+                                <strong>{key}:</strong> {String(value)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+
                       <FocusView
                         clipData={{
                           ...clipToShow,
