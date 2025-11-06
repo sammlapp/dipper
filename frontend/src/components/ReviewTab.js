@@ -5,7 +5,14 @@ import AnnotationCard from './AnnotationCard';
 import ReviewSettings from './ReviewSettings';
 import FocusView from './FocusView';
 import HelpIcon from './HelpIcon';
+import ClassifierGuidedPanel from './ClassifierGuidedPanel';
 import { useHttpAudioLoader, HttpServerStatus } from './HttpAudioLoader';
+import {
+  createStratifiedBins,
+  isBinComplete,
+  getAvailableColumns,
+  getNumericColumns
+} from '../utils/stratificationUtils';
 
 function ReviewTab({ drawerOpen = false }) {
   const [selectedFile, setSelectedFile] = useState('');
@@ -32,6 +39,7 @@ function ReviewTab({ drawerOpen = false }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [loadedPageData, setLoadedPageData] = useState([]);
   const [lastRenderedPage, setLastRenderedPage] = useState(0); // Track which page we last rendered to prevent flashing
+  const [lastRenderedBinIndex, setLastRenderedBinIndex] = useState(0); // Track which bin we last rendered in classifier-guided mode
   const [lastRenderedFocusClipIndex, setLastRenderedFocusClipIndex] = useState(0); // Track which focus clip we last rendered
   const [isPageTransitioning, setIsPageTransitioning] = useState(false);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
@@ -45,7 +53,22 @@ function ReviewTab({ drawerOpen = false }) {
   const [gridModeAutoplay, setGridModeAutoplay] = useState(false); // Auto-play in grid mode when active clip advances
   const [isLeftTrayOpen, setIsLeftTrayOpen] = useState(false);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [isClassifierGuidedPanelOpen, setIsClassifierGuidedPanelOpen] = useState(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
+
+  // Classifier-guided listening state
+  const [classifierGuidedMode, setClassifierGuidedMode] = useState({
+    enabled: false,
+    stratificationColumns: [],
+    scoreColumn: null,
+    sortStrategy: 'original', // 'original', 'score_desc', 'random'
+    maxClipsPerBin: 20,
+    completionStrategy: 'all', // 'all', 'binary_yes_count', 'multiclass_label_count'
+    completionTargetCount: 1,
+    completionTargetLabels: [] // For multiclass mode
+  });
+  const [stratifiedBins, setStratifiedBins] = useState([]);
+  const [currentBinIndex, setCurrentBinIndex] = useState(0);
   const [filters, setFilters] = useState({
     annotation: { enabled: false, values: [] },
     labels: { enabled: false, values: [] },
@@ -143,24 +166,45 @@ function ReviewTab({ drawerOpen = false }) {
 
   // Get current page data - memoized to prevent unnecessary re-renders
   const getCurrentPageData = useCallback(() => {
+    // If classifier-guided mode is enabled, use bin data instead
+    if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+      const currentBin = stratifiedBins[currentBinIndex];
+      return currentBin ? currentBin.clips : [];
+    }
+
+    // Normal pagination mode
     const start = currentPage * itemsPerPage;
     const end = start + itemsPerPage;
     return filteredAnnotationData.slice(start, end);
-  }, [currentPage, itemsPerPage, filteredAnnotationData]);
+  }, [currentPage, itemsPerPage, filteredAnnotationData, classifierGuidedMode.enabled, stratifiedBins, currentBinIndex]);
 
   // Memoize current page data separately to reduce dependencies
   const currentPageData = useMemo(() => {
+    // If classifier-guided mode is enabled, use bin data instead
+    if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+      const currentBin = stratifiedBins[currentBinIndex];
+      return currentBin ? currentBin.clips : [];
+    }
+
+    // Normal pagination mode
     const start = currentPage * itemsPerPage;
     const end = start + itemsPerPage;
     return filteredAnnotationData.slice(start, end);
-  }, [currentPage, itemsPerPage, filteredAnnotationData]);
+  }, [currentPage, itemsPerPage, filteredAnnotationData, classifierGuidedMode.enabled, stratifiedBins, currentBinIndex]);
 
-  // Get data for the last rendered page (to show old page while new one loads)
+  // Get data for the last rendered page/bin (to show old content while new one loads)
   const lastRenderedPageData = useMemo(() => {
+    // If classifier-guided mode was enabled for last render, use last bin data
+    if (classifierGuidedMode.enabled && stratifiedBins.length > 0 && lastRenderedBinIndex < stratifiedBins.length) {
+      const lastBin = stratifiedBins[lastRenderedBinIndex];
+      return lastBin ? lastBin.clips : [];
+    }
+
+    // Normal pagination mode
     const start = lastRenderedPage * itemsPerPage;
     const end = start + itemsPerPage;
     return filteredAnnotationData.slice(start, end);
-  }, [lastRenderedPage, itemsPerPage, filteredAnnotationData]);
+  }, [lastRenderedPage, lastRenderedBinIndex, itemsPerPage, filteredAnnotationData, classifierGuidedMode.enabled, stratifiedBins]);
 
   // Load spectrograms for current page
   const loadCurrentPageSpectrograms = useCallback(async () => {
@@ -263,9 +307,13 @@ function ReviewTab({ drawerOpen = false }) {
           console.warn('Some clips failed to generate spectrograms:', failedClips);
         }
 
-        // Update loaded data and mark that we've rendered this page
+        // Update loaded data and mark that we've rendered this page/bin
         setLoadedPageData(loadedClips);
-        setLastRenderedPage(currentPage); // Safe to display this page now
+        if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+          setLastRenderedBinIndex(currentBinIndex); // Safe to display this bin now
+        } else {
+          setLastRenderedPage(currentPage); // Safe to display this page now
+        }
       } catch (error) {
         console.error('Failed to load page spectrograms:', error);
         console.error('Error details:', {
@@ -278,7 +326,7 @@ function ReviewTab({ drawerOpen = false }) {
         // setIsPageTransitioning(false);
       }
     }
-  }, [rootAudioPath, httpLoader]); // Use rootAudioPath state instead of settings
+  }, [rootAudioPath, httpLoader, classifierGuidedMode.enabled, stratifiedBins.length, currentBinIndex]); // Use rootAudioPath state instead of settings
 
   // Load saved state on mount
   useEffect(() => {
@@ -299,12 +347,12 @@ function ReviewTab({ drawerOpen = false }) {
   const dataVersion = useRef(0);
   const [currentDataVersion, setCurrentDataVersion] = useState(0);
 
-  // Load spectrograms when page changes, new data loaded, settings change, or filtering changes
+  // Load spectrograms when page/bin changes, new data loaded, settings change, or filtering changes
   useEffect(() => {
     if (annotationData.length > 0) {
       loadCurrentPageSpectrograms();
     }
-  }, [currentPage, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns]);
+  }, [currentPage, currentBinIndex, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled]);
 
   // Reset active clip to first clip when page changes
   useEffect(() => {
@@ -343,6 +391,8 @@ function ReviewTab({ drawerOpen = false }) {
       return () => clearTimeout(timer);
     }
   }, [activeClipIndexOnPage, isFocusMode]); // Trigger when active clip changes
+
+  // Auto-advance functionality removed - user will see bin completion status in display above grid
 
   // Auto-save on page changes (only trigger when page actually changes)
   useEffect(() => {
@@ -393,6 +443,30 @@ function ReviewTab({ drawerOpen = false }) {
       setCurrentDataVersion(prev => prev + 1);
     }
   }, [annotationData.length]); // Only depend on LENGTH, not content
+
+  // Generate stratified bins when classifier-guided mode config changes
+  useEffect(() => {
+    if (classifierGuidedMode.enabled && filteredAnnotationData.length > 0) {
+      const bins = createStratifiedBins(filteredAnnotationData, {
+        stratificationColumns: classifierGuidedMode.stratificationColumns,
+        sortStrategy: classifierGuidedMode.sortStrategy,
+        scoreColumn: classifierGuidedMode.scoreColumn,
+        maxClipsPerBin: classifierGuidedMode.maxClipsPerBin
+      });
+      setStratifiedBins(bins);
+      setCurrentBinIndex(0); // Reset to first bin
+    } else {
+      setStratifiedBins([]);
+      setCurrentBinIndex(0);
+    }
+  }, [
+    classifierGuidedMode.enabled,
+    classifierGuidedMode.stratificationColumns,
+    classifierGuidedMode.sortStrategy,
+    classifierGuidedMode.scoreColumn,
+    classifierGuidedMode.maxClipsPerBin,
+    filteredAnnotationData
+  ]);
 
   // Re-extract available classes when manual classes change
   useEffect(() => {
@@ -445,6 +519,10 @@ function ReviewTab({ drawerOpen = false }) {
       setLoadedPageData([]);
       // Clear filters when new file is loaded
       clearFilters();
+      // Disable classifier-guided mode when new file is loaded
+      setClassifierGuidedMode(prev => ({ ...prev, enabled: false }));
+      setStratifiedBins([]);
+      setCurrentBinIndex(0);
       // Clear save path when new annotation file is loaded
       setCurrentSavePath(null);
       localStorage.removeItem('review_autosave_location');
@@ -533,6 +611,10 @@ function ReviewTab({ drawerOpen = false }) {
         setLoadedPageData([]);
         // Clear filters when new file is loaded
         clearFilters();
+        // Disable classifier-guided mode when new file is loaded
+        setClassifierGuidedMode(prev => ({ ...prev, enabled: false }));
+        setStratifiedBins([]);
+        setCurrentBinIndex(0);
         // Clear save path when new annotation file is loaded
         setCurrentSavePath(null);
         localStorage.removeItem('review_autosave_location');
@@ -990,15 +1072,27 @@ function ReviewTab({ drawerOpen = false }) {
             }
             break;
           case 'j':
-            // Cmd/Ctrl+J: previous page
-            if (currentPage > 0) {
-              setCurrentPage(prev => prev - 1);
+            // Cmd/Ctrl+J: previous page/bin
+            if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+              if (currentBinIndex > 0) {
+                setCurrentBinIndex(prev => prev - 1);
+              }
+            } else {
+              if (currentPage > 0) {
+                setCurrentPage(prev => prev - 1);
+              }
             }
             break;
           case 'k':
-            // Cmd/Ctrl+K: next page
-            if (currentPage < totalPages - 1) {
-              setCurrentPage(prev => prev + 1);
+            // Cmd/Ctrl+K: next page/bin
+            if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+              if (currentBinIndex < stratifiedBins.length - 1) {
+                setCurrentBinIndex(prev => prev + 1);
+              }
+            } else {
+              if (currentPage < totalPages - 1) {
+                setCurrentPage(prev => prev + 1);
+              }
             }
             break;
           case 'c':
@@ -1073,7 +1167,7 @@ function ReviewTab({ drawerOpen = false }) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange, handleActiveClipAnnotation, handleActiveClipNavigation]);
+  }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange, handleActiveClipAnnotation, handleActiveClipNavigation, classifierGuidedMode.enabled, stratifiedBins.length, currentBinIndex]);
 
   // Load current focus clip spectrogram when in focus mode
   useEffect(() => {
@@ -1400,20 +1494,27 @@ function ReviewTab({ drawerOpen = false }) {
   };
 
   const getGridClassName = useCallback(() => {
+    // In classifier-guided mode, use dynamic rows based on clips in bin
+    if (classifierGuidedMode.enabled && currentPageData.length > 0) {
+      const rows = Math.ceil(currentPageData.length / settings.grid_columns);
+      return `annotation-grid grid-${rows}x${settings.grid_columns}`;
+    }
     return `annotation-grid grid-${settings.grid_rows}x${settings.grid_columns}`;
-  }, [settings.grid_rows, settings.grid_columns]);
+  }, [settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled, currentPageData.length]);
 
 
 
   const renderAnnotationGrid = useMemo(() => {
-    // Determine which page data to show
-    // If we've moved to a new page but spectrograms haven't loaded, show the old page
-    const isOnNewPage = currentPage !== lastRenderedPage;
-    const hasLoadedNewPage = loadedPageData.length > 0 &&
+    // Determine which page/bin data to show
+    // If we've moved to a new page/bin but spectrograms haven't loaded, show the old content
+    const isOnNewPageOrBin = classifierGuidedMode.enabled
+      ? (currentBinIndex !== lastRenderedBinIndex)
+      : (currentPage !== lastRenderedPage);
+    const hasLoadedNewContent = loadedPageData.length > 0 &&
       loadedPageData.some(loaded => currentPageData.some(clip => clip.id === loaded.clip_id));
 
-    // Show old page if we're on a new page but it hasn't loaded yet, otherwise show current
-    const dataToShow = (isOnNewPage && !hasLoadedNewPage) ? lastRenderedPageData : currentPageData;
+    // Show old content if we're on a new page/bin but it hasn't loaded yet, otherwise show current
+    const dataToShow = (isOnNewPageOrBin && !hasLoadedNewContent) ? lastRenderedPageData : currentPageData;
 
     if (dataToShow.length === 0) {
       return (
@@ -1426,7 +1527,41 @@ function ReviewTab({ drawerOpen = false }) {
     // Don't show loading overlay - just keep old content visible until new content is ready
     // const showLoadingOverlay = httpLoader.isLoading || isPageTransitioning;
 
+    // Calculate bin completion status for display
+    const currentBin = classifierGuidedMode.enabled && stratifiedBins.length > 0
+      ? stratifiedBins[currentBinIndex]
+      : null;
+    const isBinCompleteStatus = currentBin ? isBinComplete(
+      currentBin.clips,
+      settings.review_mode,
+      {
+        strategy: classifierGuidedMode.completionStrategy,
+        targetCount: classifierGuidedMode.completionTargetCount,
+        targetLabels: classifierGuidedMode.completionTargetLabels
+      }
+    ) : false;
+
     return (
+      <>
+        {/* Bin Status Display for Classifier-Guided Mode */}
+        {classifierGuidedMode.enabled && currentBin && (
+          <div className={`bin-status-display ${isBinCompleteStatus ? 'complete' : 'incomplete'}`}>
+            <div className="bin-status-header">
+              <span className="bin-status-label">Bin {currentBinIndex + 1} of {stratifiedBins.length}</span>
+              <span className={`bin-completion-badge ${isBinCompleteStatus ? 'complete' : 'incomplete'}`}>
+                {isBinCompleteStatus ? '✓ Complete' : 'In Progress'}
+              </span>
+            </div>
+            <div className="bin-stratification-values">
+              {Object.entries(currentBin.values).map(([key, value]) => (
+                <span key={key} className="bin-value-tag">
+                  <strong>{key}:</strong> {String(value)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
       <div className="annotation-grid-container" style={{ position: 'relative' }}>
         <div className={getGridClassName()}>
           {dataToShow.map((clip, indexOnPage) => {
@@ -1481,8 +1616,9 @@ function ReviewTab({ drawerOpen = false }) {
           </div>
         )} */}
       </div>
+      </>
     );
-  }, [currentPage, lastRenderedPage, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridClassName, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, handleAnnotationChange, handleCommentChange]);
+  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridClassName, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, handleAnnotationChange, handleCommentChange, classifierGuidedMode, stratifiedBins]);
 
   return (
     <div className="review-tab-layout">
@@ -1947,6 +2083,52 @@ function ReviewTab({ drawerOpen = false }) {
         </div>
       </Drawer>
 
+      {/* Classifier-Guided Listening Panel Drawer */}
+      <Drawer
+        anchor="right"
+        open={isClassifierGuidedPanelOpen}
+        onClose={() => setIsClassifierGuidedPanelOpen(false)}
+        variant="temporary"
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: 450,
+            boxSizing: 'border-box',
+            backgroundColor: '#ffffff',
+            fontFamily: 'Rokkitt, sans-serif',
+          },
+        }}
+      >
+        <div className="drawer-header">
+          <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
+            Classifier-Guided Listening
+          </h3>
+          <IconButton
+            onClick={() => setIsClassifierGuidedPanelOpen(false)}
+            sx={{
+              color: '#6b7280',
+              '&:hover': { backgroundColor: '#f3f4f6' }
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </div>
+        <div className="drawer-content">
+          {annotationData.length > 0 && (
+            <ClassifierGuidedPanel
+              config={classifierGuidedMode}
+              onConfigChange={setClassifierGuidedMode}
+              availableColumns={getAvailableColumns(annotationData)}
+              numericColumns={getNumericColumns(annotationData)}
+              availableClasses={availableClasses}
+              reviewMode={settings.review_mode}
+              currentBinIndex={currentBinIndex}
+              totalBins={stratifiedBins.length}
+              currentBinInfo={stratifiedBins[currentBinIndex]}
+            />
+          )}
+        </div>
+      </Drawer>
+
       {/* Main Content Area - Full Window */}
       <div className="review-main-content">
         {/* Compact Top Toolbar */}
@@ -2126,46 +2308,98 @@ function ReviewTab({ drawerOpen = false }) {
                   </button>
                 )}
 
-                {/* Page Navigation */}
-                {!isFocusMode && totalPages > 1 && (
-                  <div className="page-navigation">
-                    <button
-                      className="toolbar-btn"
-                      onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
-                      disabled={currentPage === 0}
-                      title="Previous Page"
-                    >
-                      <span className="material-symbols-outlined">chevron_left</span>
-                    </button>
+                {/* Page/Bin Navigation */}
+                {!isFocusMode && (
+                  <>
+                    {classifierGuidedMode.enabled && stratifiedBins.length > 0 ? (
+                      // Bin navigation for classifier-guided mode
+                      <div className="page-navigation">
+                        <button
+                          className="toolbar-btn"
+                          onClick={() => setCurrentBinIndex(prev => Math.max(0, prev - 1))}
+                          disabled={currentBinIndex === 0}
+                          title="Previous Bin"
+                        >
+                          <span className="material-symbols-outlined">chevron_left</span>
+                        </button>
 
-                    <select
-                      className="page-dropdown"
-                      value={currentPage}
-                      onChange={(e) => setCurrentPage(parseInt(e.target.value))}
-                      title="Go to page"
-                    >
-                      {Array.from({ length: totalPages }, (_, i) => (
-                        <option key={i} value={i}>
-                          Page {i + 1}
-                        </option>
-                      ))}
-                    </select>
+                        <select
+                          className="page-dropdown"
+                          value={currentBinIndex}
+                          onChange={(e) => setCurrentBinIndex(parseInt(e.target.value))}
+                          title="Go to bin"
+                        >
+                          {stratifiedBins.map((bin, i) => (
+                            <option key={i} value={i}>
+                              Bin {i + 1}
+                            </option>
+                          ))}
+                        </select>
 
-                    <button
-                      className="toolbar-btn"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
-                      disabled={currentPage >= totalPages - 1}
-                      title="Next Page"
-                    >
-                      <span className="material-symbols-outlined">chevron_right</span>
-                    </button>
-                  </div>
+                        <button
+                          className="toolbar-btn"
+                          onClick={() => setCurrentBinIndex(prev => Math.min(stratifiedBins.length - 1, prev + 1))}
+                          disabled={currentBinIndex >= stratifiedBins.length - 1}
+                          title="Next Bin"
+                        >
+                          <span className="material-symbols-outlined">chevron_right</span>
+                        </button>
+                      </div>
+                    ) : (
+                      // Normal page navigation
+                      totalPages > 1 && (
+                        <div className="page-navigation">
+                          <button
+                            className="toolbar-btn"
+                            onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                            disabled={currentPage === 0}
+                            title="Previous Page"
+                          >
+                            <span className="material-symbols-outlined">chevron_left</span>
+                          </button>
+
+                          <select
+                            className="page-dropdown"
+                            value={currentPage}
+                            onChange={(e) => setCurrentPage(parseInt(e.target.value))}
+                            title="Go to page"
+                          >
+                            {Array.from({ length: totalPages }, (_, i) => (
+                              <option key={i} value={i}>
+                                Page {i + 1}
+                              </option>
+                            ))}
+                          </select>
+
+                          <button
+                            className="toolbar-btn"
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+                            disabled={currentPage >= totalPages - 1}
+                            title="Next Page"
+                          >
+                            <span className="material-symbols-outlined">chevron_right</span>
+                          </button>
+                        </div>
+                      )
+                    )}
+                  </>
                 )}
               </>
             )}
           </div>
 
           <div className="toolbar-right">
+            {/* Classifier-Guided Listening Button */}
+            {annotationData.length > 0 && (
+              <button
+                onClick={() => setIsClassifierGuidedPanelOpen(true)}
+                className={`toolbar-btn ${classifierGuidedMode.enabled ? 'active' : ''}`}
+                title="Classifier-Guided Listening"
+              >
+                <span className="material-symbols-outlined">analytics</span>
+              </button>
+            )}
+
             {/* Keyboard Shortcuts Help Button */}
             <button
               onClick={() => setIsShortcutsHelpOpen(true)}

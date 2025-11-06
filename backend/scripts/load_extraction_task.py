@@ -106,11 +106,17 @@ def load_extraction_csv(csv_path, threshold=0):
             assert (
                 df["annotation"].isin(["yes", "no", "uncertain", ""]).all()
             ), f"annotation column was present but contained values other than 'yes', 'no', 'uncertain', and empty cells: {df['annotation'].unique()}"
-            # Only include end_time if it was provided in the CSV
+            # Keep all columns - reorder to put standard columns first, then preserve all extra metadata columns
+            standard_cols = ["file", "start_time"]
             if "end_time" in df.columns:
-                df = df[["file", "start_time", "end_time", "annotation", "comments"]]
-            else:
-                df = df[["file", "start_time", "annotation", "comments"]]
+                standard_cols.append("end_time")
+            standard_cols.extend(["annotation", "comments"])
+
+            # Get all extra columns (metadata like card, date, grid, scores, etc.)
+            extra_cols = [col for col in df.columns if col not in standard_cols and col != "id"]
+
+            # Reorder: standard columns first, then extra columns, then id
+            df = df[standard_cols + extra_cols + ["id"]]
 
         elif "labels" in df.columns:
             # Extract classes from the labels data
@@ -164,13 +170,17 @@ def load_extraction_csv(csv_path, threshold=0):
                 raise ValueError(
                     f"annotation_status column contained invalid values: {invalid_statuses.unique()}. Valid values are: {valid_statuses}"
                 )
-            # Subset columns; Only include end_time if it was provided in the CSV
-            columns = (
-                ["file", "start_time"]
-                + (["end_time"] if "end_time" in df.columns else [])
-                + ["labels", "annotation_status", "comments"]
-            )
-            df = df[columns]
+            # Keep all columns - reorder to put standard columns first, then preserve all extra metadata columns
+            standard_cols = ["file", "start_time"]
+            if "end_time" in df.columns:
+                standard_cols.append("end_time")
+            standard_cols.extend(["labels", "annotation_status", "comments"])
+
+            # Get all extra columns (metadata like card, date, grid, scores, etc.)
+            extra_cols = [col for col in df.columns if col not in standard_cols and col != "id"]
+
+            # Reorder: standard columns first, then extra columns, then id
+            df = df[standard_cols + extra_cols + ["id"]]
             # serialize annotations to json if they are lists
             df["labels"] = df["labels"].apply(
                 lambda x: json.dumps(x) if isinstance(x, list) else "[]"
@@ -196,13 +206,18 @@ def load_extraction_csv(csv_path, threshold=0):
             # Add annotation_status for multi-class
             df["annotation_status"] = "unreviewed"
 
-            # Subset columns; Only include end_time if it was provided in the CSV
-            columns = (
-                ["file", "start_time"]
-                + (["end_time"] if "end_time" in df.columns else [])
-                + ["labels", "annotation_status", "comments"]
-            )
-            df = df[columns]
+            # Keep all columns - reorder to put standard columns first, then preserve all extra metadata columns
+            standard_cols = ["file", "start_time"]
+            if "end_time" in df.columns:
+                standard_cols.append("end_time")
+            standard_cols.extend(["labels", "annotation_status", "comments"])
+
+            # Get all extra columns (metadata) - exclude class columns and id
+            # Class columns were already processed into labels
+            extra_cols = [col for col in df.columns if col not in standard_cols and col not in classes and col != "id"]
+
+            # Reorder: standard columns first, then extra columns, then id
+            df = df[standard_cols + extra_cols + ["id"]]
 
         # Convert to appropriate json format and send
         clips = df.to_dict(orient="records")
