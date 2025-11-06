@@ -2210,13 +2210,8 @@ button:disabled {
 /* Active clip styling - thicker border */
 .annotation-card.active-clip {
   border: 4px solid var(--primary-color);
-  box-shadow: 0 0px 15px rgba(68, 149, 215, 0.7);
+  box-shadow: 0 0px 18px rgba(38, 133, 211, 0.8);
 }
-/* 
-.annotation-card.active-clip:hover {
-  border: 4px solid var(--primary-color);
-  box-shadow: 0 0px 15px rgba(68, 149, 215, 0.7);
-} */
 
 .annotation-spectrogram-container {
   position: relative;

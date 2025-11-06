@@ -40,6 +40,8 @@ function ReviewTab({ drawerOpen = false }) {
   const [focusClipIndex, setFocusClipIndex] = useState(0);
   const [activeClipIndexOnPage, setActiveClipIndexOnPage] = useState(0); // Index of active clip within current page (0 to itemsPerPage-1)
   const activeClipPlayPauseRef = useRef(null); // Ref to store active clip's play/pause function
+  const shouldAutoplayNextClip = useRef(false); // Flag to trigger autoplay after annotation
+  const [gridModeAutoplay, setGridModeAutoplay] = useState(false); // Auto-play in grid mode when active clip advances
   const [isLeftTrayOpen, setIsLeftTrayOpen] = useState(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -318,6 +320,21 @@ function ReviewTab({ drawerOpen = false }) {
       }
     }
   }, [isFocusMode]); // Only run when entering/exiting focus mode
+
+  // Trigger autoplay when active clip advances after annotation (grid mode only)
+  useEffect(() => {
+    if (!isFocusMode && shouldAutoplayNextClip.current && activeClipPlayPauseRef.current) {
+      // Use setTimeout to ensure the new clip's audio is ready
+      const timer = setTimeout(() => {
+        if (activeClipPlayPauseRef.current) {
+          activeClipPlayPauseRef.current();
+          shouldAutoplayNextClip.current = false;
+        }
+      }, 100); // Small delay to ensure audio element is ready
+
+      return () => clearTimeout(timer);
+    }
+  }, [activeClipIndexOnPage, isFocusMode]); // Trigger when active clip changes
 
   // Auto-save on page changes (only trigger when page actually changes)
   useEffect(() => {
@@ -814,6 +831,11 @@ function ReviewTab({ drawerOpen = false }) {
     // Annotate the active clip
     handleAnnotationChange(activeClip.id, annotationValue, undefined);
 
+    // Set flag for autoplay if enabled
+    if (gridModeAutoplay) {
+      shouldAutoplayNextClip.current = true;
+    }
+
     // Advance to next clip
     if (activeClipIndexOnPage < currentPageData.length - 1) {
       // Move to next clip on current page
@@ -825,7 +847,7 @@ function ReviewTab({ drawerOpen = false }) {
         // activeClipIndexOnPage will be reset to 0 by the useEffect
       }
     }
-  }, [currentPageData, activeClipIndexOnPage, handleAnnotationChange, currentPage, totalPages]);
+  }, [currentPageData, activeClipIndexOnPage, handleAnnotationChange, currentPage, totalPages, gridModeAutoplay]);
 
   // Navigate active clip within page
   const handleActiveClipNavigation = useCallback((direction) => {
@@ -2018,6 +2040,19 @@ function ReviewTab({ drawerOpen = false }) {
                     title="Toggle Comments Visibility"
                   >
                     <span className="material-symbols-outlined">comment</span>
+                  </button>
+                )}
+
+                {/* Autoplay Toggle - Grid Mode */}
+                {!isFocusMode && (
+                  <button
+                    className={`toolbar-btn ${gridModeAutoplay ? 'active' : ''}`}
+                    onClick={() => setGridModeAutoplay(!gridModeAutoplay)}
+                    title={`Grid Autoplay ${gridModeAutoplay ? 'ON' : 'OFF'}: Auto-play when advancing to next clip`}
+                  >
+                    <span className="material-symbols-outlined">
+                      {gridModeAutoplay ? 'play_circle' : 'pause_circle'}
+                    </span>
                   </button>
                 )}
 
