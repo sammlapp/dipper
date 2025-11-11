@@ -2138,6 +2138,12 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                     <kbd>Ctrl/Cmd</kbd> + <kbd>,</kbd>
                     <span>Open settings panel</span>
                   </div>
+                  {classifierGuidedMode.enabled && (
+                    <div className="shortcut-item">
+                      <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>K</kbd>
+                      <span>Jump to next incomplete bin (CGL mode)</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2146,12 +2152,24 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 <h3>Grid Mode</h3>
                 <div className="shortcuts-list">
                   <div className="shortcut-item">
+                    <kbd>Space</kbd>
+                    <span>Play/Pause active clip audio</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>J</kbd>
+                    <span>Move to previous clip on page</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>K</kbd>
+                    <span>Move to next clip on page</span>
+                  </div>
+                  <div className="shortcut-item">
                     <kbd>Ctrl/Cmd</kbd> + <kbd>J</kbd>
-                    <span>Previous page</span>
+                    <span>Previous page/bin</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Ctrl/Cmd</kbd> + <kbd>K</kbd>
-                    <span>Next page</span>
+                    <span>Next page/bin</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd>
@@ -2160,21 +2178,40 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                   {settings.review_mode === 'binary' && (
                     <>
                       <div className="shortcuts-subsection">
+                        <h4>Active Clip Annotation (Binary Mode)</h4>
+                        <div className="shortcut-item">
+                          <kbd>A</kbd>
+                          <span>Mark active clip as Yes and advance</span>
+                        </div>
+                        <div className="shortcut-item">
+                          <kbd>S</kbd>
+                          <span>Mark active clip as No and advance</span>
+                        </div>
+                        <div className="shortcut-item">
+                          <kbd>D</kbd>
+                          <span>Mark active clip as Uncertain and advance</span>
+                        </div>
+                        <div className="shortcut-item">
+                          <kbd>F</kbd>
+                          <span>Mark active clip as Unlabeled and advance</span>
+                        </div>
+                      </div>
+                      <div className="shortcuts-subsection">
                         <h4>Bulk Annotation (Binary Mode)</h4>
                         <div className="shortcut-item">
-                          <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>
-                          <span>Mark unlabeled clips on page as Yes</span>
+                          <kbd>Shift</kbd> + <kbd>A</kbd>
+                          <span>Mark all unlabeled clips on page as Yes</span>
                         </div>
                         <div className="shortcut-item">
-                          <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd>
-                          <span>Mark unlabeled clips on page as No</span>
+                          <kbd>Shift</kbd> + <kbd>S</kbd>
+                          <span>Mark all unlabeled clips on page as No</span>
                         </div>
                         <div className="shortcut-item">
-                          <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd>
-                          <span>Mark unlabeled clips on page as Uncertain</span>
+                          <kbd>Shift</kbd> + <kbd>D</kbd>
+                          <span>Mark all unlabeled clips on page as Uncertain</span>
                         </div>
                         <div className="shortcut-item">
-                          <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd>
+                          <kbd>Shift</kbd> + <kbd>F</kbd>
                           <span>Mark all clips on page as Unlabeled</span>
                         </div>
                       </div>
@@ -2205,19 +2242,19 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                         <h4>Binary Annotation</h4>
                         <div className="shortcut-item">
                           <kbd>A</kbd>
-                          <span>Mark as Yes</span>
+                          <span>Mark as Yes and advance</span>
                         </div>
                         <div className="shortcut-item">
                           <kbd>S</kbd>
-                          <span>Mark as No</span>
+                          <span>Mark as No and advance</span>
                         </div>
                         <div className="shortcut-item">
                           <kbd>D</kbd>
-                          <span>Mark as Uncertain</span>
+                          <span>Mark as Uncertain and advance</span>
                         </div>
                         <div className="shortcut-item">
                           <kbd>F</kbd>
-                          <span>Mark as Unlabeled</span>
+                          <span>Mark as Unlabeled and advance</span>
                         </div>
                       </div>
                     </>
