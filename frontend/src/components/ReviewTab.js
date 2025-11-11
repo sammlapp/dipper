@@ -379,12 +379,12 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   // Track when data actually changes (new file loaded) to trigger spectrogram reload
   const [currentDataVersion, setCurrentDataVersion] = useState(0);
 
-  // Load spectrograms when page/bin changes, new data loaded, settings change, or filtering changes
+  // Load spectrograms when page/bin changes, new data loaded, settings change, filtering changes, or mode changes
   useEffect(() => {
     if (annotationData.length > 0) {
       loadCurrentPageSpectrograms();
     }
-  }, [currentPage, currentBinIndex, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled]);
+  }, [currentPage, currentBinIndex, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled, isFocusMode]);
 
   // Reset active clip to first clip when page or bin changes
   useEffect(() => {
