@@ -26,6 +26,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     grid_columns: 4,
     show_comments: false,
     show_file_name: true,
+    show_binary_controls: true,
     resize_images: true,
     image_width: 400,
     image_height: 200,
@@ -1863,6 +1864,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 availableClasses={availableClasses}
                 showComments={settings.show_comments}
                 showFileName={settings.show_file_name}
+                showBinaryControls={settings.show_binary_controls}
                 isActive={isActive}
                 onAnnotationChange={(annotation, annotationStatus) => handleAnnotationChange(clip.id, annotation, annotationStatus)}
                 onCommentChange={(comment) => handleCommentChange(clip.id, comment)}
@@ -1903,7 +1905,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       </div>
       </>
     );
-  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridClassName, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, handleAnnotationChange, handleCommentChange, classifierGuidedMode, stratifiedBins]);
+  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridClassName, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, settings.show_binary_controls, handleAnnotationChange, handleCommentChange, classifierGuidedMode, stratifiedBins]);
 
   return (
     <div className="review-tab-layout">

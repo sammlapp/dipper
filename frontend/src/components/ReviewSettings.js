@@ -67,7 +67,8 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     // Display settings
     show_comments: false,
     show_file_name: false,
-    
+    show_binary_controls: true, // Show yes/no/uncertain controls in grid mode
+
     // Image resize settings
     resize_images: true,
     image_width: 400,
@@ -232,6 +233,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
       grid_columns: 4,
       show_comments: false,
       show_file_name: true,
+      show_binary_controls: true,
       resize_images: true,
       image_width: 400,
       image_height: 200,
@@ -404,6 +406,15 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
                     onChange={(e) => handleSettingChange('show_file_name', e.target.checked)}
                   />
                   <span>Show File Names</span>
+                </label>
+
+                <label className="toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={settings.show_binary_controls}
+                    onChange={(e) => handleSettingChange('show_binary_controls', e.target.checked)}
+                  />
+                  <span>Show Binary Controls (Grid Mode)</span>
                 </label>
               </div>
             </div>

@@ -8,6 +8,7 @@ const AnnotationCard = memo(function AnnotationCard({
   availableClasses = [],
   showComments = false,
   showFileName = true,
+  showBinaryControls = true, // Show yes/no/uncertain controls in binary mode
   isActive = false, // New prop to indicate active clip
   onAnnotationChange,
   onCommentChange,
@@ -409,16 +410,21 @@ const AnnotationCard = memo(function AnnotationCard({
 
   const renderAnnotationControl = () => {
     if (reviewMode === 'binary') {
+      // Only show controls if showBinaryControls is true
+      if (!showBinaryControls) {
+        return null;
+      }
+
       return (
         <div className="binary-annotation-control">
           <div className="segmented-control">
             {binaryOptions.map(option => {
               // For unlabeled button, show as active only when explicitly unlabeled
               // For other buttons, show as active when annotation matches
-              const isActive = option.value === 'unlabeled' 
+              const isActive = option.value === 'unlabeled'
                 ? false  // Never show unlabeled as active - it just resets
                 : annotationValue === option.value;
-              
+
               return (
                 <button
                   key={option.value}
