@@ -39,27 +39,38 @@ def get_last_error_from_log(log_file_path, max_lines=10):
     """
     if not log_file_path or not os.path.exists(log_file_path):
         return None
-    
+
     try:
-        with open(log_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        with open(log_file_path, "r", encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
-            
+
         if not lines:
             return None
-            
+
         # Get last few lines to look for errors
         last_lines = lines[-max_lines:] if len(lines) > max_lines else lines
-        
+
         # Look for common error patterns
-        error_keywords = ['ERROR', 'Error', 'error', 'FAILED', 'Failed', 'failed', 
-                         'Exception', 'Traceback', 'RuntimeError', 'ValueError', 'ImportError']
-        
+        error_keywords = [
+            "ERROR",
+            "Error",
+            "error",
+            "FAILED",
+            "Failed",
+            "failed",
+            "Exception",
+            "Traceback",
+            "RuntimeError",
+            "ValueError",
+            "ImportError",
+        ]
+
         error_lines = []
         for line in last_lines:
             line = line.strip()
             if any(keyword in line for keyword in error_keywords):
                 error_lines.append(line)
-        
+
         if error_lines:
             # Return the last error line, truncated if too long
             last_error = error_lines[-1]
@@ -74,11 +85,11 @@ def get_last_error_from_log(log_file_path, max_lines=10):
                     if len(line) > 150:
                         line = line[:147] + "..."
                     return line
-    
+
     except Exception as e:
         logger.warning(f"Could not read log file {log_file_path}: {e}")
         return None
-    
+
     return None
 
 
@@ -390,17 +401,19 @@ def check_inference_status(process, job_info=None):
                 # Try to get the actual error from log file
                 error_message = f"Inference failed with exit code {return_code}"
                 log_file_path = None
-                
+
                 # Try to get log file path from job_info
-                if job_info and 'log_file_path' in job_info:
-                    log_file_path = job_info['log_file_path']
-                
+                if job_info and "log_file_path" in job_info:
+                    log_file_path = job_info["log_file_path"]
+
                 # Try to get actual error from log file
                 if log_file_path:
                     last_error = get_last_error_from_log(log_file_path)
                     if last_error:
-                        error_message = f"{last_error} (see log file for full error message)"
-                
+                        error_message = (
+                            f"{last_error} (see log file for full error message)"
+                        )
+
                 return {
                     "status": "failed",
                     "error": error_message,
@@ -631,17 +644,19 @@ def check_training_status(process, job_info=None):
                 # Try to get the actual error from log file
                 error_message = f"Training failed with exit code {return_code}"
                 log_file_path = None
-                
+
                 # Try to get log file path from job_info
-                if job_info and 'log_file_path' in job_info:
-                    log_file_path = job_info['log_file_path']
-                
+                if job_info and "log_file_path" in job_info:
+                    log_file_path = job_info["log_file_path"]
+
                 # Try to get actual error from log file
                 if log_file_path:
                     last_error = get_last_error_from_log(log_file_path)
                     if last_error:
-                        error_message = f"{last_error} (see log file for full error message)"
-                
+                        error_message = (
+                            f"{last_error} (see log file for full error message)"
+                        )
+
                 return {
                     "status": "failed",
                     "error": error_message,
@@ -720,17 +735,19 @@ def check_extraction_status(process, job_info=None):
                 # Try to get the actual error from log file
                 error_message = f"Extraction failed with exit code {return_code}"
                 log_file_path = None
-                
+
                 # Try to get log file path from job_info
-                if job_info and 'log_file_path' in job_info:
-                    log_file_path = job_info['log_file_path']
-                
+                if job_info and "log_file_path" in job_info:
+                    log_file_path = job_info["log_file_path"]
+
                 # Try to get actual error from log file
                 if log_file_path:
                     last_error = get_last_error_from_log(log_file_path)
                     if last_error:
-                        error_message = f"{last_error} (see log file for full error message)"
-                
+                        error_message = (
+                            f"{last_error} (see log file for full error message)"
+                        )
+
                 return {
                     "status": "failed",
                     "error": error_message,
@@ -829,6 +846,23 @@ def process_single_clip(clip_data, settings):
             spectrogram = spectrogram[lowest_index : highest_index + 1, :]
             frequencies = frequencies[lowest_index : highest_index + 1]
 
+        # Show reference frequency line if requested (after bandpass filtering)
+        if settings.get("show_reference_frequency", False):
+            ref_freq = settings.get("reference_frequency", 1000)
+            # Only add reference line if frequency is within the current range
+            if frequencies.min() <= ref_freq <= frequencies.max():
+                closest_index = np.abs(frequencies - ref_freq).argmin()
+                db_range = settings.get("dB_range", [-80, -20])
+                # Make the reference line very prominent
+                spectrogram[closest_index, :] = db_range[1]
+                logger.info(
+                    f"Added reference line at {ref_freq}Hz (index {closest_index})"
+                )
+            else:
+                logger.warning(
+                    f"Reference frequency {ref_freq}Hz is outside frequency range {frequencies.min()}-{frequencies.max()}Hz"
+                )
+
         # Convert spectrogram to image array
         colormap = settings.get("spectrogram_colormap", "greys_r")
         img_array = spec_to_image(
@@ -906,7 +940,7 @@ class LightweightServer:
         """Create JSON response with proper NaN handling"""
         import json
         import math
-        
+
         def convert_nan(obj):
             if isinstance(obj, dict):
                 return {key: convert_nan(value) for key, value in obj.items()}
@@ -916,7 +950,7 @@ class LightweightServer:
                 return None
             else:
                 return obj
-        
+
         clean_data = convert_nan(data)
         return web.json_response(clean_data, **kwargs)
 
@@ -2015,7 +2049,10 @@ class LightweightServer:
 
             if not os.path.exists(file_path):
                 return web.json_response(
-                    {"status": "error", "error": f"Predictions file not found: {file_path}"},
+                    {
+                        "status": "error",
+                        "error": f"Predictions file not found: {file_path}",
+                    },
                     status=400,
                 )
 
@@ -2023,7 +2060,7 @@ class LightweightServer:
             logger.info(f"Reading columns from {file_ext} file: {file_path}")
 
             try:
-                if file_ext == '.pkl':
+                if file_ext == ".pkl":
                     # Read pickle file and get column names
                     df = pd.read_pickle(file_path)
                     columns = df.columns.tolist()
@@ -2035,12 +2072,20 @@ class LightweightServer:
                     logger.info(f"CSV columns: {columns}")
 
                 return web.json_response(
-                    {"status": "success", "columns": columns, "file_path": file_path, "file_type": file_ext}
+                    {
+                        "status": "success",
+                        "columns": columns,
+                        "file_path": file_path,
+                        "file_type": file_ext,
+                    }
                 )
 
             except Exception as e:
                 return web.json_response(
-                    {"status": "error", "error": f"Failed to read predictions file: {str(e)}"},
+                    {
+                        "status": "error",
+                        "error": f"Failed to read predictions file: {str(e)}",
+                    },
                     status=400,
                 )
 
