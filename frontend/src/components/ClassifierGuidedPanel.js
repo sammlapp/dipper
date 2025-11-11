@@ -109,72 +109,6 @@ function ClassifierGuidedPanel({
           </div>
 
           <div className="panel-section">
-            <h4>Clip Sorting</h4>
-            <div className="sort-options">
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="sortStrategy"
-                  value="original"
-                  checked={config.sortStrategy === 'original'}
-                  onChange={(e) => handleSortStrategyChange(e.target.value)}
-                />
-                <span>Original order</span>
-              </label>
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="sortStrategy"
-                  value="score_desc"
-                  checked={config.sortStrategy === 'score_desc'}
-                  onChange={(e) => handleSortStrategyChange(e.target.value)}
-                />
-                <span>Highest to lowest score</span>
-              </label>
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="sortStrategy"
-                  value="random"
-                  checked={config.sortStrategy === 'random'}
-                  onChange={(e) => handleSortStrategyChange(e.target.value)}
-                />
-                <span>Random order</span>
-              </label>
-            </div>
-
-            {config.sortStrategy === 'score_desc' && (
-              <div className="score-column-select">
-                <label>Score Column:</label>
-                <Select
-                  options={numericColumnOptions}
-                  value={selectedScoreColumn}
-                  onChange={handleScoreColumnChange}
-                  placeholder="Select score column..."
-                  isClearable
-                  className="react-select-container"
-                  classNamePrefix="react-select"
-                />
-                {!config.scoreColumn && (
-                  <p className="warning-text">⚠️ Please select a score column</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="panel-section">
-            <h4>Max Clips Per Bin</h4>
-            <input
-              type="number"
-              value={config.maxClipsPerBin}
-              onChange={(e) => handleMaxClipsChange(e.target.value)}
-              min="1"
-              className="number-input"
-            />
-            <p className="help-text">Maximum number of clips to display per bin (default: 20)</p>
-          </div>
-
-          <div className="panel-section">
             <h4>Bin Completion Strategy</h4>
             <div className="completion-options">
               <label className="radio-label">
@@ -257,34 +191,74 @@ function ClassifierGuidedPanel({
               </div>
             )}
           </div>
+          
+          <div className="panel-section">
+            <h4>Clip Sorting</h4>
+            <div className="sort-options">
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  name="sortStrategy"
+                  value="original"
+                  checked={config.sortStrategy === 'original'}
+                  onChange={(e) => handleSortStrategyChange(e.target.value)}
+                />
+                <span>Original order</span>
+              </label>
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  name="sortStrategy"
+                  value="score_desc"
+                  checked={config.sortStrategy === 'score_desc'}
+                  onChange={(e) => handleSortStrategyChange(e.target.value)}
+                />
+                <span>Highest to lowest score</span>
+              </label>
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  name="sortStrategy"
+                  value="random"
+                  checked={config.sortStrategy === 'random'}
+                  onChange={(e) => handleSortStrategyChange(e.target.value)}
+                />
+                <span>Random order</span>
+              </label>
+            </div>
 
-          {totalBins > 0 && (
-            <div className="panel-section bin-info">
-              <h4>Current Progress</h4>
-              <div className="bin-stats">
-                <div className="stat-item">
-                  <span className="stat-label">Bin:</span>
-                  <span className="stat-value">{currentBinIndex + 1} / {totalBins}</span>
-                </div>
-                {currentBinInfo && (
-                  <>
-                    <div className="stat-item">
-                      <span className="stat-label">Clips in bin:</span>
-                      <span className="stat-value">{currentBinInfo.displayedClips}</span>
-                    </div>
-                    <div className="bin-values">
-                      <span className="stat-label">Bin values:</span>
-                      {Object.entries(currentBinInfo.values).map(([key, value]) => (
-                        <div key={key} className="bin-value-item">
-                          <strong>{key}:</strong> {String(value)}
-                        </div>
-                      ))}
-                    </div>
-                  </>
+            {config.sortStrategy === 'score_desc' && (
+              <div className="score-column-select">
+                <label>Score Column:</label>
+                <Select
+                  options={numericColumnOptions}
+                  value={selectedScoreColumn}
+                  onChange={handleScoreColumnChange}
+                  placeholder="Select score column..."
+                  isClearable
+                  className="react-select-container"
+                  classNamePrefix="react-select"
+                />
+                {!config.scoreColumn && (
+                  <p className="warning-text">⚠️ Please select a score column</p>
                 )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
+
+          <div className="panel-section">
+            <h4>Max Clips Per Bin</h4>
+            <input
+              type="number"
+              value={config.maxClipsPerBin}
+              onChange={(e) => handleMaxClipsChange(e.target.value)}
+              min="1"
+              className="number-input"
+            />
+            <p className="help-text">Maximum number of clips to display per bin (default: 20)</p>
+          </div>
+
+
         </>
       )}
     </div>
