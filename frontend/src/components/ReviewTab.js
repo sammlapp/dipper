@@ -1287,41 +1287,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         }
       }
 
-      // Grid mode only shortcuts
+      // Grid mode only shortcuts (with Cmd/Ctrl)
       if (!isFocusMode && cmdOrCtrl) {
         switch (event.key.toLowerCase()) {
-          case 'a':
-            if (event.shiftKey) {
-              // Cmd/Ctrl+Shift+A: bulk annotate as Yes
-              if (settings.review_mode === 'binary') {
-                handleBulkAnnotation('yes');
-              }
-            }
-            break;
-          case 's':
-            if (event.shiftKey) {
-              // Cmd/Ctrl+Shift+S: bulk annotate as No
-              if (settings.review_mode === 'binary') {
-                handleBulkAnnotation('no');
-              }
-            }
-            break;
-          case 'd':
-            if (event.shiftKey) {
-              // Cmd/Ctrl+Shift+D: bulk annotate as Uncertain
-              if (settings.review_mode === 'binary') {
-                handleBulkAnnotation('uncertain');
-              }
-            }
-            break;
-          case 'f':
-            if (event.shiftKey) {
-              // Cmd/Ctrl+Shift+F: bulk annotate as Unlabeled
-              if (settings.review_mode === 'binary') {
-                handleBulkAnnotation('unlabeled');
-              }
-            }
-            break;
           case 'j':
             // Cmd/Ctrl+J: previous page/bin
             if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
@@ -1370,8 +1338,36 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           return;
         }
 
-        // Binary mode: a/s/d/f shortcuts to annotate active clip and advance
-        if (settings.review_mode === 'binary') {
+        // Shift+A/S/D/F: bulk annotate (binary mode only)
+        if (event.shiftKey && settings.review_mode === 'binary') {
+          switch (event.key.toLowerCase()) {
+            case 'a':
+              // Shift+A: Bulk annotate as Yes
+              event.preventDefault();
+              handleBulkAnnotation('yes');
+              return;
+            case 's':
+              // Shift+S: Bulk annotate as No
+              event.preventDefault();
+              handleBulkAnnotation('no');
+              return;
+            case 'd':
+              // Shift+D: Bulk annotate as Uncertain
+              event.preventDefault();
+              handleBulkAnnotation('uncertain');
+              return;
+            case 'f':
+              // Shift+F: Bulk annotate as Unlabeled
+              event.preventDefault();
+              handleBulkAnnotation('unlabeled');
+              return;
+            default:
+              break;
+          }
+        }
+
+        // Binary mode: a/s/d/f shortcuts (without Shift) to annotate active clip and advance
+        if (!event.shiftKey && settings.review_mode === 'binary') {
           switch (event.key.toLowerCase()) {
             case 'a':
               // A: Mark active clip as Yes and advance
