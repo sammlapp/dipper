@@ -81,6 +81,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   });
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [currentSavePath, setCurrentSavePath] = useState(null); // Session save path
+  const [serverInitializing, setServerInitializing] = useState(false);
+  const serverInitializedRef = useRef(false); // Track if server has been initialized
   const fileInputRef = useRef(null);
 
   // HTTP-based loader (fast and reliable)
@@ -298,7 +300,15 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           visualizationSettings.dB_range = [-80, -20];
         }
 
+        // Show server initializing message only on first load
+        if (!serverInitializedRef.current) {
+          setServerInitializing(true);
+        }
         const loadedClips = await httpLoader.loadClipsBatch(clipsToLoad, visualizationSettings);
+        if (!serverInitializedRef.current) {
+          serverInitializedRef.current = true;
+          setServerInitializing(false);
+        }
         console.log('Loaded clips result:', loadedClips);
 
         // Check if any clips failed to load
@@ -338,6 +348,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           settings: visualizationSettings,
           clipCount: clipsToLoad.length
         });
+        // Mark server as initialized even on error to avoid showing message repeatedly
+        if (!serverInitializedRef.current) {
+          serverInitializedRef.current = true;
+          setServerInitializing(false);
+        }
       } finally {
         // Don't set transitioning state - no overlay shown
         // setIsPageTransitioning(false);
@@ -1866,11 +1881,14 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           })}
         </div>
 
-        {/* Loading overlay disabled - old content stays visible until new content loads */}
-        {/* {showLoadingOverlay && (
+        {/* Loading overlay - show when server is initializing */}
+        {serverInitializing && (
           <div className="loading-overlay">
             <div className="loading-content">
-              <p>Loading spectrograms...</p>
+              <p>Initializing audio processing server...</p>
+              <p style={{ fontSize: '0.9em', color: '#666', marginTop: '8px' }}>
+                This may take a few seconds on first load while Python libraries are loaded.
+              </p>
               {httpLoader.progress > 0 && (
                 <div className="progress-bar">
                   <div
@@ -1881,7 +1899,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
               )}
             </div>
           </div>
-        )} */}
+        )}
       </div>
       </>
     );

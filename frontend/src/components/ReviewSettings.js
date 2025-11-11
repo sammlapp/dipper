@@ -66,7 +66,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     
     // Display settings
     show_comments: false,
-    show_file_name: true,
+    show_file_name: false,
     
     // Image resize settings
     resize_images: true,
