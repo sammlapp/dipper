@@ -273,13 +273,12 @@ need to update BMZ version then update dependency
 - don't like the visual aesthetic of the segmented controls. Let's try something different while retaining the per-button coloring and functionality
 - add settings option for whether to auto-advance after an annotation in Focus mode
 - "status bar" is being covered by the global app status bar in App.js instead of integrating with it. 
-- show reference frequency line: this is not doing anything
-- in Build version, changing the spectrogram color map breaks something
+- auto-advance in classifier-guided listening mode: 
 
 ### ✅ Review-only App
 within this project, create a separate deployable/buildable version of the app that only includes the Review tab. In this version of the app, we can remove page navigation as there will only be one page. We should be able to build this app as a desktop executable that includes the lightweight compiled python environment.
 
-- the offset of main content vs top menu bar isn't working correctly. When the window is narrow the menu bar will wrap around and become larger. The main content should simply always be below the menu bar. It seems like there should be a simpler way to do this than trying to calculate the expected height of the menu bar. 
+- the offset of main content vs top menu bar isn't working correctly. When the window is narrow the menu bar will wrap around and become larger, causing it to cover the top of the main content. The main content should simply always be below the menu bar. It seems like there should be a simpler way to do this than trying to calculate the expected height of the menu bar, by placing the element below the menu bar instead of behind it. 
 
 **COMPLETED**: Created review-only version of Dipper
 - Modified App.js to conditionally render based on `REACT_APP_REVIEW_ONLY` environment variable
@@ -353,13 +352,10 @@ Apply Shallow Classifier to Embedding DB:
 
 
 Otherwise, the task creation form remains the same. When Embed to database is selected in the multi-select, a different 
+
+
 ## updates for review tab
-
-- reference frequency line not showing. To create the reference frequency line, should make the pixels maximal value at the relevant row of the spectrogram. 
-
 consolidate the global theming options into a simple config or css file, so that I can make edits to the set of colors, fonts, font weights, font sizes, overall spacing values in one place for the entire app. 
-
-- if one or more audio files is not found when trying to display it, provide a helpful message like: f"Audio file was not found in {absolute_path}.  Set 'Root Audio Folder' to the location from which relative paths are specified in the 'file' column of the annotation csv, or clear it if absolute paths are specified."
 
 ## conda-pack updates:
 - if on linux or mac, include ai-edge-litert as a dependency and allow BirdNET use in the inference gui

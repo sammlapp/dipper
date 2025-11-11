@@ -93,7 +93,7 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": "assets/icon.icns",
+      "icon": "assets/dipper.icns",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "target": [
@@ -130,7 +130,7 @@
     },
     "dmg": {
       "title": "Dipper",
-      "icon": "assets/icon.icns",
+      "icon": "assets/dipper.icns",
       "background": null,
       "contents": [
         {

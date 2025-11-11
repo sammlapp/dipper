@@ -45,7 +45,7 @@
   ],
   "mac": {
     "category": "public.app-category.productivity",
-    "icon": "assets/icon.icns",
+    "icon": "assets/dipper.icns",
     "hardenedRuntime": false,
     "gatekeeperAssess": false,
     "target": [
@@ -82,7 +82,7 @@
   },
   "dmg": {
     "title": "Dipper Review",
-    "icon": "assets/icon.icns",
+    "icon": "assets/dipper.icns",
     "background": null,
     "contents": [
       {
