@@ -1002,6 +1002,7 @@ class LightweightServer:
         self.app.router.add_post(
             "/extraction/scan-predictions", self.scan_predictions_folder
         )
+        self.app.router.add_post("/review/load-task", self.load_review_task)
         self.app.router.add_post("/extraction/run", self.run_extraction)
         self.app.router.add_get(
             "/extraction/status/{job_id}", self.get_extraction_status
@@ -1029,6 +1030,7 @@ class LightweightServer:
                     "scan_folder",
                     "get_sample_detections",
                     "load_scores",
+                    "load_extraction_task",
                     "config_management",
                     "env_management",
                     "inference_runner",
@@ -1106,6 +1108,249 @@ class LightweightServer:
         except Exception as e:
             logger.error(f"Error loading scores: {e}")
             return web.json_response({"error": str(e), "scores": {}}, status=500)
+
+    def _multihot_to_class_list(self, series, classes, threshold=0):
+        """Helper function to convert multi-hot row to list of class names"""
+        labels = series[classes]
+        # Convert to numeric, treating non-numeric values as 0
+        labels = pd.to_numeric(labels, errors="coerce").fillna(0)
+        return labels[labels > threshold].index.to_list()
+
+    async def load_review_task(self, request):
+        """Load extraction task CSV file for the Review tab"""
+        try:
+            data = await request.json()
+            csv_path = data.get("csv_path")
+            threshold = data.get("threshold", 0)
+
+            if not csv_path:
+                return web.json_response({"error": "csv_path is required"}, status=400)
+
+            if not os.path.exists(csv_path):
+                return web.json_response(
+                    {"error": f"File not found: {csv_path}"}, status=404
+                )
+
+            logger.info(f"Loading extraction task CSV: {csv_path}")
+
+            # Read CSV file
+            df = pd.read_csv(csv_path)
+
+            # Validate required columns
+            required_columns = ["file", "start_time"]
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                return web.json_response(
+                    {
+                        "error": f"Missing required columns: {', '.join(missing_columns)}"
+                    },
+                    status=400,
+                )
+
+            logger.info(f"Found {len(df)} clips in CSV")
+            logger.info(f"Columns: {list(df.columns)}")
+
+            # Convert numeric columns to proper types
+            df["start_time"] = pd.to_numeric(df["start_time"], errors="coerce")
+            if "end_time" in df.columns:
+                df["end_time"] = pd.to_numeric(df["end_time"], errors="coerce")
+
+            # Determine clip duration if end time is provided
+            if (
+                "end_time" in df.columns
+                and len(df) > 0
+                and pd.notna(df["end_time"].iloc[0])
+            ):
+                duration = float(df.iloc[0]["end_time"] - df.iloc[0]["start_time"])
+            else:
+                duration = None
+
+            # Fill missing values
+            df["id"] = list(range(len(df)))
+            if "comments" in df.columns:
+                df["comments"].fillna("", inplace=True)
+            else:
+                df["comments"] = ""
+
+            # Check for conflicting columns
+            if "annotation" in df.columns and "labels" in df.columns:
+                return web.json_response(
+                    {
+                        "error": """Found columns for both 'annotation' (yes/no/uncertain) and
+                        'labels' (lists of classes present) which could lead to mass
+                        confusion and is not allowed. Consider creating a version of the
+                        annotation file in which only one of these columns is present.
+                        If you are performing single-class annotation, retain the
+                        'annotation' column and delete the 'labels' column. If you are
+                        performing multi-class annotation, retain the 'labels'
+                        column and remove the 'annotation' column."""
+                    },
+                    status=400,
+                )
+
+            classes = None
+
+            if "annotation" in df.columns:
+                # Binary classification format
+                df["annotation"].fillna("", inplace=True)
+                df["annotation"] = df["annotation"].str.strip().str.lower()
+
+                # Validate annotation values
+                valid_annotations = ["yes", "no", "uncertain", ""]
+                invalid = df["annotation"][~df["annotation"].isin(valid_annotations)]
+                if not invalid.empty:
+                    return web.json_response(
+                        {
+                            "error": f"annotation column contained invalid values: {invalid.unique()}. Valid values are: {valid_annotations}"
+                        },
+                        status=400,
+                    )
+
+                # Reorder columns
+                standard_cols = ["file", "start_time"]
+                if "end_time" in df.columns:
+                    standard_cols.append("end_time")
+                standard_cols.extend(["annotation", "comments"])
+
+                extra_cols = [
+                    col
+                    for col in df.columns
+                    if col not in standard_cols and col != "id"
+                ]
+                df = df[standard_cols + extra_cols + ["id"]]
+
+            elif "labels" in df.columns:
+                # Multi-class with labels column
+                classes = set()
+                df["labels"].fillna("", inplace=True)
+
+                # Parse labels
+                def parse_labels(x):
+                    if pd.isna(x) or x == "":
+                        return []
+                    elif isinstance(x, list):
+                        return x
+                    elif isinstance(x, str):
+                        if x.startswith("[") and x.endswith("]"):
+                            try:
+                                return json.loads(x.replace("'", '"'))
+                            except:
+                                return []
+                        else:
+                            return [
+                                label.strip() for label in x.split(",") if label.strip()
+                            ]
+                    else:
+                        return []
+
+                df["labels"] = df["labels"].apply(parse_labels)
+
+                # Extract unique classes
+                for labels_list in df["labels"]:
+                    if isinstance(labels_list, list):
+                        classes.update(labels_list)
+                classes = sorted(list(classes)) if classes else None
+
+                # Handle annotation_status
+                if "annotation_status" not in df.columns:
+                    df["annotation_status"] = "unreviewed"
+                else:
+                    df["annotation_status"].fillna("unreviewed", inplace=True)
+
+                # Validate annotation_status
+                valid_statuses = ["complete", "unreviewed", "uncertain"]
+                invalid_statuses = df["annotation_status"][
+                    ~df["annotation_status"].isin(valid_statuses)
+                ]
+                if not invalid_statuses.empty:
+                    return web.json_response(
+                        {
+                            "error": f"annotation_status column contained invalid values: {invalid_statuses.unique()}. Valid values are: {valid_statuses}"
+                        },
+                        status=400,
+                    )
+
+                # Reorder columns
+                standard_cols = ["file", "start_time"]
+                if "end_time" in df.columns:
+                    standard_cols.append("end_time")
+                standard_cols.extend(["labels", "annotation_status", "comments"])
+
+                extra_cols = [
+                    col
+                    for col in df.columns
+                    if col not in standard_cols and col != "id"
+                ]
+                df = df[standard_cols + extra_cols + ["id"]]
+
+                # Serialize labels to JSON
+                df["labels"] = df["labels"].apply(
+                    lambda x: json.dumps(x) if isinstance(x, list) else "[]"
+                )
+
+            else:
+                # Multi-hot format (one column per class)
+                classes = list(
+                    set(df.columns)
+                    - set(["file", "start_time", "end_time", "comments", "id"])
+                )
+                df["labels"] = df.apply(
+                    self._multihot_to_class_list, axis=1, args=(classes, threshold)
+                )
+
+                # Serialize labels to JSON
+                df["labels"] = df["labels"].apply(
+                    lambda x: json.dumps(x) if isinstance(x, list) else "[]"
+                )
+
+                if "comments" not in df.columns:
+                    df["comments"] = ""
+
+                df["annotation_status"] = "unreviewed"
+
+                # Reorder columns
+                standard_cols = ["file", "start_time"]
+                if "end_time" in df.columns:
+                    standard_cols.append("end_time")
+                standard_cols.extend(["labels", "annotation_status", "comments"])
+
+                extra_cols = [
+                    col
+                    for col in df.columns
+                    if col not in standard_cols and col not in classes and col != "id"
+                ]
+                df = df[standard_cols + extra_cols + ["id"]]
+
+            # Convert to JSON
+            clips = df.to_dict(orient="records")
+
+            # Handle NaN values
+            for i, clip in enumerate(clips):
+                clip["id"] = i
+                for key, value in clip.items():
+                    if pd.isna(value):
+                        clip[key] = None
+
+            result = {
+                "clips": clips,
+                "total_clips": len(clips),
+                "columns": list(df.columns),
+                "duration": duration,
+                "classes": classes,
+            }
+
+            return self.json_response_with_nan_handling(result)
+
+        except pd.errors.EmptyDataError:
+            return web.json_response({"error": "CSV file is empty"}, status=400)
+        except pd.errors.ParserError as e:
+            logger.error(f"CSV parse error: {e}")
+            return web.json_response(
+                {"error": f"Failed to parse CSV: {str(e)}"}, status=400
+            )
+        except Exception as e:
+            logger.error(f"Error loading extraction task: {e}")
+            return web.json_response({"error": str(e)}, status=500)
 
     async def count_file_rows(self, request):
         """Count rows in a CSV or PKL file"""

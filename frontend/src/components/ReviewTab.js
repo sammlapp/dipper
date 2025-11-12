@@ -676,18 +676,25 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       const newSettings = { ...currentSettings, root_audio_path: csvDirectory };
       localStorage.setItem('review_settings', JSON.stringify(newSettings));
 
-      // Use Python script to read CSV file
-      const processId = Date.now().toString();
-      const result = await window.electronAPI.runPythonScript(
-        'load_extraction_task.py',
-        [filePath],
-        processId
-      );
+      // Use HTTP endpoint to load CSV file
+      const response = await fetch('http://localhost:8000/review/load-task', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          csv_path: filePath,
+          threshold: 0
+        })
+      });
 
-      console.log('Raw Python script result:', result);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
 
-      const data = JSON.parse(result.stdout);
-      console.log('Parsed annotation data:', data);
+      const data = await response.json();
+      console.log('Loaded annotation data:', data);
 
       if (data.error) {
         console.error('Backend error:', data.error);
