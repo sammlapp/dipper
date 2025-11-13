@@ -358,14 +358,30 @@ class TaskManager {
           }
 
           const result = await response.json();
+          console.log('[TaskManager] Inference status poll result:', result);
 
           // Update task progress based on status
           if (result.status === 'running') {
             // Store system PID if available
-            const updates = { progress: 'Inference running...' };
+            const updates = {};
+
+            // Use detailed status message from .status file if available
+            if (result.message) {
+              console.log('[TaskManager] Using detailed status message:', result.message);
+              updates.progress = result.message;
+            } else {
+              updates.progress = 'Inference running...';
+            }
+
+            // Add progress percentage if available
+            if (result.progress !== undefined) {
+              updates.progressPercent = result.progress;
+            }
+
             if (result.system_pid) {
               updates.systemPid = result.system_pid;
             }
+
             this.updateTask(taskId, updates);
             // Continue polling
             setTimeout(poll, pollInterval);
@@ -549,10 +565,24 @@ class TaskManager {
           // Update task progress based on status
           if (result.status === 'running') {
             // Store system PID if available
-            const updates = { progress: 'Training running...' };
+            const updates = {};
+
+            // Use detailed status message from .status file if available
+            if (result.message) {
+              updates.progress = result.message;
+            } else {
+              updates.progress = 'Training running...';
+            }
+
+            // Add progress percentage if available
+            if (result.progress !== undefined) {
+              updates.progressPercent = result.progress;
+            }
+
             if (result.system_pid) {
               updates.systemPid = result.system_pid;
             }
+
             this.updateTask(taskId, updates);
             // Continue polling
             setTimeout(poll, pollInterval);
@@ -728,10 +758,24 @@ class TaskManager {
           // Update task progress based on status
           if (result.status === 'running') {
             // Store system PID if available
-            const updates = { progress: 'Clip extraction task running...' };
+            const updates = {};
+
+            // Use detailed status message from .status file if available
+            if (result.message) {
+              updates.progress = result.message;
+            } else {
+              updates.progress = 'Clip extraction task running...';
+            }
+
+            // Add progress percentage if available
+            if (result.progress !== undefined) {
+              updates.progressPercent = result.progress;
+            }
+
             if (result.system_pid) {
               updates.systemPid = result.system_pid;
             }
+
             this.updateTask(taskId, updates);
             // Continue polling
             setTimeout(poll, pollInterval);

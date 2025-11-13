@@ -28,6 +28,40 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def update_status(
+    job_folder, status, stage=None, progress=None, message=None, **metadata
+):
+    """Write status update to .status file in job directory
+
+    Args:
+        job_folder: Path to directory where job stores outputs
+        status: Current status (e.g., 'running', 'completed', 'error')
+        stage: Current stage of processing (e.g., 'loading_model', 'processing_files')
+        progress: Progress percentage (0-100)
+        message: Human-readable status message
+        **metadata: Additional metadata to include in status file
+    """
+    import time
+
+    status_file = Path(job_folder) / ".status"
+    status_data = {"status": status, "timestamp": time.time()}
+    if stage:
+        status_data["stage"] = stage
+    if message:
+        status_data["message"] = message
+    if progress is not None:
+        status_data["progress"] = progress
+    if metadata:
+        status_data["metadata"] = metadata
+
+    try:
+        with open(status_file, "w") as f:
+            json.dump(status_data, f, indent=2)
+        logger.info(f"Updated status: {status_data}")
+    except Exception as e:
+        logger.warning(f"Failed to update status file: {e}")
+
+
 def run_inference(files, model, config_data):
     """Run inference on audio files using the model's predict method"""
     logger.info(f"Processing {len(files)} audio files")
@@ -36,13 +70,11 @@ def run_inference(files, model, config_data):
     try:
         # Progress tracking
         total_files = len(files)
+        job_folder = config_data.get("job_folder")
 
         # Use the model's predict method with the configuration
         # This matches the streamlit implementation: model.predict(ss.selected_files, **ss.cfg["inference"])
         logger.info("Starting model prediction...")
-
-        # Show progress
-        logger.info(f"Progress: 0% (0/{total_files})")
 
         if config_data.get("mode") == "classify_from_hoplite":
             # run shallow classifier on features retrieved from hoplite db
@@ -54,11 +86,24 @@ def run_inference(files, model, config_data):
 
         logger.info(f"Progress: 100% ({total_files}/{total_files})")
         logger.info(f"Predictions generated with shape: {predictions.shape}")
+        update_status(
+            job_folder,
+            "running",
+            stage="processing_files",
+            progress=100,
+            message=f"Completed processing {total_files} files",
+        )
 
         return predictions
 
     except Exception as e:
         logger.error(f"Error during inference: {e}")
+        update_status(
+            job_folder,
+            "error",
+            stage="processing_files",
+            message=f"Error during inference: {str(e)}",
+        )
         import traceback
 
         logger.error(f"Traceback: {traceback.format_exc()}")
@@ -73,6 +118,14 @@ def save_results(predictions, output_file, config_data):
 
     if output_file:
         try:
+            job_folder = config_data.get("job_folder")
+            update_status(
+                job_folder,
+                "running",
+                stage="saving_results",
+                message=f"Saving predictions to {os.path.basename(output_file)}",
+            )
+
             if sparse_threshold is None:
                 # save all scores for all classes and clips
                 predictions.to_csv(output_file)
@@ -90,6 +143,12 @@ def save_results(predictions, output_file, config_data):
             logger.info(f"Predictions saved to: {output_file}")
         except Exception as e:
             logger.error(f"Failed to save predictions: {e}")
+            update_status(
+                job_folder,
+                "error",
+                stage="saving_results",
+                message=f"Failed to save predictions: {str(e)}",
+            )
             raise
 
 
@@ -134,10 +193,12 @@ def group_files_by_subfolder(files):
     return dict(subfolder_groups)
 
 
-def run_classification(model, files, job_dir, config_data):
+def run_classification(model, files, config_data):
     # Extract values from config file
     inference_config = config_data.get("inference_settings", {})
     logger.info(f"Inference Configuration: {inference_config}")
+
+    job_folder = config_data.get("job_folder")
 
     out_name = (
         "predictions.csv"
@@ -161,13 +222,20 @@ def run_classification(model, files, job_dir, config_data):
         all_results = []
         output_files = []
 
-        for subfolder_name, files_subset in subfolder_groups.items():
+        for i, (subfolder_name, files_subset) in enumerate(subfolder_groups.items()):
             logger.info(
-                f"Processing subfolder '{subfolder_name}' with {len(files_subset)} files"
+                f"Processing subfolder {i+1} of {len(subfolder_groups)} ('{subfolder_name}') with {len(files_subset)} files"
+            )
+            update_status(
+                job_folder,
+                "running",
+                stage=f"processing_{subfolder_name}",
+                progress=int((i / len(subfolder_groups)) * 100),
+                message=f"Processing subfolder {i+1} of {len(subfolder_groups)}: '{subfolder_name}'",
             )
 
             # Generate output file name for this subfolder
-            output_file = job_dir / f"{subfolder_name}_{out_name}"
+            output_file = Path(job_folder) / f"{subfolder_name}_{out_name}"
             output_files.append(str(output_file))
 
             # Run inference on this subset
@@ -220,10 +288,20 @@ def run_classification(model, files, job_dir, config_data):
             else "local model"
         )
         logger.info(f"Starting inference with model: {model_name}")
-        predictions = run_inference(files, model, inference_config)
+        # Show progress
+        total_files = len(files)
+        logger.info(f"Progress: 0% (0/{total_files})")
+        update_status(
+            job_folder,
+            "running",
+            stage="processing_files",
+            progress=0,
+            message=f"Processing {total_files} audio files",
+        )
+        predictions = run_inference(files, model, config_data)
 
-        output_file = job_dir / out_name
-        save_results(predictions, output_file, inference_config)
+        output_file = Path(job_folder) / out_name
+        save_results(predictions, output_file, config_data)
 
         # summary of task completed
         summary.update(
@@ -241,6 +319,15 @@ def run_classification(model, files, job_dir, config_data):
         )
 
     logger.info("Inference completed successfully")
+
+    update_status(
+        job_folder,
+        "completed",
+        stage="finished",
+        progress=100,
+        message="Inference completed successfully",
+    )
+
     print(json.dumps(summary))
 
 
@@ -315,8 +402,18 @@ def main():
     # Load configuration from file
     config_data = load_config_file(args.config, logger=logger)
 
+    # Get job folder for status updates
+    job_folder = Path(config_data.get("job_folder"))
+
     try:
+
         # Resolve files from any of the specified methods in the config
+        update_status(
+            job_folder,
+            "running",
+            stage="resolving_files",
+            message="Resolving audio files from configuration",
+        )
         files = resolve_files_from_config(config_data, logger)
 
         # Validate first file exists
@@ -327,6 +424,12 @@ def main():
 
         # initialize model from BMZ or local file
         logger.info("Loading and initializing model from configuration")
+        update_status(
+            job_folder,
+            "running",
+            stage="loading_model",
+            message="Loading and initializing model",
+        )
         model = load_model(config_data, logger)
 
         logger.info(f"Output directory: {config_data.get('output_dir')}")
@@ -359,7 +462,7 @@ def main():
             mode = "classification"
         logger.info("current mode: " + mode)
         if mode == "classification":
-            run_classification(model, files, job_dir, config_data)
+            run_classification(model, files, config_data)
         elif mode == "embed_to_hoplite":
             assert hasattr(
                 model, "embed_to_hoplite_db"
@@ -376,6 +479,12 @@ def main():
 
     except Exception as e:
         logger.error(f"Inference failed: {e}")
+        update_status(
+            job_folder,
+            "error",
+            stage="failed",
+            message=f"Inference failed: {str(e)}",
+        )
         error_summary = {"status": "error", "error": str(e)}
         print(json.dumps(error_summary))
         sys.exit(1)

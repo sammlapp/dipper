@@ -225,6 +225,30 @@ wandb integration with training & inference for logging progress and model evalu
 
 for clip review from query/explore mode: "add to cart" button on panel, adds the clip to an annotation "cart" that can be exported as an annotation task
 
+
+## Environment management
+
+When we build  the env .tar.gz it should be placed in the local project folder (no change). However, when downloading and unpacking the environment during app runtime, we need to place the downloaded .tar.gz in a system-specific and app-specific cache dir, which we can get with the appdirs.user_cache_dir() function. I added the module appdirs.py in backend/scripts. 
+
+Add gdown as a dependency `pip install gdown`, it will also be needed in the pyinstaller executable.
+
+Global variable for the google drive sharing link of the heavier Pytorch environment: 
+https://drive.google.com/uc?id=1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O
+
+The environment can be downloaded on an as-needed basis (when inference or training script is run and the environment isn't yet available) using python or bash 
+```python
+import gdown
+PYTORCH_ENV_URL="https://drive.google.com/uc?id=1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O"
+gdown.download(PYTORCH_ENV_URL, "dipper_pytorch_env.tar.gz", quiet=False)
+```
+
+```bash
+gdown 'https://drive.google.com/uc?id=1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O'
+```
+
+The file is the .tar.gz that we create when we build:python-env to create the pytorch enviornment. It should be placed in the appropriate cache directory for the user's system. This should become part of the lightweight_server.setup_environment() procedure, which subsequently unpacks the .tar.gz file and puts it in the correct location. While downloading the environment (a one-time operation), we should provide an informative message in the status bar so that the user understands that downloading may take a few minutes (700 Mb). 
+
+
 ## Extraction improvements:
 Stratification by folder metadata (eg 'primary period', 'secondary period','site', 'treatment group')
 

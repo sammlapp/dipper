@@ -373,16 +373,18 @@ def start_inference_process(job_id, config_path, env_python_path):
         if not os.path.exists(config_path):
             return {"status": "error", "error": f"Config file not found: {config_path}"}
 
-        # Load config to get log file path
+        # Load config to get log file path and job folder
         log_file_path = None
+        job_folder = None
         try:
             import json
 
             with open(config_path, "r") as f:
                 config_data = json.load(f)
                 log_file_path = config_data.get("log_file_path")
+                job_folder = config_data.get("job_folder")
         except Exception as e:
-            logger.warning(f"Could not read log_file_path from config: {e}")
+            logger.warning(f"Could not read config data: {e}")
 
         # Run inference.py with the specified Python environment
         inference_script = os.path.join(
@@ -430,6 +432,7 @@ def start_inference_process(job_id, config_path, env_python_path):
             "command": " ".join(cmd),
             "message": "Inference process started successfully",
             "log_file_path": log_file_path,
+            "job_folder": job_folder,
         }
 
     except Exception as e:
@@ -446,19 +449,24 @@ def check_inference_status(process, job_info=None):
         return_code = process.poll()
 
         if return_code is None:
-            # Process is still running
             status_response = {
                 "status": "running",
-                "message": "Inference process is still running",
+                "message": "Inference process is initializing",
             }
 
             # Try to read detailed status from .status file
             if job_info and "job_folder" in job_info:
                 status_file = os.path.join(job_info["job_folder"], ".status")
+                logger.info(
+                    f"[check_inference_status] Checking for status file: {status_file}"
+                )
                 if os.path.exists(status_file):
                     try:
-                        with open(status_file, 'r') as f:
+                        with open(status_file, "r") as f:
                             status_data = json.load(f)
+                            logger.info(
+                                f"[check_inference_status] Read status file data: {status_data}"
+                            )
                             # Merge status file data into response
                             if "stage" in status_data:
                                 status_response["stage"] = status_data["stage"]
@@ -468,8 +476,17 @@ def check_inference_status(process, job_info=None):
                                 status_response["message"] = status_data["message"]
                             if "metadata" in status_data:
                                 status_response["metadata"] = status_data["metadata"]
+                            logger.info(
+                                f"[check_inference_status] Merged status response: {status_response}"
+                            )
                     except Exception as e:
-                        logger.debug(f"Could not read status file: {e}")
+                        logger.warning(
+                            f"[check_inference_status] Could not read status file: {e}"
+                        )
+                else:
+                    logger.debug(
+                        f"[check_inference_status] Status file does not exist yet: {status_file}"
+                    )
 
             return status_response
         else:
@@ -556,16 +573,18 @@ def start_training_process(job_id, config_path, env_python_path):
         if not os.path.exists(config_path):
             return {"status": "error", "error": f"Config file not found: {config_path}"}
 
-        # Load config to get log file path
+        # Load config to get log file path and job folder
         log_file_path = None
+        job_folder = None
         try:
             import json
 
             with open(config_path, "r") as f:
                 config_data = json.load(f)
                 log_file_path = config_data.get("log_file_path")
+                job_folder = config_data.get("job_folder")
         except Exception as e:
-            logger.warning(f"Could not read log_file_path from config: {e}")
+            logger.warning(f"Could not read config data: {e}")
 
         # Run train_model.py with the specified Python environment
         training_script = os.path.join(
@@ -613,6 +632,7 @@ def start_training_process(job_id, config_path, env_python_path):
             "command": " ".join(cmd),
             "message": "Training process started successfully",
             "log_file_path": log_file_path,
+            "job_folder": job_folder,
         }
 
     except Exception as e:
@@ -640,16 +660,18 @@ def start_extraction_process(job_id, config_path, env_python_path):
         if not os.path.exists(config_path):
             return {"status": "error", "error": f"Config file not found: {config_path}"}
 
-        # Load config to get log file path
+        # Load config to get log file path and job folder
         log_file_path = None
+        job_folder = None
         try:
             import json
 
             with open(config_path, "r") as f:
                 config_data = json.load(f)
                 log_file_path = config_data.get("log_file_path")
+                job_folder = config_data.get("job_folder")
         except Exception as e:
-            logger.warning(f"Could not read log_file_path from config: {e}")
+            logger.warning(f"Could not read config data: {e}")
 
         # Run create_extraction_task.py with the specified Python environment
         extraction_script = os.path.join(
@@ -697,6 +719,7 @@ def start_extraction_process(job_id, config_path, env_python_path):
             "command": " ".join(cmd),
             "message": "Extraction process started successfully",
             "log_file_path": log_file_path,
+            "job_folder": job_folder,
         }
 
     except Exception as e:
@@ -724,7 +747,7 @@ def check_training_status(process, job_info=None):
                 status_file = os.path.join(job_info["job_folder"], ".status")
                 if os.path.exists(status_file):
                     try:
-                        with open(status_file, 'r') as f:
+                        with open(status_file, "r") as f:
                             status_data = json.load(f)
                             # Merge status file data into response
                             if "stage" in status_data:
@@ -823,7 +846,7 @@ def check_extraction_status(process, job_info=None):
                 status_file = os.path.join(job_info["job_folder"], ".status")
                 if os.path.exists(status_file):
                     try:
-                        with open(status_file, 'r') as f:
+                        with open(status_file, "r") as f:
                             status_data = json.load(f)
                             # Merge status file data into response
                             if "stage" in status_data:
@@ -1775,6 +1798,7 @@ class LightweightServer:
                     "command": result["command"],
                     "started_at": asyncio.get_event_loop().time(),
                     "log_file_path": result.get("log_file_path"),
+                    "job_folder": result.get("job_folder"),
                 }
 
                 return web.json_response(
@@ -1946,6 +1970,7 @@ class LightweightServer:
                     "started_at": asyncio.get_event_loop().time(),
                     "job_type": "training",
                     "log_file_path": result.get("log_file_path"),
+                    "job_folder": result.get("job_folder"),
                 }
 
                 return web.json_response(
@@ -2145,6 +2170,7 @@ class LightweightServer:
                     "started_at": asyncio.get_event_loop().time(),
                     "job_type": "extraction",
                     "log_file_path": result.get("log_file_path"),
+                    "job_folder": result.get("job_folder"),
                 }
 
                 return web.json_response(
