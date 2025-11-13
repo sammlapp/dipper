@@ -275,10 +275,13 @@ need to update BMZ version then update dependency
 - "status bar" is being covered by the global app status bar in App.js instead of integrating with it. 
 - auto-advance in classifier-guided listening mode: 
 
+Something is wrong with the way grid mode is rendering when CGL is enabled. When CGL is off, I can create a grid with 2 columns, but when CGL is on, choosing 2 columns setting creates only 1 column in the displayed grid. 
+
 ### ✅ Review-only App
 within this project, create a separate deployable/buildable version of the app that only includes the Review tab. In this version of the app, we can remove page navigation as there will only be one page. We should be able to build this app as a desktop executable that includes the lightweight compiled python environment.
 
 - the offset of main content vs top menu bar isn't working correctly. When the window is narrow the menu bar will wrap around and become larger, causing it to cover the top of the main content. The main content should simply always be below the menu bar. It seems like there should be a simpler way to do this than trying to calculate the expected height of the menu bar, by placing the element below the menu bar instead of behind it. 
+
 
 **COMPLETED**: Created review-only version of Dipper
 - Modified App.js to conditionally render based on `REACT_APP_REVIEW_ONLY` environment variable
