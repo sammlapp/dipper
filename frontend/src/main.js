@@ -383,7 +383,7 @@ ipcMain.handle('generate-unique-folder-name', async (event, basePath, folderName
 ipcMain.handle('save-file', async (event, defaultName) => {
   // Determine file type from extension
   const isJsonFile = defaultName && defaultName.toLowerCase().includes('.json');
-  
+
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName,
     filters: isJsonFile ? [
@@ -397,66 +397,7 @@ ipcMain.handle('save-file', async (event, defaultName) => {
   return result.filePath;
 });
 
-ipcMain.handle('run-python-script', async (event, scriptPath, args, processId) => {
-  return new Promise((resolve, reject) => {
-    // Get script name without extension
-    const scriptName = path.basename(scriptPath, '.py');
-    const pythonCmd = getPythonCommand(scriptName);
-    
-    let command, commandArgs;
-    if (pythonCmd.needsScript) {
-      command = pythonCmd.command;
-      commandArgs = [pythonCmd.scriptPath, ...args];
-    } else {
-      command = pythonCmd.command;
-      commandArgs = args;
-    }
-    
-    console.log(`Running: ${command} ${commandArgs.join(' ')}`);
-    
-    const process = spawn(command, commandArgs);
-    pythonProcesses.set(processId, process);
-    
-    let stdout = '';
-    let stderr = '';
-    
-    process.stdout.on('data', (data) => {
-      const output = data.toString();
-      stdout += output;
-      // Send progress updates to renderer
-      mainWindow.webContents.send('python-output', { 
-        processId, 
-        type: 'stdout', 
-        data: output 
-      });
-    });
-    
-    process.stderr.on('data', (data) => {
-      const output = data.toString();
-      stderr += output;
-      mainWindow.webContents.send('python-output', { 
-        processId, 
-        type: 'stderr', 
-        data: output 
-      });
-    });
-    
-    process.on('close', (code) => {
-      pythonProcesses.delete(processId);
-      if (code === 0) {
-        resolve({ stdout, stderr, code });
-      } else {
-        reject(new Error(`Python process exited with code ${code}: ${stderr}`));
-      }
-    });
-    
-    process.on('error', (error) => {
-      pythonProcesses.delete(processId);
-      reject(error);
-    });
-  });
-});
-
+// Process management - used as fallback for job cancellation
 ipcMain.handle('kill-python-process', async (event, processId) => {
   const process = pythonProcesses.get(processId);
   if (process) {
@@ -467,83 +408,10 @@ ipcMain.handle('kill-python-process', async (event, processId) => {
   return false;
 });
 
-ipcMain.handle('test-python-path', async () => {
-  const pythonPath = getCondaPythonPath();
-  return {
-    pythonPath: pythonPath,
-    exists: fs.existsSync(pythonPath),
-    homeDir: os.homedir()
-  };
-});
-
-ipcMain.handle('create-audio-clips', async (event, filePath, startTime, endTime, settings) => {
-  return new Promise((resolve, reject) => {
-    const pythonCmd = getPythonCommand('create_audio_clips');
-    
-    const args = [
-      '--file', filePath,
-      '--start', startTime.toString(),
-      '--end', endTime.toString(),
-      '--settings', JSON.stringify(settings)
-    ];
-    
-    let command, commandArgs;
-    if (pythonCmd.needsScript) {
-      command = pythonCmd.command;
-      commandArgs = [pythonCmd.scriptPath, ...args];
-    } else {
-      command = pythonCmd.command;
-      commandArgs = args;
-    }
-    
-    console.log(`Creating audio clips: ${command} ${commandArgs.join(' ')}`);
-    
-    const process = spawn(command, commandArgs);
-    
-    let stdout = '';
-    let stderr = '';
-    
-    process.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-    
-    process.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-    
-    process.on('close', (code) => {
-      if (code === 0) {
-        try {
-          const result = JSON.parse(stdout);
-          resolve(result);
-        } catch (error) {
-          reject(new Error(`Failed to parse audio clip result: ${error.message}`));
-        }
-      } else {
-        reject(new Error(`Audio clip creation failed: ${stderr}`));
-      }
-    });
-    
-    process.on('error', (error) => {
-      reject(error);
-    });
-  });
-});
-
 ipcMain.handle('write-file', async (event, filePath, content) => {
   try {
     fs.writeFileSync(filePath, content, 'utf8');
     return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// User data path
-ipcMain.handle('get-user-data-path', async () => {
-  try {
-    const userDataPath = app.getPath('userData');
-    return { success: true, path: userDataPath };
   } catch (error) {
     return { success: false, error: error.message };
   }

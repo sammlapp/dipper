@@ -79,37 +79,53 @@ function AudioClipCard({
         normalize_audio: true
       };
 
-      if (window.electronAPI) {
-        const result = await window.electronAPI.createAudioClips(
-          file_path,
-          start_time,
-          end_time,
-          settings
-        );
+      // Use HTTP backend (works in both Electron and browser)
+      const serverUrl = 'http://localhost:8000';
 
-        if (result.status === 'success') {
-          setClipResult(result);
+      // Build query parameters
+      const params = new URLSearchParams({
+        file_path,
+        start_time: start_time.toString(),
+        end_time: end_time.toString(),
+        spec_window_size: settings.spec_window_size.toString(),
+        spectrogram_colormap: settings.spectrogram_colormap,
+        dB_range: JSON.stringify(settings.dB_range),
+        use_bandpass: settings.use_bandpass.toString(),
+        bandpass_range: JSON.stringify(settings.bandpass_range),
+        resize_images: settings.resize_images.toString(),
+        image_width: settings.image_width.toString(),
+        image_height: settings.image_height.toString(),
+        normalize_audio: settings.normalize_audio.toString()
+      });
 
-          // Prioritize base64 data over file paths for faster loading
-          if (result.audio_base64) {
-            setAudioBase64(result.audio_base64);
-          } else if (result.audio_path) {
-            // Fallback to file path if base64 not available
-            setAudioUrl(`file://${result.audio_path}`);
-          }
+      const response = await fetch(`${serverUrl}/clip?${params}`);
 
-          // Update spectrogram if we got a new one
-          if (result.spectrogram_base64) {
-            const dataUrl = `data:image/png;base64,${result.spectrogram_base64}`;
-            setSpectrogramUrl(dataUrl);
-          }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
-          setDuration(result.duration || (end_time - start_time));
-        } else {
-          setError(result.error || 'Failed to create audio clip');
+      const result = await response.json();
+
+      if (result.status === 'success' || result.audio_base64) {
+        setClipResult(result);
+
+        // Prioritize base64 data over file paths for faster loading
+        if (result.audio_base64) {
+          setAudioBase64(result.audio_base64);
+        } else if (result.audio_path) {
+          // Fallback to file path if base64 not available
+          setAudioUrl(`file://${result.audio_path}`);
         }
+
+        // Update spectrogram if we got a new one
+        if (result.spectrogram_base64) {
+          const dataUrl = `data:image/png;base64,${result.spectrogram_base64}`;
+          setSpectrogramUrl(dataUrl);
+        }
+
+        setDuration(result.duration || (end_time - start_time));
       } else {
-        setError('Electron API not available');
+        setError(result.error || 'Failed to create audio clip');
       }
     } catch (err) {
       setError(`Failed to load clip: ${err.message}`);

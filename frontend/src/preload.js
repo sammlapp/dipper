@@ -14,25 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFile: (defaultName) => ipcRenderer.invoke('save-file', defaultName),
   writeFile: (filePath, content) => ipcRenderer.invoke('write-file', filePath, content),
 
-  // Python script execution
-  runPythonScript: (scriptPath, args, processId) => 
-    ipcRenderer.invoke('run-python-script', scriptPath, args, processId),
-  killPythonProcess: (processId) => 
-    ipcRenderer.invoke('kill-python-process', processId),
-  testPythonPath: () => ipcRenderer.invoke('test-python-path'),
-
-  // Audio processing
-  createAudioClips: (filePath, startTime, endTime, settings) =>
-    ipcRenderer.invoke('create-audio-clips', filePath, startTime, endTime, settings),
-
-  // User data path
-  getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
-
-  // Python output listener
-  onPythonOutput: (callback) => {
-    ipcRenderer.on('python-output', callback);
-  },
-  removePythonOutputListener: (callback) => {
-    ipcRenderer.removeListener('python-output', callback);
-  }
+  // Process management (kill only - used as fallback for job cancellation)
+  killPythonProcess: (processId) =>
+    ipcRenderer.invoke('kill-python-process', processId)
 });

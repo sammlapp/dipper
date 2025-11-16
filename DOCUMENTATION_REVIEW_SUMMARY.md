@@ -164,20 +164,11 @@ The architecture review identified requirements for running Dipper as a web appl
 
 **Three Options:**
 
-**A. Upload-based**
-- Users upload audio files to server
-- Server stores in temporary directory
-- Process and return results
-
 **B. Server-side browsing**
 - Users browse server file system via web UI
 - Security: Restrict to allowed directories
 - Suitable for shared data repositories
-
-**C. Cloud storage integration**
-- Integration with S3, Google Drive, etc.
-- Server downloads and processes
-- Suitable for distributed teams
+- SVAR is a good library for file navigation https://svar.dev/react/filemanager/#demo
 
 ### Server Mode Feature Matrix
 
