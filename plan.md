@@ -1,223 +1,41 @@
 This project will create a cross-platform desktop app that runs pytorch machine learning models and allows users to train models in an active learning loop. 
-  
-Conda environment: `conda activate train_gui`
-
-The project will use the bioacoustics model zoo for pre-trained bioacoustic identification models: https://github.com/kitzeslab/bioacoustics-model-zoo/
-
-and opensoundscape: https://github.com/kitzeslab/opensoundscape which uses pytorch
-
-The front end will be fluid, modern, intuitive, and attractive. 
-
-Users can customize preprocessing, training, and inference settings. These settings are saved and loaded from configuration files. Python scripts for pytorch model inference and training run in subprocesses and reference the configuration files. 
-
-The app will be built for desktop guis on Mac, Linux, and Windows. Python environments will be bundled and shipped to the user. Users should simply be able to install and launch the app, then use GUI workflows for model training and inference. 
-
-streamlit_inference.py is provided as a reference for understanding and porting basic functionality, but not as a final product. 
 
 ## minimal changes:
-allow tasks to run on parallel if user clicks run in parallel
-
-# Build pipeline checklist
-- pyinstaller build of lightweight env is working
-- running app using pyinstaller for lightweight backend: works well
-- conda-pack is now succeeding after resolving issues with packages installed with conda then modified by pip
-- the environment built with conda pack works. I can run /path/to/env/bin/python backend/scripts/predict.py --config /path/to/config.txt. It runs inference and creates the csv. 
-
-# Visual design
-
-For theming, let's switch to using Material UI components, icons, and theming throughout
-Installation: (I ran this myself)
-npm install @mui/material @emotion/react @emotion/styled
-
-Start by taking a close look at this Material UI "Dashboard" example project:
-https://github.com/mui/material-ui/tree/v7.2.0/docs/data/material/getting-started/templates/dashboard 
-Usage instructions (if we were using the example template):
-- Copy these folders (dashboard and shared-theme) into your project, or one of the example projects.
-- Make sure your project has the required dependencies: @mui/material, @mui/icons-material, @emotion/styled, @emotion/react, @mui/x-charts, @mui/x-date-pickers, @mui/x-data-grid, @mui/x-tree-view, dayjs
-- Import and use the Dashboard component.
-- 
-
-(we will eventually use date pickers and charts)
-
-Use default light color theme, for now. Use the icons from material-ui throughout.  
-
-For fonts let's switch to Monserrat, via FontSource
-
-I already ran npm install @fontsource-variable/montserrat
-
-We can import it in the entry point like this:
-import '@fontsource/monserrat/300.css';
-import '@fontsource/monserrat/400.css';
-import '@fontsource/monserrat/500.css';
-import '@fontsource/monserrat/700.css';
-
-Review tab visuals:
-- dB range slider still has poor appearance. use the react material-ui range slider
-- also throughout, switch to using the AutoComplete element from material-ui for multi-selects . example:
-<Autocomplete
-        multiple
-        id="tags-outlined"
-        options={speciesList}
-        getOptionLabel={(option) => option.title}
-        defaultValue={[speciesList]}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label="select species"
-            placeholder="Selected labels"
-          />
-        )}
-      />
-(including the multi-selects for filtering by labels in Review tab)
+allow up to N background tasks to run in parallel if user clicks run in parallel
 
 
-
-
-previous color scheme:
-but these colors for accents: 
-#eae0d5 off-white shades
-#395756 dark accent 1
-#4f5d75 dark accent 2
-#c6ac8f medium accent
-#d36135 highlights/alert
-
-
-# Review tab:
-User will select an annotation task. The interface will be very similar to that implemented in backend/reference/binary_classification_review.py:
-- the annotation task is a csv with the relative audio path `file`, `start_time` in seconds of the clip within the audio path, `annotation`, and `comments`
-- grid of spectrogram/audio clip cards displayed to user, with pagination over all rows in the annotation task
-- there will be two review modes: binary review and multi-class review
-- binary review: as in binary_classification_review.py, there is a multi-select for 'yes' 'no' 'uncertain' or 'unlabeled' for each audio clip. A visual effect (eg colored outline green/yellow/red/grey) indicates the current label of the clip. Optionally, the user can toggle on "show comment field" and write text comments. `annototation` value is yes/no/uncertain or empty (nan) for not annotated
-- multi-class review: each audio clip panel has multi-select (react-select) instead of multi-select of yes/no/uncertain/unlabeled. `annotation` column will contain a comma-separated list of classes ['a','b']. Empty list [] indicates annotated and no classes, whereas empty / nan indicates the clip has not been annotated. 
-- implement a settings panel with spectrogram window length, frequency bandpass range, dB range, colormap, number of rows and columns for grid of displayed clips, show/hide comments field, show/hide file name
-
-
-### active clip functionality in grid view
-one clip is active at a time. 
-- the active clip is always one of the clips on the current page. If page changes, set first clip on page as active
-- The active clip has a thicker outline on the display panel
-- Binary classification mode: user can use a/s/d/f shortcuts to annotate the active clip; when a/s/d/f is clicked, "active" clip moves to the next clip; if last clip on page, transitions to next page and first clip on new page is active; user can navigate Active clip to previous/next clip on page with j/k
-- Multi-class classification mode: the multi select of the active clip is activated, so that the user can simply start typing labels.
-- active clip does not go beyond first/last index on the page (no advance from last clip on page, no backwards-move from first clip on page); 
-- when switching to focus mode, the clip that appears in the focus mode display is the clip that was "active" in grid mode
-- clicking on a panel (somewhere other than the spectrogram, comments box, or annotation controls) makes that clip active
-
-### Classifier-guided listening (CGL)
-
-We are going to introduce an option called "classifier-guided listening". When selected, the clips on a page in grid view are determined by stratification based on metadata columns in the annotation csv. For instance, the annotation csv could contain columns "location_id" and "primary_period". Then there will be one page of clips for each unique combination of "location_id" and "primary_period". The user selects the names of columns to use for stratification in a menu panel. The user can also select a column containing classifier score, in order to sort the displayed clips on the page from highest to lowest classifier score. There is also a menu option for the maximum number of clips to display per stratification bin, default 20. 
-Since the set of clips on a page is determined by the stratification bins, the "number of rows" menu option will be ignored when classifier-guided listening is enabled. The number of columns menu option is still used, and the grid contains as many rows as needed to display all clips in the stratification bin. 
-Importantly, the user can also specify rules for when to stop annotating within a bin (see below). When a bin is complete, the GUI auto-advances to the next page. 
-
-Here's what we need:
-- a module implementing the logic for finding unique combinations of the selected stratification columns and generating the sets of clips to be displayed on each page
-- a brand new panel in the GUI, accessed via a button called "classifier guided listening", with menu options for: (0) turning on/off classifier guided listening mode. (1) selecting columns of the loaded csv to use for stratification; (2) selecting a column to use as the classifier score, plus a toggle for displaying the clips in (a) original order (b) highest to lowest score (c) random order. 
-- "bin completion" logic: the user specifies a strategy to use for when the stratification bin is considered complete. The options are 
-
-(1) All: annotate all clips in bin
-
-(2) Binary: annotate until [select number] clips are labeled Yes; A bin is also 'complete' if all clips are labeled with any of yes/no/uncertain, even if the desired count of Yes has not been reached
-
-(3) Multi-class: annotate until the count of any of these labels: [multi-select labels] is: [select number]. Clips only count toward the total when they are marked 'complete'. A bin is also 'complete' if all clips are marked 'complete', even if the desired count has not been reached. 
-
-## build strategy
-- implement saving and loading all inference settings, including paths, to a config file. The path to the config file will be the single argument taken by the inference.py script. 
-- we will use pyinstaller to build an executable for the backend scripts EXCLUDING ml and heavy dependencies (no predict, train embed). The scripts should only depend on pandas, matplotlib, numpy, librosa, etc. They will not require pytorch, opensoundscape, or bioacoustics-model-zoo
-- we will build frozen python enviornment(s) that will be downloaded on an as-needed basis: for now, just dipper_pytorch_env.yml which we will build using conda-pack to create a .tar.gz. 
-- inference will run in the background by writing a config file, and running the python script specifying the inference environment python, something like `/path/to/dipper_pytorch_env/bin/python inference.py --config inference_config.yml &"
-- make sure we can build the app, communicate between the frontend and backend with the pyinstaller compiled simpler backend enviornment, build the distributable environment with conda-pack, and run a simple python script using the conda-pack env
-
-
-## Shortcuts for review tab (when in grid view):
-- generally, use ctrl for window and cmd for mac
-- toggle shortcuts on/off in the settings tab
-- ctrl/cmd+shift+C: show/hide comments
-- ctrl/cmd+A/S/D/F: annotate all clips on page as yes/no/uncertain/unlabeled (only has an effect in binary classification model)
-- ctrl+j/k: previous/next page 
-
-## auto-save for review tab
-- create a session variable for where to save annotations
-- add a toggle/button switch for auto-save on/off, default on
-- user selects the save location with a button
-- any time the user changes page or goes to previous/next clip in focus mode, auto-saves if auto-save is on
-- if save location has not been set, opens a File Save As dialogue to select the file
-
-
-# requested / complete:
-
-## clip extraction / annotation task creation
-
-from a "wizard" or from Explore tab
-
-start by creating or providing a table of audio file | location | start_timestamp | end timestamp
-
-filter to:
-- dates
-- times of day
-
-stratification by: metadata columns, date
-
-within stratification bins, selection based on score:
-- score range / threshold -> random sample
-- stratified score bins -> random sample
-- score-weighted or z-score weighted sampling
-- highest scoring N clips
-
-### Extraction tab
-We will have a separate script that creates and runs the extraction task from the config file, in a background process using the pytorch python environment. 
-
-- User selects a folder containing inference outputs (predictions.csv or .pkl)
-CSVs should all have the same set of columns: 'file','start_time','end_time', then one column per class
-- User selects class list with a multi-select populated by the score file columns
-- User selects type(s) of stratification:
-The idea of stratification is that for each unique combination of each value, a fixed number of clips are chosen for annotation
-EG if you stratify by 4 date windows and subfolders (say there are 5), and you choose N=1 clip per stratification, you get 4x5x1=20 clips to review for each species. 
-  - stratify by subfolder
-  - (more types of stratification by date windows, time windows, and folder metadata to be implemented later)
-- user selects type(s) of filtering:
-  - filter by score threshold: remove any scores beneath a threshold
-  - (later we will implement date and time window filtering)
-- User selects type of extraction for each unique comination of the stratification values:
-
-  - random N clips
-  - score-bin stratified: N clips for each score bin
-      - text field allows specification for score percentile bins
-      - default: [[0,75],[75,90],[90-95],[95,100]]
-      - these values represent score percentiles, NOT raw scores
-      - percentiles should be calculated after applying the score threshold
-  - highest scoring: fixed N clips with the highest scores
-  Multiple strategies can be chosen, rather than just one. Clips selected from each
-  strategies are added to a single annotation task csv. 
-
-
-Select an output directory
-
-Check box for `export associated audio clips`
-- if selected, can specify total clip duration to extract
-- extracted clip is centered on the `start_time,end_time` interval of the selected clip. Eg for 5 seconds with start_time=10,end-time=13, select 9-14
-- clips are extracted to `output_directory/clips/`
-
-Select 'binary annotation' or 'multiclass annotation' mode:
-Binary annotation: Clicking `Run extraction task` creates one csv file per species in `out_dir/{species_name}_annotation_task_{timestamp}.csv` with columns `file,start_time,end_time,annotation,score`. 
-Multi-class annotation: Clicking `Run extraction task` creates one csv file `annotation_task_{timestamp}.csv` for all species, with same columns as loaded score files. 
-
-The contents of the 'file' column in the created csv files depends on whether audio clips are extracted:
-- if audio clips are extracted, put clips in `out_dir/clips/` and use the relative path in the file column. Start time and end time will be relative to the extracted clip. eg `"clips/clip1.wav",0,3,5.2,-1.5,...` for one of the clips. 
-- if audio clips are not extracted, keep the same `file` `start_time` and `end_time` values as the original df
-
-Extraction:
-- Clips can be efficiently extracted with `opensoundscape.Audio.from_file(file,offset=,duration=).save(clip_save_path)`
-- if the same audio clip is selected for multiple species, do not extract multiple copies of it: instead refer back to the same clip name
-- attempt to include the correct root audio dir to use for the Review tab in the config file. Correct root audio dir is output_dir if extracting audio clips, or the same root audio dir as the inference config file if not extracting clips
-
-Test out the script on /Users/SML161/Downloads/HawkEars_Embedding_-_1_files_-_7272025_10843_AM/predictions.csv
-
+# Build and release
+- lightweight python executable for GUI back-end is built with pyinstaller
+- heavy python environment is built with conda-pack (inference, train scripts)
+- inference, train, extraction scripts run in separate processes and are tracked by task manager
+- these run with the built-in heavier conda env (downloaded on demand to application cache dir) unless the user specifies a custom python env to use
+- an annota
 # Incomplete items / TODO /feature request
+
+tion-only version of the app can be built
+
+## next steps:
+separate HopLite Database-oriented embed, train, and predict into its own area
+test using custom models
+test builds that allow inference and training
+get feedback on inference and training builds
+running on servers: port forwarding or otherwise providing a web-based gui where user can access Dipper running on a remote machine
+- need to be very careful with multi-user scenarios, sessions, what happens when more than one person using Dipper
+
+- IPC may be unnecessarily complicated. PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules. 
+
+- saving/loading annotation settings to json: includes view settings and CGL
+- CGL true/false should persist across app restart
+
+- stratification by arbitrary columns for clip extraction
+
+- delete archive file of pytorch env after unpacking
+- eventually will want to choose between pytorch envs depending on (1) operating system, (2) model being run
 
 ## general feature request list 
 
-get xeno-canto recordings for a species to supplement training data?!
-
-potentially allow parallel as well as sequential tasks
+get xeno-canto / other public recordings for a species to supplement training data?!
+- this functionality is now provided in Jan's package
 
 denoising and/or bandpassing for audio playback / review
 
@@ -226,27 +44,7 @@ wandb integration with training & inference for logging progress and model evalu
 for clip review from query/explore mode: "add to cart" button on panel, adds the clip to an annotation "cart" that can be exported as an annotation task
 
 
-## Environment management
-
-When we build  the env .tar.gz it should be placed in the local project folder (no change). However, when downloading and unpacking the environment during app runtime, we need to place the downloaded .tar.gz in a system-specific and app-specific cache dir, which we can get with the appdirs.user_cache_dir() function. I added the module appdirs.py in backend/scripts. 
-
-Add gdown as a dependency `pip install gdown`, it will also be needed in the pyinstaller executable.
-
-Global variable for the google drive sharing link of the heavier Pytorch environment: 
-https://drive.google.com/uc?id=1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O
-
-The environment can be downloaded on an as-needed basis (when inference or training script is run and the environment isn't yet available) using python or bash 
-```python
-import gdown
-PYTORCH_ENV_URL="https://drive.google.com/uc?id=1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O"
-gdown.download(PYTORCH_ENV_URL, "dipper_pytorch_env.tar.gz", quiet=False)
-```
-
-```bash
-gdown 'https://drive.google.com/uc?id=1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O'
-```
-
-The file is the .tar.gz that we create when we build:python-env to create the pytorch enviornment. It should be placed in the appropriate cache directory for the user's system. This should become part of the lightweight_server.setup_environment() procedure, which subsequently unpacks the .tar.gz file and puts it in the correct location. While downloading the environment (a one-time operation), we should provide an informative message in the status bar so that the user understands that downloading may take a few minutes (700 Mb). 
+review tab "undo" functionality? I think this would require tracking the full-page or single-clip annotations in a history so that we can sequentially undo and redo changes witch ctrl/cmd+z and ctrl/cmd+y
 
 
 ## Extraction improvements:
@@ -280,22 +78,7 @@ export default function BasicDateRangePicker() {
   );
 }
 ```
-  
 
-## app-wide updates
-Hawkears not loading offline - HTTP error something to do with download-cached-file I think
-
-- the multi-selects for filtering should use the same type of selector as the annotation panels, react-select
-
-review tab "undo" functionality? I think this would require tracking the full-page or single-clip annotations in a history so that we can sequentially undo and redo changes witch ctrl/cmd+z and ctrl/cmd+y
-
-## HAWKEARS Low band is broken in v0.12.0: 
-need to update BMZ version then update dependency
-
-## review tab
-- settings checkbox to show/hide the yes/no/uncertain/unlabeled segmented control for each clip panel in grid mode + binary classification: default is checked; when un-checked user can still annotate via keyboard controls and active clip navigation but the panel is compact with no segmented control shown
-- don't like the visual aesthetic of the segmented controls. Let's try something different while retaining the per-button coloring and functionality
-- add settings option for whether to auto-advance after an annotation in Focus mode
 - "status bar" is being covered by the global app status bar in App.js instead of integrating with it. 
 - auto-advance in classifier-guided listening mode: 
 
@@ -306,30 +89,12 @@ within this project, create a separate deployable/buildable version of the app t
 
 - the offset of main content vs top menu bar isn't working correctly. When the window is narrow the menu bar will wrap around and become larger, causing it to cover the top of the main content. The main content should simply always be below the menu bar. It seems like there should be a simpler way to do this than trying to calculate the expected height of the menu bar, by placing the element below the menu bar instead of behind it. 
 
-
-**COMPLETED**: Created review-only version of Dipper
-- Modified App.js to conditionally render based on `REACT_APP_REVIEW_ONLY` environment variable
-- Created separate Electron main process file (`main-review.js`) with "Dipper Review" branding
-- Added build scripts to package.json:
-  - `npm run electron-dev-review` - Development mode
-  - `npm run build:review` - React build only
-  - `npm run build:review-all` - React + Python build
-  - `npm run dist:review-mac` - macOS distribution build
-- Created electron-builder-review.json for separate build configuration
-- App builds to `dist-review/` directory
-- JavaScript bundle is 31KB smaller than full app
-- No navigation drawer - full width used for Review interface
-- Includes full Python HTTP server for audio processing
-- See REVIEW_ONLY_APP.md for complete documentation  
-
-
 ## Training with hoplite
 I implemented training with hoplite in opso branch
 Now can have a script that
 - selects hoplite db and embedding model
 - ingests various training/val sets with single target or multi-target labels
 - embeds any training/val sets as necessary
-
 
 ## rewind
 - throughout the application, when providing click-to-play spectrograms, make it so that clicking on the left 20% of the spectrogram rewinds the clip to the beginning instead of performing the play/pause action. Show a rewind icon when hovering over the left 20% of the spectrogram. 
@@ -347,7 +112,6 @@ Now can have a script that
 - would be huge if task management can be integrated across users; eg what if two people run the app on the same server, should have a central task management system and run jobs sequentially
 
 alternatively, could run backend on remote, run frontend locally, connect to backend via GUI on frontend. This seems more complicated overall because it requires more custom IPC.
-
 
 ### Training wishlist
 - convert Raven annotations to training data
