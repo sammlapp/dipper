@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { FormControl, Select, MenuItem } from '@mui/material';
 
 /**
  * Frontend Performance Profiler for measuring rendering and IPC times
@@ -362,11 +363,13 @@ export const PerformanceProfilerPanel = ({ performanceData, measurements, onClea
           <div className="profiler-controls">
             <label>
               Sort by:
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-                <option value="duration">Duration</option>
-                <option value="timestamp">Timestamp</option>
-                <option value="operation">Operation</option>
-              </select>
+              <FormControl size="small" sx={{ minWidth: 120, ml: 1 }}>
+                <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                  <MenuItem value="duration">Duration</MenuItem>
+                  <MenuItem value="timestamp">Timestamp</MenuItem>
+                  <MenuItem value="operation">Operation</MenuItem>
+                </Select>
+              </FormControl>
             </label>
             <button onClick={onClear} className="clear-button">Clear Data</button>
           </div>

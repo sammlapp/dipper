@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { FormControl, Select, MenuItem } from '@mui/material';
 import HelpIcon from './HelpIcon';
+import { selectCSVFiles, selectFolder, saveFile, selectJSONFiles } from '../utils/fileOperations';
 
 // Default values for training form
 const DEFAULT_VALUES = {
@@ -101,7 +103,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleFullyAnnotatedSelection = async () => {
     try {
-      const files = await window.electronAPI.selectCSVFiles();
+      const files = await selectCSVFiles();
       if (files && files.length > 0) {
         setConfig(prev => ({
           ...prev,
@@ -118,7 +120,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleSingleClassAnnotationSelection = async () => {
     try {
-      const files = await window.electronAPI.selectCSVFiles();
+      const files = await selectCSVFiles();
       if (files && files.length > 0) {
         // Add new entries with empty class assignments
         const newAnnotations = files.map(file => ({ file, class: '' }));
@@ -153,7 +155,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleBackgroundSamplesSelection = async () => {
     try {
-      const files = await window.electronAPI.selectCSVFiles();
+      const files = await selectCSVFiles();
       if (files && files.length > 0) {
         setConfig(prev => ({
           ...prev,
@@ -167,7 +169,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleRootAudioFolderSelection = async () => {
     try {
-      const folder = await window.electronAPI.selectFolder();
+      const folder = await selectFolder();
       if (folder) {
         setConfig(prev => ({ ...prev, root_audio_folder: folder }));
       }
@@ -178,7 +180,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleEvaluationFileSelection = async () => {
     try {
-      const files = await window.electronAPI.selectCSVFiles();
+      const files = await selectCSVFiles();
       if (files && files.length > 0) {
         setConfig(prev => ({
           ...prev,
@@ -192,7 +194,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleSaveLocationSelection = async () => {
     try {
-      const location = await window.electronAPI.selectFolder();
+      const location = await selectFolder();
       if (location) {
         setConfig(prev => ({ ...prev, save_location: location }));
       }
@@ -203,7 +205,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleCustomPythonEnvSelection = async () => {
     try {
-      const folder = await window.electronAPI.selectFolder();
+      const folder = await selectFolder();
       if (folder) {
         setConfig(prev => ({ ...prev, custom_python_env_path: folder }));
       }
@@ -284,14 +286,9 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const saveTrainingConfig = async () => {
     try {
-      if (!window.electronAPI) {
-        alert('Electron API not available - running in browser mode');
-        return;
-      }
-
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const defaultName = `training_config_${timestamp}.json`;
-      const configPath = await window.electronAPI.saveFile(defaultName);
+      const configPath = await saveFile(defaultName);
 
       if (configPath) {
         // Parse hidden layer sizes from string to array of integers
@@ -361,12 +358,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const loadTrainingConfig = async () => {
     try {
-      if (!window.electronAPI) {
-        alert('Electron API not available - running in browser mode');
-        return;
-      }
-
-      const configFile = await window.electronAPI.selectJSONFiles();
+      const configFile = await selectJSONFiles();
       if (configFile && configFile.length > 0) {
         const response = await fetch('http://localhost:8000/config/load', {
           method: 'POST',
@@ -441,19 +433,20 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         {/* Model Selection */}
         <div className="form-group">
           <label>Base Model <HelpIcon section="training-model-selection" /></label>
-          <select
-            value={config.model}
-            onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
-          >
-            <option value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</option>
-            {/* don't allow ensembled HawkEars <option value="HawkEars">HawkEars</option> */}
-            <option value="BirdNET">BirdNET Global bird species classifier</option>
-            {/* don't allow training low-band hawkears, weird architecture */}
-            <option value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</option>
-            {/* <option value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</option> */}
-            {/* <option value="Perch">Perch Global bird species classifier </option> */}
-
-          </select>
+          <FormControl size="small" fullWidth sx={{ mt: 0.5 }}>
+            <Select
+              value={config.model}
+              onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
+            >
+              <MenuItem value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</MenuItem>
+              {/* don't allow ensembled HawkEars <MenuItem value="HawkEars">HawkEars</MenuItem> */}
+              <MenuItem value="BirdNET">BirdNET Global bird species classifier</MenuItem>
+              {/* don't allow training low-band hawkears, weird architecture */}
+              <MenuItem value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</MenuItem>
+              {/* <MenuItem value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</MenuItem> */}
+              {/* <MenuItem value="Perch">Perch Global bird species classifier </MenuItem> */}
+            </Select>
+          </FormControl>
         </div>
 
         {/* Fully Annotated Files */}
@@ -518,16 +511,18 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
                 {singleClassAnnotations.map((item, index) => (
                   <div key={index} className="annotation-item">
                     <span className="file-name">{item.file.split('/').pop()}</span>
-                    <select
-                      value={item.class}
-                      onChange={(e) => updateSingleClassAnnotationClass(index, e.target.value)}
-                      className="class-selector"
-                    >
-                      <option value="">Select class...</option>
-                      {getClassListArray().map(cls => (
-                        <option key={cls} value={cls}>{cls}</option>
-                      ))}
-                    </select>
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                      <Select
+                        value={item.class}
+                        onChange={(e) => updateSingleClassAnnotationClass(index, e.target.value)}
+                        displayEmpty
+                      >
+                        <MenuItem value="">Select class...</MenuItem>
+                        {getClassListArray().map(cls => (
+                          <MenuItem key={cls} value={cls}>{cls}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                     <button
                       onClick={() => removeSingleClassAnnotation(index)}
                       className="remove-button"

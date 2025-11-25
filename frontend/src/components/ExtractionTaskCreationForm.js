@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Select from 'react-select';
 import HelpIcon from './HelpIcon';
+import { selectFolder, saveFile, selectJSONFiles } from '../utils/fileOperations';
 
 // Default values for extraction task creation form
 const DEFAULT_VALUES = {
@@ -39,7 +40,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handlePredictionsFolderSelection = async () => {
     try {
-      const folder = await window.electronAPI.selectFolder();
+      const folder = await selectFolder();
       if (folder) {
         setConfig(prev => ({ ...prev, predictions_folder: folder }));
 
@@ -79,7 +80,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleOutputDirSelection = async () => {
     try {
-      const dir = await window.electronAPI.selectFolder();
+      const dir = await selectFolder();
       if (dir) {
         setConfig(prev => ({ ...prev, output_dir: dir }));
       }
@@ -166,14 +167,9 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const saveExtractionConfig = async () => {
     try {
-      if (!window.electronAPI) {
-        console.log('Electron API not available - running in browser mode');
-        return;
-      }
-
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const defaultName = `extraction_config_${timestamp}.json`;
-      const configPath = await window.electronAPI.saveFile(defaultName);
+      const configPath = await saveFile(defaultName);
 
       if (configPath) {
         const configData = {
@@ -214,12 +210,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const loadExtractionConfig = async () => {
     try {
-      if (!window.electronAPI) {
-        console.log('Electron API not available - running in browser mode');
-        return;
-      }
-
-      const configFile = await window.electronAPI.selectJSONFiles();
+      const configFile = await selectJSONFiles();
       if (configFile && configFile.length > 0) {
         const response = await fetch('http://localhost:8000/config/load', {
           method: 'POST',

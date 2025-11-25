@@ -6,6 +6,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "build:server": "cross-env REACT_APP_MODE=server react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "build:python-pyinstaller": "python ../backend/build_pyinstaller.py",
@@ -34,13 +35,21 @@
     "dist:review-win": "npm run build:review-all && node scripts/build-review.js --win",
     "dist:review-linux": "npm run build:review-all && node scripts/build-review.js --linux",
     "dist:review-all": "npm run build:review-all && node scripts/build-review.js --mac --win --linux",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "tauri:dev": "tauri dev",
+    "tauri:dev:full": "concurrently \"python ../backend/lightweight_server.py --port 8000\" \"wait-on http://localhost:8000/health && tauri dev\"",
+    "tauri:dev:review": "cross-env REACT_APP_REVIEW_ONLY=true tauri dev",
+    "tauri:dev:review:full": "concurrently \"python ../backend/lightweight_server.py --port 8000\" \"wait-on http://localhost:8000/health && cross-env REACT_APP_REVIEW_ONLY=true tauri dev\"",
+    "tauri:build": "npm run build && tauri build",
+    "tauri:build:all": "npm run build:all && tauri build",
+    "tauri:build:review": "npm run build:review && tauri build --config '{\"build\":{\"beforeBuildCommand\":\"\"}}'"
   },
   "dependencies": {
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.0",
     "@mui/material": "^5.15.0",
+    "@tauri-apps/api": "^2.1.1",
     "electron-is-dev": "^2.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -48,6 +57,7 @@
     "react-select": "^5.10.1"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.9.4",
     "concurrently": "^8.2.0",
     "cross-env": "^7.0.3",
     "electron": "^28.3.3",

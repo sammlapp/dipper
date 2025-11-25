@@ -1207,6 +1207,11 @@ class LightweightServer:
         self.app.router.add_post("/files/get-csv-columns", self.get_csv_columns)
         self.app.router.add_post("/files/count-rows", self.count_file_rows)
 
+        # Server mode file browsing routes
+        self.app.router.add_post("/files/browse", self.browse_files)
+        self.app.router.add_post("/files/save", self.save_file_server)
+        self.app.router.add_post("/files/unique-name", self.generate_unique_name)
+
     async def root_handler(self, request):
         """Root endpoint to handle HEAD requests from wait-on"""
         return web.json_response({"status": "ok", "server": "lightweight_server"})
@@ -2527,6 +2532,158 @@ class LightweightServer:
         except Exception as e:
             logger.error(f"Error getting file columns: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def browse_files(self, request):
+        """Browse server-side files (server mode only)"""
+        try:
+            data = await request.json()
+            path = data.get("path", os.path.expanduser("~"))
+
+            # Security: Restrict to allowed base paths
+            # Allow user home directory and common data directories
+            allowed_paths = [
+                os.path.expanduser("~"),
+                "/data",
+                "/mnt",
+                "/media",
+                "/Users",  # macOS
+                "/home",   # Linux
+            ]
+
+            # Check if path is under any allowed directory
+            normalized_path = os.path.normpath(os.path.abspath(path))
+            is_allowed = any(
+                normalized_path.startswith(os.path.normpath(os.path.abspath(base)))
+                for base in allowed_paths
+            )
+
+            if not is_allowed:
+                return web.json_response(
+                    {"error": "Access denied to this directory"}, status=403
+                )
+
+            # Check if path exists
+            if not os.path.exists(normalized_path):
+                return web.json_response(
+                    {"error": f"Path does not exist: {path}"}, status=404
+                )
+
+            # List directory contents
+            items = []
+            try:
+                for entry in os.scandir(normalized_path):
+                    try:
+                        stat_info = entry.stat()
+                        items.append({
+                            "id": entry.path,
+                            "value": entry.name,
+                            "size": stat_info.st_size if entry.is_file() else 0,
+                            "date": int(stat_info.st_mtime * 1000),  # milliseconds
+                            "type": "folder" if entry.is_dir() else "file",
+                        })
+                    except (OSError, PermissionError):
+                        # Skip files/folders we can't access
+                        continue
+
+                # Sort: folders first, then by name
+                items.sort(key=lambda x: (x["type"] != "folder", x["value"].lower()))
+
+            except PermissionError:
+                return web.json_response(
+                    {"error": "Permission denied"}, status=403
+                )
+
+            return web.json_response({
+                "data": items,
+                "path": normalized_path
+            })
+
+        except Exception as e:
+            logger.error(f"Error browsing files: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def save_file_server(self, request):
+        """Save file on server (server mode only)"""
+        try:
+            data = await request.json()
+            file_path = data.get("path")
+            content = data.get("content")
+
+            if not file_path or content is None:
+                return web.json_response(
+                    {"error": "Missing path or content"}, status=400
+                )
+
+            # Security: Validate path is under allowed directories
+            allowed_paths = [
+                os.path.expanduser("~"),
+                "/data",
+                "/mnt",
+                "/media",
+                "/Users",
+                "/home",
+            ]
+
+            normalized_path = os.path.normpath(os.path.abspath(file_path))
+            is_allowed = any(
+                normalized_path.startswith(os.path.normpath(os.path.abspath(base)))
+                for base in allowed_paths
+            )
+
+            if not is_allowed:
+                return web.json_response(
+                    {"error": "Access denied to this location"}, status=403
+                )
+
+            # Create parent directories if needed
+            os.makedirs(os.path.dirname(normalized_path), exist_ok=True)
+
+            # Write file
+            with open(normalized_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+
+            return web.json_response({
+                "status": "success",
+                "path": normalized_path
+            })
+
+        except Exception as e:
+            logger.error(f"Error saving file: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def generate_unique_name(self, request):
+        """Generate unique folder/file name (server mode only)"""
+        try:
+            data = await request.json()
+            base_path = data.get("basePath")
+            folder_name = data.get("folderName")
+
+            if not base_path or not folder_name:
+                return web.json_response(
+                    {"error": "Missing basePath or folderName"}, status=400
+                )
+
+            # Check if base path exists
+            if not os.path.exists(base_path):
+                return web.json_response(
+                    {"error": f"Base path does not exist: {base_path}"}, status=404
+                )
+
+            # Generate unique name
+            unique_name = folder_name
+            counter = 1
+
+            while os.path.exists(os.path.join(base_path, unique_name)):
+                unique_name = f"{folder_name}_{counter}"
+                counter += 1
+
+            return web.json_response({
+                "uniqueName": unique_name
+            })
+
+        except Exception as e:
+            logger.error(f"Error generating unique name: {e}")
+            return web.json_response({"error": str(e)}, status=500)
 
     async def start_server(self):
         """Start the HTTP server"""

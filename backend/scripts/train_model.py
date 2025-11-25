@@ -359,7 +359,7 @@ def run_training(config):
         # Load pre-trained model
         model_name = config.get("model")
         logger.info(f"Loading backbone model: {model_name}")
-        model = load_model(model_name, logger)
+        model = load_model(config, logger)
 
         logger.info(f" Using device: {model.device}")
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Slider, styled } from '@mui/material';
+import { Slider, styled, FormControl, Select, MenuItem } from '@mui/material';
 
 // Styled Material UI Slider with local color scheme
 const StyledSlider = styled(Slider)({
@@ -361,26 +361,30 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
               <div className="grid-settings">
                 <label>
                   Rows:
-                  <select
-                    value={settings.grid_rows}
-                    onChange={(e) => handleSettingChange('grid_rows', parseInt(e.target.value))}
-                  >
-                    {[1, 2, 3, 4, 5, 6,7,8,9,10].map(num => (
-                      <option key={num} value={num}>{num}</option>
-                    ))}
-                  </select>
+                  <FormControl size="small" sx={{ minWidth: 70, ml: 1 }}>
+                    <Select
+                      value={settings.grid_rows}
+                      onChange={(e) => handleSettingChange('grid_rows', parseInt(e.target.value))}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                        <MenuItem key={num} value={num}>{num}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
                 </label>
-                
+
                 <label>
                   Columns:
-                  <select
-                    value={settings.grid_columns}
-                    onChange={(e) => handleSettingChange('grid_columns', parseInt(e.target.value))}
-                  >
-                    {[1, 2, 3, 4, 5, 6,7,8,9,10].map(num => (
-                      <option key={num} value={num}>{num}</option>
-                    ))}
-                  </select>
+                  <FormControl size="small" sx={{ minWidth: 70, ml: 1 }}>
+                    <Select
+                      value={settings.grid_columns}
+                      onChange={(e) => handleSettingChange('grid_columns', parseInt(e.target.value))}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                        <MenuItem key={num} value={num}>{num}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
                 </label>
               </div>
             </div>
@@ -445,14 +449,16 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
               <div className="focus-size-settings">
                 <label>
                   Focus View Size:
-                  <select
-                    value={settings.focus_size}
-                    onChange={(e) => handleSettingChange('focus_size', e.target.value)}
-                  >
-                    <option value="small">Small (600px wide)</option>
-                    <option value="medium">Medium (900px wide)</option>
-                    <option value="large">Large (full width)</option>
-                  </select>
+                  <FormControl size="small" sx={{ minWidth: 180, ml: 1 }}>
+                    <Select
+                      value={settings.focus_size}
+                      onChange={(e) => handleSettingChange('focus_size', e.target.value)}
+                    >
+                      <MenuItem value="small">Small (600px wide)</MenuItem>
+                      <MenuItem value="medium">Medium (900px wide)</MenuItem>
+                      <MenuItem value="large">Large (full width)</MenuItem>
+                    </Select>
+                  </FormControl>
                 </label>
               </div>
             </div>
@@ -518,29 +524,33 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
               <div className="spectrogram-settings">
                 <label>
                   Window Size:
-                  <select
-                    value={settings.spec_window_size}
-                    onChange={(e) => handleSettingChange('spec_window_size', parseInt(e.target.value))}
-                  >
-                    <option value={256}>256</option>
-                    <option value={512}>512</option>
-                    <option value={1024}>1024</option>
-                    <option value={2048}>2048</option>
-                  </select>
+                  <FormControl size="small" sx={{ minWidth: 100, ml: 1 }}>
+                    <Select
+                      value={settings.spec_window_size}
+                      onChange={(e) => handleSettingChange('spec_window_size', parseInt(e.target.value))}
+                    >
+                      <MenuItem value={256}>256</MenuItem>
+                      <MenuItem value={512}>512</MenuItem>
+                      <MenuItem value={1024}>1024</MenuItem>
+                      <MenuItem value={2048}>2048</MenuItem>
+                    </Select>
+                  </FormControl>
                 </label>
-                
+
                 <label>
                   Colormap:
-                  <select
-                    value={settings.spectrogram_colormap}
-                    onChange={(e) => handleSettingChange('spectrogram_colormap', e.target.value)}
-                  >
-                    {colormapOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <FormControl size="small" sx={{ minWidth: 180, ml: 1 }}>
+                    <Select
+                      value={settings.spectrogram_colormap}
+                      onChange={(e) => handleSettingChange('spectrogram_colormap', e.target.value)}
+                    >
+                      {colormapOptions.map(option => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
                 </label>
               </div>
               

@@ -3,6 +3,7 @@ import { Slider, styled } from '@mui/material';
 import SpeciesMultiSelect from './SpeciesMultiSelect';
 import AudioClipCard from './AudioClipCard';
 import DisplaySettings from './DisplaySettings';
+import { selectCSVFiles } from '../utils/fileOperations';
 
 // Styled Material UI Slider with local color scheme
 const StyledSlider = styled(Slider)({
@@ -132,13 +133,7 @@ function ExploreTab() {
 
   const handleLoadCSV = async () => {
     try {
-      if (!window.electronAPI) {
-        // For browser testing, use file input
-        fileInputRef.current?.click();
-        return;
-      }
-
-      const files = await window.electronAPI.selectCSVFiles();
+      const files = await selectCSVFiles();
       if (files && files.length > 0) {
         const filePath = files[0];
         setSelectedFile(filePath);

@@ -4,6 +4,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { generateUniqueFolderName } from './fileOperations';
 
 export const TASK_STATUS = {
   UNSTARTED: 'unstarted',
@@ -868,17 +869,14 @@ class TaskManager {
     // Clean the task name for use as folder name
     const cleanedName = taskName.replace(/[^a-zA-Z0-9\-_\s]/g, '').replace(/\s+/g, '_');
 
-    // Use Electron API to generate unique folder name
-    if (window.electronAPI && window.electronAPI.generateUniqueFolderName) {
-      try {
-        return await window.electronAPI.generateUniqueFolderName(baseDir, cleanedName);
-      } catch (error) {
-        console.warn('Failed to generate unique folder name via Electron API, using fallback:', error);
-      }
+    // Use file operations abstraction to generate unique folder name
+    try {
+      return await generateUniqueFolderName(baseDir, cleanedName);
+    } catch (error) {
+      console.warn('Failed to generate unique folder name via file operations, using fallback:', error);
+      // Fallback: just return the cleaned name (original behavior)
+      return cleanedName;
     }
-
-    // Fallback: just return the cleaned name (original behavior)
-    return cleanedName;
   }
 
   // Utility Methods

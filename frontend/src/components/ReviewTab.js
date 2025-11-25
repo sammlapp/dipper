@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Drawer, IconButton, Modal, Box, Typography } from '@mui/material';
+import { Drawer, IconButton, Modal, Box, Typography, FormControl, Select, MenuItem } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import AnnotationCard from './AnnotationCard';
 import ReviewSettings from './ReviewSettings';
@@ -13,6 +13,7 @@ import {
   getAvailableColumns,
   getNumericColumns
 } from '../utils/stratificationUtils';
+import { selectCSVFiles, selectFolder, saveFile, writeFile } from '../utils/fileOperations';
 
 function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const [selectedFile, setSelectedFile] = useState('');
@@ -591,13 +592,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
 
   const handleLoadAnnotationTask = async () => {
     try {
-      if (!window.electronAPI) {
-        // For browser testing, use file input
-        fileInputRef.current?.click();
-        return;
-      }
-
-      const files = await window.electronAPI.selectCSVFiles();
+      const files = await selectCSVFiles();
       if (files && files.length > 0) {
         setSelectedFile(files[0]);
         await loadAndProcessCSV(files[0]);
@@ -755,13 +750,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       console.error('Error stack:', err.stack);
 
       // Try to write error to a log file for debugging
-      if (window.electronAPI?.writeFile) {
-        const errorLog = `Error loading annotation task at ${new Date().toISOString()}:\n${err.message}\n${err.stack}\n\n`;
-        try {
-          window.electronAPI.writeFile('/tmp/annotation_errors.log', errorLog, { flag: 'a' });
-        } catch (logErr) {
-          console.error('Could not write to error log:', logErr);
-        }
+      const errorLog = `Error loading annotation task at ${new Date().toISOString()}:\n${err.message}\n${err.stack}\n\n`;
+      try {
+        await writeFile('/tmp/annotation_errors.log', errorLog);
+      } catch (logErr) {
+        console.error('Could not write to error log:', logErr);
       }
 
       setError('Failed to load annotation task: ' + err.message);
@@ -1512,16 +1505,14 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
 
   const handleSelectRootAudioPath = async () => {
     try {
-      if (window.electronAPI) {
-        const folder = await window.electronAPI.selectFolder();
-        if (folder) {
-          setRootAudioPath(folder);
-          // Save to localStorage
-          const savedSettings = localStorage.getItem('review_settings');
-          const currentSettings = savedSettings ? JSON.parse(savedSettings) : {};
-          const newSettings = { ...currentSettings, root_audio_path: folder };
-          localStorage.setItem('review_settings', JSON.stringify(newSettings));
-        }
+      const folder = await selectFolder();
+      if (folder) {
+        setRootAudioPath(folder);
+        // Save to localStorage
+        const savedSettings = localStorage.getItem('review_settings');
+        const currentSettings = savedSettings ? JSON.parse(savedSettings) : {};
+        const newSettings = { ...currentSettings, root_audio_path: folder };
+        localStorage.setItem('review_settings', JSON.stringify(newSettings));
       }
     } catch (err) {
       console.error('Failed to select root audio folder:', err);
@@ -1544,20 +1535,18 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
               const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
               const defaultName = `annotations_${timestamp}.csv`;
 
-              if (window.electronAPI?.saveFile) {
-                saveLocation = await window.electronAPI.saveFile(defaultName);
-                if (saveLocation) {
-                  setCurrentSavePath(saveLocation);
-                } else {
-                  resolve(); // User cancelled save dialog
-                  return;
-                }
+              saveLocation = await saveFile(defaultName);
+              if (saveLocation) {
+                setCurrentSavePath(saveLocation);
+              } else {
+                resolve(); // User cancelled save dialog
+                return;
               }
             }
 
-            if (saveLocation && window.electronAPI?.writeFile) {
+            if (saveLocation) {
               const csvContent = exportToCSV(currentData, currentSettings);
-              await window.electronAPI.writeFile(saveLocation, csvContent);
+              await writeFile(saveLocation, csvContent);
               setHasUnsavedChanges(false);
               console.log('Auto-saved to:', saveLocation);
             }
@@ -1589,9 +1578,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         return new Promise(async (resolve, reject) => {
           try {
             // If we have a save path, use it directly
-            if (currentSavePath && window.electronAPI?.writeFile) {
+            if (currentSavePath) {
               const csvContent = exportToCSV(currentData, currentSettings);
-              await window.electronAPI.writeFile(currentSavePath, csvContent);
+              await writeFile(currentSavePath, csvContent);
               setHasUnsavedChanges(false);
               console.log('Saved to:', currentSavePath);
               resolve();
@@ -1626,41 +1615,14 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   };
 
   const handleSaveAsWithData = async (currentData, currentSettings) => {
-    if (!window.electronAPI) {
-      // Browser fallback - create downloadable file
-      const csvContent = exportToCSV(currentData, currentSettings);
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `annotations_${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setHasUnsavedChanges(false);
-      return;
-    }
-
     const csvContent = exportToCSV(currentData, currentSettings);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const defaultName = `annotations_${timestamp}.csv`;
 
-    // Check if writeFile is available for proper Electron file saving
-    if (window.electronAPI.writeFile) {
-      const filePath = await window.electronAPI.saveFile(defaultName);
-      if (filePath) {
-        await window.electronAPI.writeFile(filePath, csvContent);
-        setCurrentSavePath(filePath); // Set the save path for future auto-saves
-        setHasUnsavedChanges(false);
-      }
-    } else {
-      // Fallback: just trigger download without file dialog
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = defaultName;
-      a.click();
-      URL.revokeObjectURL(url);
+    const filePath = await saveFile(defaultName);
+    if (filePath) {
+      await writeFile(filePath, csvContent);
+      setCurrentSavePath(filePath); // Set the save path for future auto-saves
       setHasUnsavedChanges(false);
     }
   };
@@ -1856,70 +1818,70 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           </div>
         )}
 
-      <div className="annotation-grid-container" style={{ position: 'relative' }}>
-        <div
-          className="annotation-grid"
-          style={{
-            '--rows': getGridDimensions().rows,
-            '--cols': getGridDimensions().columns,
-          }}
-        >
-          {dataToShow.map((clip, indexOnPage) => {
-            // Find the loaded data for this clip
-            const loadedClip = loadedPageData.find(loaded => loaded.clip_id === clip.id) || clip;
-            const isActive = indexOnPage === activeClipIndexOnPage;
+        <div className="annotation-grid-container" style={{ position: 'relative' }}>
+          <div
+            className="annotation-grid"
+            style={{
+              '--rows': getGridDimensions().rows,
+              '--cols': getGridDimensions().columns,
+            }}
+          >
+            {dataToShow.map((clip, indexOnPage) => {
+              // Find the loaded data for this clip
+              const loadedClip = loadedPageData.find(loaded => loaded.clip_id === clip.id) || clip;
+              const isActive = indexOnPage === activeClipIndexOnPage;
 
-            return (
-              <AnnotationCard
-                key={clip.id} // Use stable key to prevent unnecessary re-mounts
-                clipData={{
-                  ...clip,
-                  spectrogram_base64: loadedClip.spectrogram_base64,
-                  audio_base64: loadedClip.audio_base64
-                }}
-                reviewMode={settings.review_mode}
-                availableClasses={availableClasses}
-                showComments={settings.show_comments}
-                showFileName={settings.show_file_name}
-                showBinaryControls={settings.show_binary_controls}
-                isActive={isActive}
-                onAnnotationChange={(annotation, annotationStatus) => handleAnnotationChange(clip.id, annotation, annotationStatus)}
-                onCommentChange={(comment) => handleCommentChange(clip.id, comment)}
-                onCardClick={() => setActiveClipIndexOnPage(indexOnPage)}
-                onPlayPause={isActive ? (audioControls) => {
-                  // Store previous clip's controls before updating to new clip
-                  if (activeClipAudioControlsRef.current) {
-                    previousClipAudioControlsRef.current = activeClipAudioControlsRef.current;
-                  }
-                  // Store new active clip's controls
-                  activeClipAudioControlsRef.current = audioControls;
-                } : undefined}
-                disableAutoLoad={true} // Use batch loading instead
-              />
-            );
-          })}
-        </div>
-
-        {/* Loading overlay - show when server is initializing */}
-        {serverInitializing && (
-          <div className="loading-overlay">
-            <div className="loading-content">
-              <p>Initializing audio processing server...</p>
-              <p style={{ fontSize: '0.9em', color: '#666', marginTop: '8px' }}>
-                This may take a few seconds on first load while Python libraries are loaded.
-              </p>
-              {httpLoader.progress > 0 && (
-                <div className="progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{ width: `${httpLoader.progress}%` }}
-                  />
-                </div>
-              )}
-            </div>
+              return (
+                <AnnotationCard
+                  key={clip.id} // Use stable key to prevent unnecessary re-mounts
+                  clipData={{
+                    ...clip,
+                    spectrogram_base64: loadedClip.spectrogram_base64,
+                    audio_base64: loadedClip.audio_base64
+                  }}
+                  reviewMode={settings.review_mode}
+                  availableClasses={availableClasses}
+                  showComments={settings.show_comments}
+                  showFileName={settings.show_file_name}
+                  showBinaryControls={settings.show_binary_controls}
+                  isActive={isActive}
+                  onAnnotationChange={(annotation, annotationStatus) => handleAnnotationChange(clip.id, annotation, annotationStatus)}
+                  onCommentChange={(comment) => handleCommentChange(clip.id, comment)}
+                  onCardClick={() => setActiveClipIndexOnPage(indexOnPage)}
+                  onPlayPause={isActive ? (audioControls) => {
+                    // Store previous clip's controls before updating to new clip
+                    if (activeClipAudioControlsRef.current) {
+                      previousClipAudioControlsRef.current = activeClipAudioControlsRef.current;
+                    }
+                    // Store new active clip's controls
+                    activeClipAudioControlsRef.current = audioControls;
+                  } : undefined}
+                  disableAutoLoad={true} // Use batch loading instead
+                />
+              );
+            })}
           </div>
-        )}
-      </div>
+
+          {/* Loading overlay - show when server is initializing */}
+          {serverInitializing && (
+            <div className="loading-overlay">
+              <div className="loading-content">
+                <p>Initializing audio processing server...</p>
+                <p style={{ fontSize: '0.9em', color: '#666', marginTop: '8px' }}>
+                  This may take a few seconds on first load while Python libraries are loaded.
+                </p>
+                {httpLoader.progress > 0 && (
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${httpLoader.progress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </>
     );
   }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridDimensions, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, settings.show_binary_controls, handleAnnotationChange, handleCommentChange, classifierGuidedMode, stratifiedBins]);
@@ -2329,21 +2291,20 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                     Filter by annotation
                   </label>
                   {filters.annotation.enabled && (
-                    <select
-                      multiple
-                      value={filters.annotation.values}
-                      onChange={(e) => {
-                        const values = Array.from(e.target.selectedOptions, option => option.value);
-                        handleFilterChange('annotation', true, values);
-                      }}
-                      className="filter-multiselect"
-                    >
-                      {getFilterOptions.annotation.map(option => (
-                        <option key={option} value={option}>
-                          {option === '' ? 'unlabeled' : option}
-                        </option>
-                      ))}
-                    </select>
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                      <Select
+                        multiple
+                        value={filters.annotation.values}
+                        onChange={(e) => handleFilterChange('annotation', true, e.target.value)}
+                        renderValue={(selected) => selected.map(v => v === '' ? 'unlabeled' : v).join(', ')}
+                      >
+                        {getFilterOptions.annotation.map(option => (
+                          <MenuItem key={option} value={option}>
+                            {option === '' ? 'unlabeled' : option}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   )}
                 </div>
               )}
@@ -2361,21 +2322,20 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                       Filter by labels
                     </label>
                     {filters.labels.enabled && (
-                      <select
-                        multiple
-                        value={filters.labels.values}
-                        onChange={(e) => {
-                          const values = Array.from(e.target.selectedOptions, option => option.value);
-                          handleFilterChange('labels', true, values);
-                        }}
-                        className="filter-multiselect"
-                      >
-                        {getFilterOptions.labels.map(option => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
+                      <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <Select
+                          multiple
+                          value={filters.labels.values}
+                          onChange={(e) => handleFilterChange('labels', true, e.target.value)}
+                          renderValue={(selected) => selected.join(', ')}
+                        >
+                          {getFilterOptions.labels.map(option => (
+                            <MenuItem key={option} value={option}>
+                              {option}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     )}
                   </div>
 
@@ -2389,21 +2349,20 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                       Filter by status
                     </label>
                     {filters.annotation_status.enabled && (
-                      <select
-                        multiple
-                        value={filters.annotation_status.values}
-                        onChange={(e) => {
-                          const values = Array.from(e.target.selectedOptions, option => option.value);
-                          handleFilterChange('annotation_status', true, values);
-                        }}
-                        className="filter-multiselect"
-                      >
-                        {getFilterOptions.annotation_status.map(option => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
+                      <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <Select
+                          multiple
+                          value={filters.annotation_status.values}
+                          onChange={(e) => handleFilterChange('annotation_status', true, e.target.value)}
+                          renderValue={(selected) => selected.join(', ')}
+                        >
+                          {getFilterOptions.annotation_status.map(option => (
+                            <MenuItem key={option} value={option}>
+                              {option}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     )}
                   </div>
                 </>
@@ -2674,18 +2633,19 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                           <span className="material-symbols-outlined">chevron_left</span>
                         </button>
 
-                        <select
-                          className="page-dropdown"
-                          value={currentBinIndex}
-                          onChange={(e) => setCurrentBinIndex(parseInt(e.target.value))}
-                          title="Go to bin"
-                        >
-                          {stratifiedBins.map((_, i) => (
-                            <option key={i} value={i}>
-                              Bin {i + 1}
-                            </option>
-                          ))}
-                        </select>
+                        <FormControl size="small" sx={{ minWidth: 90 }}>
+                          <Select
+                            value={currentBinIndex}
+                            onChange={(e) => setCurrentBinIndex(parseInt(e.target.value))}
+                            title="Go to bin"
+                          >
+                            {stratifiedBins.map((_, i) => (
+                              <MenuItem key={i} value={i}>
+                                Bin {i + 1}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
 
                         <button
                           className="toolbar-btn"
@@ -2709,18 +2669,19 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                             <span className="material-symbols-outlined">chevron_left</span>
                           </button>
 
-                          <select
-                            className="page-dropdown"
-                            value={currentPage}
-                            onChange={(e) => setCurrentPage(parseInt(e.target.value))}
-                            title="Go to page"
-                          >
-                            {Array.from({ length: totalPages }, (_, i) => (
-                              <option key={i} value={i}>
-                                Page {i + 1}
-                              </option>
-                            ))}
-                          </select>
+                          <FormControl size="small" sx={{ minWidth: 100 }}>
+                            <Select
+                              value={currentPage}
+                              onChange={(e) => setCurrentPage(parseInt(e.target.value))}
+                              title="Go to page"
+                            >
+                              {Array.from({ length: totalPages }, (_, i) => (
+                                <MenuItem key={i} value={i}>
+                                  Page {i + 1}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
 
                           <button
                             className="toolbar-btn"
@@ -2914,40 +2875,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
             !loading && !error && (
               <div className="placeholder-container">
                 <div className="placeholder-content">
-                  <h3>Ready for Annotation Review 📝 <HelpIcon section="review" /></h3>
-                  <p>Load a CSV file to begin reviewing and annotating audio clips. Supported formats:</p>
-
-                  <div className="format-section">
-                    <h4>📋 Required Columns (all formats)</h4>
-                    <ul>
-                      <li><strong>file</strong>: Path to audio file</li>
-                      <li><strong>start_time</strong>: Start time in seconds</li>
-                      <li><strong>end_time</strong>: End time in seconds (optional)</li>
-                      <li><strong>comments</strong>: Text comments (optional)</li>
-                    </ul>
-
-                    <h4>Format 1: Binary Review</h4>
-                    <ul>
-                      <li><strong>annotation</strong>: Binary labels (yes/no/uncertain/empty)</li>
-                    </ul>
-                    <p><em>Example: file,start_time,end_time,annotation,comments</em></p>
-
-                    <h4>Format 2: Multi-class with Labels Column</h4>
-                    <ul>
-                      <li><strong>labels</strong>: Comma-separated or JSON list of classes</li>
-                      <li><strong>annotation_status</strong>: complete/unreviewed/uncertain</li>
-                    </ul>
-                    <p><em>Example: file,start_time,end_time,labels,annotation_status,comments</em></p>
-
-                    <h4>Format 3: Multi-hot (One Column Per Class)</h4>
-                    <ul>
-                      <li><strong>[class_name]</strong>: One column per class with 0/1 values or continuous scores</li>
-                    </ul>
-                    <p><em>Example: file,start_time,end_time,robin,cardinal,blue_jay,comments</em></p>
-                  </div>
-
-                  <p><strong>The system auto-detects the format and switches to the appropriate review mode.</strong></p>
-
+                  {/* <h3>Ready for Annotation Review 📝 <HelpIcon section="review" /></h3> */}
                   {/* Load CSV Button */}
                   <div className="placeholder-actions">
                     <button
@@ -2961,49 +2889,83 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                       <small>You can also use the menu button in the top-left to access loading and filtering options.</small>
                     </p>
                   </div>
+                  <p>Load a CSV file to begin reviewing and annotating audio clips. Supported formats:</p>
+
+                  <div className="format-section">
+                    <h4>Columns used in all formats</h4>
+                    <ul>
+                      <li>Required: <strong>file</strong>: Path to audio file; <strong>start_time, end_time</strong>: Clip time (seconds) relative to file start</li>
+                      <li>Optional: <strong>comments</strong>: Text comments (optional)</li>
+                    </ul>
+
+                    <h4>Format 1: Binary Review</h4>
+                    <ul>
+                      <li><strong>annotation</strong>: Binary labels (yes/no/uncertain/empty)</li>
+                    </ul>
+                    <p><em>Example: file,start_time,end_time,annotation,comments<br /> /path/to/file.wav,5,8,Yes,Primary song</em></p>
+
+                    <h4>Format 2: Multi-class with Labels Column</h4>
+                    <ul>
+                      <li><strong>labels</strong>: Comma-separated or JSON list of classes</li>
+                      <li><strong>annotation_status</strong>: complete/unreviewed/uncertain</li>
+                    </ul>
+                    <p><em>Example: file,start_time,end_time,labels,annotation_status,comments<br />/path/to/file.wav,5,8,"[AMRO,NOCA]",complete,Alarm calls</em></p>
+
+                    <h4>Format 3: Multi-hot (One Column Per Class)</h4>
+                    <ul>
+                      <li>One column per class with 0/1 values or continuous scores</li>
+                    </ul>
+                    <p><em>Example: file,start_time,end_time,robin,cardinal,blue_jay,comments<br />/path/to/file.wav,5,8,1,0,0,"Very distant"</em></p>
+                  </div>
+
+                  <p><strong>The system auto-detects the format and switches to the appropriate review mode.</strong></p>
+
+
                 </div>
               </div>
             )
           )}
         </div>
 
-      </div>
+      </div >
       {/* Status Bar - Always visible when data is loaded */}
-      {annotationData.length > 0 && (
-        <div className="review-status-bar">
-          <div className="status-section">
-            <span className="status-label">Current Page:</span>
-            <span className="status-value">{currentPage + 1} of {totalPages}</span>
-          </div>
-          <div className="status-section">
-            <span className="status-label">Annotated:</span>
-            <span className="status-value">
-              {annotationData.filter(item =>
-                settings.review_mode === 'binary'
-                  ? item.annotation && item.annotation !== ''
-                  : item.annotation_status === 'complete'
-              ).length} of {annotationData.length}
-            </span>
-          </div>
-          <div className="status-section">
-            <span className="status-label">Progress:</span>
-            <span className="status-value">
-              {Math.round((annotationData.filter(item =>
-                settings.review_mode === 'binary'
-                  ? item.annotation && item.annotation !== ''
-                  : item.annotation_status === 'complete'
-              ).length / annotationData.length) * 100)}%
-            </span>
-          </div>
-          {isFocusMode && (
+      {
+        annotationData.length > 0 && (
+          <div className="review-status-bar">
             <div className="status-section">
-              <span className="status-label">Focus:</span>
-              <span className="status-value">{focusClipIndex + 1} of {filteredAnnotationData.length}</span>
+              <span className="status-label">Current Page:</span>
+              <span className="status-value">{currentPage + 1} of {totalPages}</span>
             </div>
-          )}
-        </div>
-      )}
-    </div>
+            <div className="status-section">
+              <span className="status-label">Annotated:</span>
+              <span className="status-value">
+                {annotationData.filter(item =>
+                  settings.review_mode === 'binary'
+                    ? item.annotation && item.annotation !== ''
+                    : item.annotation_status === 'complete'
+                ).length} of {annotationData.length}
+              </span>
+            </div>
+            <div className="status-section">
+              <span className="status-label">Progress:</span>
+              <span className="status-value">
+                {Math.round((annotationData.filter(item =>
+                  settings.review_mode === 'binary'
+                    ? item.annotation && item.annotation !== ''
+                    : item.annotation_status === 'complete'
+                ).length / annotationData.length) * 100)}%
+              </span>
+            </div>
+            {isFocusMode && (
+              <div className="status-section">
+                <span className="status-label">Focus:</span>
+                <span className="status-value">{focusClipIndex + 1} of {filteredAnnotationData.length}</span>
+              </div>
+            )}
+          </div>
+        )
+      }
+    </div >
   );
 }
 

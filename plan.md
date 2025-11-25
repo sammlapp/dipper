@@ -9,22 +9,65 @@ allow up to N background tasks to run in parallel if user clicks run in parallel
 - heavy python environment is built with conda-pack (inference, train scripts)
 - inference, train, extraction scripts run in separate processes and are tracked by task manager
 - these run with the built-in heavier conda env (downloaded on demand to application cache dir) unless the user specifies a custom python env to use
-- an annota
+- an annotation-only version of the app can be built
+
 # Incomplete items / TODO /feature request
 
-tion-only version of the app can be built
+## known bugs
+
+cannot ctrl/cmd+c/v in the app 
+
+Multi-class review mode segmented control still has ugly styling, update to match Binary review segmented annotation control
+
+When using remote file explorer, "save" dialogue is incorrect - cannot create file
+
+Sometimes does not render specs on the page (bin) when enabling classifier guided listening (CGL)
+
+Tauri build not rendering Review tab clips correctly
+
+Need to test training (failed, fixed bug in script, didn't try again)
+
+Extraction load config is not working
+
+Extraction results in an error, somewhere we get a pd.Series instead of pd.DataFrame
+2025-11-20 22:11:19,733 - ERROR - Traceback (most recent call last):
+  File "/Users/SML161/training_gui/backend/scripts/create_extraction_task.py", line 749, in create_extraction_task
+    selected_clips_df = extract_clips_from_groups(groups, config)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/SML161/training_gui/backend/scripts/create_extraction_task.py", line 471, in extract_clips_from_groups
+    group_clips.extend(extract_highest_scoring(filtered_df, class_list, config))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/SML161/training_gui/backend/scripts/create_extraction_task.py", line 388, in extract_highest_scoring
+    if class_name not in group_df.columns:
+                         ^^^^^^^^^^^^^^^^
+  File "/Users/SML161/Library/Caches/Dipper/envs/dipper_pytorch_env/lib/python3.11/site-packages/pandas/core/generic.py", line 6321, in __getattr__
+    return object.__getattribute__(self, name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Series' object has no attribute 'columns'
 
 ## next steps:
-separate HopLite Database-oriented embed, train, and predict into its own area
-test using custom models
+server configuration and connection; test remote access; fix file save (create file) dialog
+
+add alternative "view mode" for multi-class annotation: instead of a multi-select box, each class has a button that can be toggled for present/absent. Class buttons are floated in a wrapping div, such that multiple can appear side by side if there is enough horizontal space.
+
+select ports for lightweight_server (currently 3000) and react frontend/backend comm (currently 8000) dynamically and store as a variable, rather than hard-coding the port throughout the app. 
+
+separate HopLite Database-oriented embed, train, and predict into its own app
+
+test inference with custom/local models
+
 test builds that allow inference and training
+
 get feedback on inference and training builds
+
 running on servers: port forwarding or otherwise providing a web-based gui where user can access Dipper running on a remote machine
+- no-electron version of app runs with just lightweight_server+react+rust locally
+- file selection/explorer with SVAR
 - need to be very careful with multi-user scenarios, sessions, what happens when more than one person using Dipper
 
-- IPC may be unnecessarily complicated. PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules. 
+- PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules. 
 
-- saving/loading annotation settings to json: includes view settings and CGL
+- Review saving/loading annotation settings to json: includes view settings and CGL
 - CGL true/false should persist across app restart
 
 - stratification by arbitrary columns for clip extraction
@@ -36,6 +79,7 @@ running on servers: port forwarding or otherwise providing a web-based gui where
 
 get xeno-canto / other public recordings for a species to supplement training data?!
 - this functionality is now provided in Jan's package
+- also possible via scripting on BirdSet, though snapshot is early 2024
 
 denoising and/or bandpassing for audio playback / review
 

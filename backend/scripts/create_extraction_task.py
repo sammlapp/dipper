@@ -443,6 +443,12 @@ def extract_clips_from_groups(
     all_selected_clips = []
 
     for group_name, group_df in groups.items():
+        # Ensure each group is a DataFrame; some calling patterns can
+        # accidentally pass a Series here, which breaks downstream code
+        # that relies on the .columns attribute.
+        if isinstance(group_df, pd.Series):
+            group_df = group_df.to_frame().T
+
         logging.info(
             f"Processing group '{group_name}' with {len(group_df)} predictions"
         )

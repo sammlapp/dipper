@@ -41,36 +41,6 @@ This document summarizes the comprehensive review and update of project document
    - Active planning and TODO items
    - Feature requests and improvements
 
-### ❌ Outdated Documentation (RECOMMEND REMOVAL)
-
-1. **BACKEND_API_NOTES.md** (1.8KB)
-   - **Reason:** File counting API details now documented in ARCHITECTURE.md
-   - **Action:** Archive or remove
-
-2. **CLASSIFIER_GUIDED_IMPLEMENTATION.md** (7.7KB)
-   - **Reason:** Implementation details from old development phase
-   - **Action:** Archive (may have historical value)
-
-3. **CLEANUP_SUMMARY.md** (3.8KB)
-   - **Reason:** Historical cleanup notes from July 2024
-   - **Action:** Remove (no longer relevant)
-
-4. **IMPLEMENTATION_SUMMARY.md** (8.3KB)
-   - **Reason:** Build strategy details now in ARCHITECTURE.md
-   - **Action:** Remove (superseded by ARCHITECTURE.md)
-
-5. **QUICKSTART.md** (2.8KB)
-   - **Reason:** References non-existent files (App-simple.js, App-complex.js)
-   - **Action:** Remove or completely rewrite
-
-6. **gemini.md** (7.9KB)
-   - **Reason:** Outdated guide for Gemini Code Assist
-   - **Action:** Remove (CLAUDE.md serves this purpose)
-
-7. **README-dist.md** (1.4KB)
-   - **Reason:** Distribution notes, redundant with main README
-   - **Action:** Merge into README.md or remove
-
 ## Complexity Analysis (#simplify)
 
 The architecture review identified several areas of unnecessary complexity:

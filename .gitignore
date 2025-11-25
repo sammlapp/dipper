@@ -86,3 +86,5 @@ environments/
 runtime_envs/
 Support/Electron/envs/dipper_pytorch_env/bin/ahost
 dist-review/
+frontend/src-tauri/target
+frontend/src-tauri/bin

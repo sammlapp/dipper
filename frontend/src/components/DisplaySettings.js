@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FormControl, Select, MenuItem } from '@mui/material';
 
 function DisplaySettings({ onSettingsChange }) {
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -83,33 +84,37 @@ function DisplaySettings({ onSettingsChange }) {
           <div className="settings-grid">
             <label>
               Window Size:
-              <select
-                value={settings.spec_window_size}
-                onChange={(e) => handleSettingChange('spec_window_size', parseInt(e.target.value))}
-              >
-                <option value={32}>32</option>
-                <option value={64}>64</option>
-                <option value={128}>128</option>
-                <option value={256}>256</option>
-                <option value={512}>512</option>
-                <option value={1024}>1024</option>
-                <option value={2048}>2048</option>
-                <option value={4096}>4096</option>
-              </select>
+              <FormControl size="small" sx={{ minWidth: 100, ml: 1 }}>
+                <Select
+                  value={settings.spec_window_size}
+                  onChange={(e) => handleSettingChange('spec_window_size', parseInt(e.target.value))}
+                >
+                  <MenuItem value={32}>32</MenuItem>
+                  <MenuItem value={64}>64</MenuItem>
+                  <MenuItem value={128}>128</MenuItem>
+                  <MenuItem value={256}>256</MenuItem>
+                  <MenuItem value={512}>512</MenuItem>
+                  <MenuItem value={1024}>1024</MenuItem>
+                  <MenuItem value={2048}>2048</MenuItem>
+                  <MenuItem value={4096}>4096</MenuItem>
+                </Select>
+              </FormControl>
             </label>
 
             <label>
               Colormap:
-              <select
-                value={settings.spectrogram_colormap}
-                onChange={(e) => handleSettingChange('spectrogram_colormap', e.target.value)}
-              >
-                {colormapOptions.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <FormControl size="small" sx={{ minWidth: 180, ml: 1 }}>
+                <Select
+                  value={settings.spectrogram_colormap}
+                  onChange={(e) => handleSettingChange('spectrogram_colormap', e.target.value)}
+                >
+                  {colormapOptions.map(option => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </label>
 
             <label>

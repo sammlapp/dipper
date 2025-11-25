@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { FormControl, Select, MenuItem } from '@mui/material';
 import HelpIcon from './HelpIcon';
+import { selectFiles, selectFolder, selectTextFiles, selectModelFiles, saveFile, selectJSONFiles } from '../utils/fileOperations';
 
 // Default values for inference form
 const DEFAULT_VALUES = {
@@ -69,7 +71,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleFileSelection = async () => {
     try {
-      const files = await window.electronAPI.selectFiles();
+      const files = await selectFiles();
       if (files && files.length > 0) {
         setConfig(prev => ({
           ...prev,
@@ -87,7 +89,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleFolderSelection = async () => {
     try {
-      const folder = await window.electronAPI.selectFolder();
+      const folder = await selectFolder();
       if (folder && selectedExtensions.length > 0) {
         // Create globbing patterns for selected extensions
         const patterns = generatePatternsForExtensions(folder, selectedExtensions);
@@ -111,7 +113,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleFileListSelection = async () => {
     try {
-      const files = await window.electronAPI.selectTextFiles();
+      const files = await selectTextFiles();
       if (files && files.length > 0) {
         const filePath = files[0]; // Should be a text file (.txt or .csv)
         setConfig(prev => ({
@@ -208,7 +210,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleOutputDirSelection = async () => {
     try {
-      const dir = await window.electronAPI.selectFolder();
+      const dir = await selectFolder();
       if (dir) {
         setConfig(prev => ({ ...prev, output_dir: dir }));
       }
@@ -219,7 +221,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleModelFileSelection = async () => {
     try {
-      const files = await window.electronAPI.selectModelFiles();
+      const files = await selectModelFiles();
       if (files && files.length > 0) {
         const modelFile = files[0];
         setConfig(prev => ({ ...prev, model: modelFile }));
@@ -231,7 +233,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const handleCustomPythonEnvSelection = async () => {
     try {
-      const folder = await window.electronAPI.selectFolder();
+      const folder = await selectFolder();
       if (folder) {
         setConfig(prev => ({ ...prev, custom_python_env_path: folder }));
       }
@@ -293,14 +295,9 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const saveInferenceConfig = async () => {
     try {
-      if (!window.electronAPI) {
-        console.log('Electron API not available - running in browser mode');
-        return;
-      }
-
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const defaultName = `inference_config_${timestamp}.json`;
-      const configPath = await window.electronAPI.saveFile(defaultName);
+      const configPath = await saveFile(defaultName);
 
       if (configPath) {
         const configData = {
@@ -360,12 +357,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const loadInferenceConfig = async () => {
     try {
-      if (!window.electronAPI) {
-        console.log('Electron API not available - running in browser mode');
-        return;
-      }
-
-      const configFile = await window.electronAPI.selectJSONFiles();
+      const configFile = await selectJSONFiles();
       if (configFile && configFile.length > 0) {
         // Use HTTP API to load config
         const response = await fetch('http://localhost:8000/config/load', {
@@ -716,19 +708,21 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         {config.model_source === 'bmz' ? (
           <div className="form-group">
             <label>Model <HelpIcon section="inference-models" /></label>
-            <select
-              value={config.model}
-              onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
-            >
-              <option value="HawkEars">HawkEars</option>
-              <option value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</option>
-              <option value="HawkEars_Low_Band">Ruffed & Spruce Grouse (HawkEars Low-band)</option>
-              <option value="BirdNET">BirdNET Global bird species classifier</option>
-              <option value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</option>
-              <option value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</option>
-              {/* <option value="Perch">Perch Global bird species classifier </option> */}
-              {/* haven't created TF environments yet */}
-            </select>
+            <FormControl size="small" fullWidth sx={{ mt: 0.5 }}>
+              <Select
+                value={config.model}
+                onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
+              >
+                <MenuItem value="HawkEars">HawkEars</MenuItem>
+                <MenuItem value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</MenuItem>
+                <MenuItem value="HawkEars_Low_Band">Ruffed & Spruce Grouse (HawkEars Low-band)</MenuItem>
+                <MenuItem value="BirdNET">BirdNET Global bird species classifier</MenuItem>
+                <MenuItem value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</MenuItem>
+                <MenuItem value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</MenuItem>
+                {/* <MenuItem value="Perch">Perch Global bird species classifier </MenuItem> */}
+                {/* haven't created TF environments yet */}
+              </Select>
+            </FormControl>
           </div>
         ) : (
           <div className="form-group full-width">
