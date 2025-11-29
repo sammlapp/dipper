@@ -216,12 +216,12 @@ fn wait_for_server(max_retries: u32) -> bool {
     false
 }
 
-/// Start the backend HTTP server using Tauri's sidecar mechanism
-fn start_backend_server(app: &tauri::AppHandle) -> Option<Child> {
+/// Start the backend HTTP server using Tauri's sidecar mechanism (non-blocking)
+fn start_backend_server(app: &tauri::AppHandle) {
     // Check if server is already running
     if check_server_running() {
         println!("HTTP server already running on port {}", HTTP_SERVER_PORT);
-        return None;
+        return;
     }
 
     println!("Starting HTTP server sidecar...");
@@ -233,27 +233,11 @@ fn start_backend_server(app: &tauri::AppHandle) -> Option<Child> {
         .args(["--port", &HTTP_SERVER_PORT.to_string()])
         .spawn()
     {
-        Ok((_, child)) => {
-            println!("HTTP server sidecar started");
-
-            // Convert to std::process::Child for storage
-            // Note: Tauri's CommandChild doesn't give us a Child directly,
-            // so we'll wait for the server differently
-
-            // Wait for server to be ready
-            if wait_for_server(30) {
-                println!("HTTP server is ready");
-            } else {
-                eprintln!("Server started but health check failed");
-            }
-
-            // Return None since we can't easily store the Tauri child process
-            // The process will be cleaned up when the app exits
-            None
+        Ok(_) => {
+            println!("HTTP server sidecar spawned successfully");
         }
         Err(e) => {
             eprintln!("Failed to start HTTP server sidecar: {}", e);
-            None
         }
     }
 }
@@ -266,8 +250,121 @@ fn main() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
-            // Start the backend server (sidecar process managed by Tauri)
+            // Get window handles
+            let splash_window = app.get_webview_window("splash").expect("Splash window not found");
+            let main_window = app.get_webview_window("main").expect("Main window not found");
+
+            // Load splash HTML content
+            let splash_html = r#"
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Rokkitt', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #395756 0%, #4f5d75 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .splash-container {
+            text-align: center;
+            color: white;
+        }
+
+        .logo {
+            font-size: 64px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #ffffff;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #c6ac8f;
+            margin-bottom: 10px;
+            margin-top: 10px;
+            font-weight: 300;
+        }
+
+        .loader {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #ffffff;
+            border-radius: 50%;
+            margin: 0 auto;
+            animation: spin 1s linear infinite;
+        }
+
+        .status {
+            margin-top: 20px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 300;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="splash-container">
+        <img src="./icon.svg" alt="Dipper Logo" class="logo" width="200" height="200">
+        <div class="subtitle">Dipper is booting...</div>
+        <div class="loader"></div>
+    </div>
+</body>
+
+</html>
+"#;
+            splash_window.eval(&format!("document.documentElement.innerHTML = `{}`;", splash_html.replace("`", "\\`")))
+                .expect("Failed to load splash HTML");
+
+            // Show splash screen immediately
+            splash_window.show().expect("Failed to show splash window");
+
+            // Start the backend server (non-blocking)
             start_backend_server(&app.handle());
+
+            // Clone handles for background thread
+            let main_window_clone = main_window.clone();
+            let splash_window_clone = splash_window.clone();
+
+            // Wait for backend server in background thread
+            thread::spawn(move || {
+                println!("Waiting for backend server to be ready...");
+                if wait_for_server(30) {
+                    println!("Backend server is ready!");
+                    // Show main window and close splash
+                    main_window_clone.show().expect("Failed to show main window");
+                    splash_window_clone.close().expect("Failed to close splash window");
+                } else {
+                    eprintln!("Backend server failed to start - showing main window anyway");
+                    main_window_clone.show().expect("Failed to show main window");
+                    splash_window_clone.close().expect("Failed to close splash window");
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

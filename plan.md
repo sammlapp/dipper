@@ -50,7 +50,7 @@ server configuration and connection; test remote access; fix file save (create f
 
 add alternative "view mode" for multi-class annotation: instead of a multi-select box, each class has a button that can be toggled for present/absent. Class buttons are floated in a wrapping div, such that multiple can appear side by side if there is enough horizontal space.
 
-select ports for lightweight_server (currently 3000) and react frontend/backend comm (currently 8000) dynamically and store as a variable, rather than hard-coding the port throughout the app. 
+select ports for lightweight_server (currently 3000) and react frontend/backend comm (currently 8000) dynamically and store as a variable or something that can be accessed in all necessary places, rather than hard-coding the port throughout the app. The app should still work properly when some other process is using port 3000 or 8000. Also ensure that the backend pyinstaller process (currently port 8000) closes when the app closes or is quit/killed. The lightweight server shouldn't keep running past the main app. 
 
 separate HopLite Database-oriented embed, train, and predict into its own app
 
