@@ -91,13 +91,13 @@ def install_conda_pack():
         print("⚠️  Failed to install conda-pack via conda, trying pip...")
         try:
             run_command(
-                "pip install conda-pack", description="Installing conda-pack via pip"
+                "python -m pip install conda-pack", description="Installing conda-pack via pip"
             )
         except:
             print("❌ Failed to install conda-pack. Please install it manually:")
             print("   conda install conda-pack -c conda-forge")
             print("   OR")
-            print("   pip install conda-pack")
+            print("   python -m pip install conda-pack")
             sys.exit(1)
 
 

@@ -18,7 +18,7 @@ jobs:
       matrix:
         include:
           - platform: macos-x64
-            os: macos-15-large
+            os: macos-15-intel
             artifact_name: conda-env-macos-x64
           - platform: macos-arm64
             os: macos-latest
@@ -31,9 +31,7 @@ jobs:
             artifact_name: conda-env-linux-x64
 
     # Only run for selected platforms
-    if: |
-      inputs.platforms == 'all' ||
-      contains(inputs.platforms, matrix.platform)
+    if: inputs.platforms == 'all' || contains(inputs.platforms, matrix.platform)
 
     steps:
       - name: Checkout code

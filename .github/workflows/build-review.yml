@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15-large  # Intel (macos-15-intel)
+          - os: macos-15-intel  # Intel
             artifact_name: lightweight_server-macos-x64
           - os: macos-latest  # ARM (macos-15)
             artifact_name: lightweight_server-macos-arm64
@@ -71,7 +71,7 @@ jobs:
       matrix:
         include:
           - platform: macos-x64
-            os: macos-15-large  # Intel (macos-15-intel)
+            os: macos-15-intel  # Intel
             rust_target: x86_64-apple-darwin
             pyinstaller_artifact: lightweight_server-macos-x64
           - platform: macos-arm64
@@ -132,18 +132,24 @@ jobs:
           echo "::error::PyInstaller artifact for ${{ matrix.platform }} not found. Skipping Tauri build."
           exit 1
 
-      - name: Make PyInstaller executable (Unix)
+      - name: Rename and prepare PyInstaller executable (Unix)
         if: matrix.platform != 'windows-x64'
         shell: bash
         run: |
-          chmod +x frontend/src-tauri/bin/lightweight_server
-          ls -lh frontend/src-tauri/bin/
+          cd frontend/src-tauri/bin
+          # Rename to include target triple as Tauri expects
+          mv lightweight_server lightweight_server-${{ matrix.rust_target }}
+          chmod +x lightweight_server-${{ matrix.rust_target }}
+          ls -lh
 
-      - name: Verify PyInstaller executable (Windows)
+      - name: Rename and prepare PyInstaller executable (Windows)
         if: matrix.platform == 'windows-x64'
         shell: bash
         run: |
-          ls -lh frontend/src-tauri/bin/
+          cd frontend/src-tauri/bin
+          # Rename to include target triple as Tauri expects
+          mv lightweight_server.exe lightweight_server-${{ matrix.rust_target }}.exe
+          ls -lh
 
       - name: Install frontend dependencies
         working-directory: frontend

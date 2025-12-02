@@ -117,8 +117,8 @@ This directory contains automated build workflows for Dipper across multiple pla
 
 | Platform | Architecture | Runner | Status |
 |----------|-------------|--------|--------|
-| macOS    | Intel (x64) | `macos-15-large` (macos-15-intel) | Supported |
-| macOS    | Apple Silicon (arm64) | `macos-latest` (macos-15) | Supported |
+| macOS    | Intel (x64) | `macos-15-intel` | Supported |
+| macOS    | Apple Silicon (arm64) | `macos-latest` | Supported |
 | Windows  | x64 | `windows-latest` | Supported |
 | Linux    | x64 | `ubuntu-latest` | Supported |
 

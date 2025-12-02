@@ -72,11 +72,12 @@ def create_virtual_env():
 
     # Install requirements
     print("📦 Installing requirements...")
-    run_command(f'"{pip_exe}" install --upgrade pip setuptools wheel')
+    # Use python -m pip to avoid Windows file locking issues when upgrading pip
+    run_command(f'"{python_exe}" -m pip install --upgrade pip setuptools wheel')
 
     # Install requirements from file if it exists
     requirements_file = BACKEND_DIR / "requirements-lightweight.txt"
-    run_command(f'"{pip_exe}" install -r {requirements_file}')
+    run_command(f'"{python_exe}" -m pip install -r {requirements_file}')
 
     return python_exe, pip_exe, pyinstaller_exe, venv_path
 
