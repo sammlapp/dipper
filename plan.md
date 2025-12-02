@@ -74,6 +74,14 @@ get feedback on inference and training builds
 
 Review tab status bar: if we are in the full app (not review-only), the review status bar is covered by the global app status bar, it should be bumped up so that it is not hidden. 
 
+Work on setting up the Github based cross platform build: apple silicon, apple intel, windows, linux
+- builds pyinstaller lightweight_server executable for the os (currently npm run build:python-pyinstaller)
+- builds the tauri desktop executable app for the os (currently npm run tauri:build or tauri:build:review)
+- separate Github workflows/actions for review-only and full app
+- full app: also creates the dipper-pytorch-env environment with conda-pack (app downloads this env as needed)
+
+Me: add github "secrets" set up for signing Mac app
+
 ## general feature request list 
 
 get xeno-canto / other public recordings for a species to supplement training data?!

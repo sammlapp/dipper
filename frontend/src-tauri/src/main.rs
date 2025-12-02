@@ -274,7 +274,7 @@ fn wait_for_server(port: u16, max_retries: u32) -> bool {
             // Only print every 5th attempt after the first 3 to reduce spam
             println!("⏳ Checking backend health on port {}... (attempt {}/{})", port, i + 1, max_retries);
         }
-        thread::sleep(Duration::from_millis(1500));
+        thread::sleep(Duration::from_secs(2));
     }
     eprintln!("✗ Backend health check timed out after {} attempts", max_retries);
     false
@@ -493,10 +493,6 @@ fn main() {
 
             // Wait for backend server in background thread
             thread::spawn(move || {
-                // Give the backend a moment to start up before checking
-                println!("Giving backend 2 seconds to initialize...");
-                thread::sleep(Duration::from_secs(2));
-
                 println!("Waiting for backend server to be ready on port {}...", port);
                 if wait_for_server(port, 30) {
                     println!("✓ Backend server is ready!");
