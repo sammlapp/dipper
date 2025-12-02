@@ -42,7 +42,7 @@
     "tauri:dev:review:full": "concurrently \"python ../backend/lightweight_server.py --port 8000\" \"wait-on http://localhost:8000/health && cross-env REACT_APP_REVIEW_ONLY=true tauri dev\"",
     "tauri:build": "npm run build && tauri build",
     "tauri:build:all": "npm run build:all && tauri build",
-    "tauri:build:review": "npm run build:review && tauri build --skip-stapling --config '{\"build\":{\"beforeBuildCommand\":\"\"}}'"
+    "tauri:build:review": "npm run build:review && tauri build --skip-stapling"
   },
   "dependencies": {
     "@emotion/react": "^11.11.0",
