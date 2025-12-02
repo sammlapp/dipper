@@ -51,7 +51,10 @@ This directory contains automated build workflows for Dipper across multiple pla
 ### 3. Build Full App (`build-full.yml`)
 **Trigger:**
 - Push to `main` or `develop`
-- Tags matching `v*` but NOT `v*-review` (e.g., `v0.0.6`)
+- Tags matching version patterns:
+  - `v0.0.6` (release)
+  - `v0.0.6-alpha`, `v0.0.6-beta`, `v0.0.6-rc1` (pre-releases)
+  - **Does NOT trigger on** `v*-review` tags
 - Manual workflow dispatch
 
 **Purpose:** Build complete app with ML training capabilities
@@ -60,23 +63,53 @@ This directory contains automated build workflows for Dipper across multiple pla
 1. **PyInstaller Backend** (all platforms)
    - Same as review build
 
-2. **Conda-Pack ML Environment** (all platforms)
-   - PyTorch + dependencies
-   - ~700MB compressed archive
-   - Automatically downloaded by app on first use
-
-3. **Tauri Full App** (all platforms)
+2. **Tauri Full App** (all platforms)
    - DMG for macOS
    - NSIS installer for Windows
    - AppImage for Linux
 
 **Artifacts:**
-- Full app installers for each platform
-- Conda-pack environment archives (`dipper_pytorch_env.tar.gz`)
-- Environment extraction and test scripts
-- Larger download size (~100-200MB app + ~700MB ML env)
+- Full app installers for each platform (~100-200MB)
+- ML environment is NOT included (built separately via `build-conda-env.yml`)
 
 **Use this for:** Full production releases with ML capabilities
+
+**Note:** The ML environment (~700MB) is built separately and distributed via the conda environment workflow. The app will automatically download it on first use.
+
+---
+
+### 4. Build Conda-Pack Environment (`build-conda-env.yml`)
+**Trigger:**
+- Manual workflow dispatch only
+- Select which platforms to build (macOS x64, macOS ARM, Windows, Linux, or all)
+
+**Purpose:** Build ML environment separately from app releases
+
+**What it builds:**
+- Conda-pack ML environment for selected platforms
+- PyTorch + OpenSoundscape + dependencies
+- ~700MB compressed archive per platform
+
+**Artifacts:**
+- Platform-specific `dipper_pytorch_env.tar.gz` files
+- Extraction scripts (`extract_and_test_env.sh`)
+- Test scripts (`test_environment.py`)
+- Creates a timestamped GitHub release (e.g., `conda-env-20250102-143022`)
+- Artifacts retained for 90 days
+
+**Use this for:** Building ML environments when dependencies change
+
+**When to run:**
+- After updating `backend/dipper_pytorch_env.yml`
+- Before major releases
+- When PyTorch or ML dependencies are updated
+
+**How to run:**
+1. Go to **Actions** tab → **Build Conda-Pack Environment**
+2. Click **Run workflow**
+3. Enter platforms to build (e.g., "all" or "macos-x64,linux")
+4. Wait 30-90 minutes for build to complete
+5. Environment will be available as a GitHub release
 
 ---
 
@@ -84,10 +117,12 @@ This directory contains automated build workflows for Dipper across multiple pla
 
 | Platform | Architecture | Runner | Status |
 |----------|-------------|--------|--------|
-| macOS    | Intel (x64) | `macos-13` | ✅ Supported |
-| macOS    | Apple Silicon (arm64) | `macos-14` | ✅ Supported |
-| Windows  | x64 | `windows-latest` | ✅ Supported |
-| Linux    | x64 | `ubuntu-latest` | ✅ Supported |
+| macOS    | Intel (x64) | `macos-15-large` (macos-15-intel) | Supported |
+| macOS    | Apple Silicon (arm64) | `macos-latest` (macos-15) | Supported |
+| Windows  | x64 | `windows-latest` | Supported |
+| Linux    | x64 | `ubuntu-latest` | Supported |
+
+**Note:** Builds are independent per platform. If PyInstaller or conda-pack build fails on one platform, the other platforms will continue building. Each Tauri build only requires its own platform's artifacts to succeed.
 
 ---
 
@@ -114,23 +149,52 @@ This directory contains automated build workflows for Dipper across multiple pla
 
 ### Full App Release
 
-1. **Tag the release:**
+**IMPORTANT:** Full app releases require a separate conda environment build first!
+
+1. **Build conda environments** (if ML dependencies changed):
    ```bash
-   git tag v0.0.6
-   git push origin v0.0.6
+   # Go to Actions → Build Conda-Pack Environment → Run workflow
+   # Select "all" platforms
+   # Wait ~30-90 minutes
+   # This creates a timestamped conda-env release
    ```
 
-2. **Workflow runs automatically:**
-   - Builds PyInstaller backend for all platforms
-   - Builds conda-pack ML environments (~30-60 minutes)
-   - Builds full Tauri apps
-   - Creates draft GitHub release with installers and ML environments
+2. **Tag the app release:**
+   ```bash
+   # For stable release:
+   git tag v0.0.6
+   git push origin v0.0.6
 
-3. **Edit and publish:**
+   # For pre-release:
+   git tag v0.0.6-beta
+   git push origin v0.0.6-beta
+   ```
+
+3. **Workflow runs automatically:**
+   - Builds PyInstaller backend for all platforms
+   - Builds full Tauri apps
+   - Creates draft GitHub release with installers
+   - Does NOT build conda environment (use pre-built one)
+
+4. **Edit and publish:**
    - Go to GitHub Releases
    - Edit the draft release
    - Add release notes
+   - Note which conda-env release to use
    - Publish the release
+
+### Tag Naming Convention
+
+**Review-only:** `v*-review`
+- `v0.0.6-review` ✓ Triggers review build
+- `v0.0.6-release` ✗ Does NOT trigger review build
+
+**Full app:** `v[0-9]+.[0-9]+.[0-9]+` with optional suffix
+- `v0.0.6` ✓ Stable release
+- `v0.0.6-alpha` ✓ Alpha pre-release
+- `v0.0.6-beta` ✓ Beta pre-release
+- `v0.0.6-rc1` ✓ Release candidate
+- `v0.0.6-review` ✗ Does NOT trigger full build (triggers review)
 
 ---
 

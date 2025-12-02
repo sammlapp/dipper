@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]  # macos-latest is ARM (macos-15)
 
     steps:
       - name: Checkout code
@@ -78,12 +78,12 @@ jobs:
 
       - name: Test PyInstaller build script
         run: |
-          echo "✅ PyInstaller build script exists"
+          echo "[OK] PyInstaller build script exists"
           test -f backend/build_pyinstaller.py
 
       - name: Test conda-pack build script
         run: |
-          echo "✅ Conda-pack build script exists"
+          echo "[OK] Conda-pack build script exists"
           test -f backend/build_conda_pack.py
 
   quick-build-test:
@@ -103,13 +103,15 @@ jobs:
         run: |
           cd backend
           python build_pyinstaller.py
+        env:
+          PYTHONIOENCODING: utf-8
 
       - name: Verify executable
         run: |
           if [ -f "frontend/python-dist/lightweight_server" ]; then
-            echo "✅ PyInstaller executable built successfully"
+            echo "[SUCCESS] PyInstaller executable built successfully"
             ls -lh frontend/python-dist/lightweight_server
           else
-            echo "❌ PyInstaller executable not found"
+            echo "[ERROR] PyInstaller executable not found"
             exit 1
           fi

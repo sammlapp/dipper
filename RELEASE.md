@@ -21,16 +21,16 @@ git push origin v0.0.6
 ## What Gets Built
 
 ### Review-Only Build (`v*-review` tags)
-- ✅ PyInstaller lightweight_server for all platforms
-- ✅ Tauri desktop app (DMG, EXE, AppImage)
-- ❌ No ML training environment
+- [YES] PyInstaller lightweight_server for all platforms
+- [YES] Tauri desktop app (DMG, EXE, AppImage)
+- [NO] ML training environment
 - **Size:** ~100-200 MB per platform
 - **Use for:** Distribution to annotators for review tasks only
 
 ### Full App Build (`v*` tags, excluding `v*-review`)
-- ✅ PyInstaller lightweight_server for all platforms
-- ✅ Conda-pack ML environment (~700 MB) for all platforms
-- ✅ Tauri desktop app (DMG, EXE, AppImage)
+- [YES] PyInstaller lightweight_server for all platforms
+- [YES] Conda-pack ML environment (~700 MB) for all platforms
+- [YES] Tauri desktop app (DMG, EXE, AppImage)
 - **Size:** ~100-200 MB app + ~700 MB ML environment
 - **Use for:** Full production releases with training capabilities
 
@@ -99,7 +99,7 @@ git push origin v0.0.6
    - Add detailed release notes
    - Add screenshots if UI changed
    - Add upgrade instructions if needed
-4. ✅ **Publish release**
+4. **Publish release**
 
 ## Build Outputs
 

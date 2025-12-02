@@ -1,0 +1,135 @@
+name: Build Conda-Pack Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Platforms to build (comma-separated: macos-x64, macos-arm64, windows, linux, or "all")'
+        required: true
+        default: 'all'
+        type: string
+
+jobs:
+  build-conda-pack:
+    name: Build Conda-Pack Environment - ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-x64
+            os: macos-15-large
+            artifact_name: conda-env-macos-x64
+          - platform: macos-arm64
+            os: macos-latest
+            artifact_name: conda-env-macos-arm64
+          - platform: windows
+            os: windows-latest
+            artifact_name: conda-env-windows-x64
+          - platform: linux
+            os: ubuntu-latest
+            artifact_name: conda-env-linux-x64
+
+    # Only run for selected platforms
+    if: |
+      inputs.platforms == 'all' ||
+      contains(inputs.platforms, matrix.platform)
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: '3.11'
+          miniforge-version: latest
+
+      - name: Build conda-pack environment
+        shell: bash -el {0}
+        run: |
+          cd backend
+          python build_conda_pack.py
+        env:
+          PYTHONIOENCODING: utf-8
+
+      - name: Verify conda-pack archive
+        shell: bash
+        run: |
+          if [ -f "environments/dipper_pytorch_env.tar.gz" ]; then
+            echo "[SUCCESS] Conda-pack environment built successfully"
+            ls -lh environments/dipper_pytorch_env.tar.gz
+          else
+            echo "[ERROR] Conda-pack environment not found"
+            exit 1
+          fi
+
+      - name: Upload conda-pack artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            environments/dipper_pytorch_env.tar.gz
+            environments/extract_and_test_env.sh
+            environments/test_environment.py
+          retention-days: 90  # Keep for 90 days since these are manually built
+
+  create-release:
+    name: Create Conda Environment Release
+    needs: build-conda-pack
+    runs-on: ubuntu-latest
+    if: always()  # Run even if some platforms failed
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Display artifact structure
+        run: |
+          echo "Downloaded artifacts:"
+          ls -R artifacts/
+
+      - name: Create timestamp for release
+        id: timestamp
+        run: echo "date=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: conda-env-${{ steps.timestamp.outputs.date }}
+          name: "ML Environment Build - ${{ steps.timestamp.outputs.date }}"
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.sh
+            artifacts/**/*.py
+          draft: false
+          prerelease: false
+          body: |
+            ## Conda-Pack ML Environment
+
+            This release contains pre-built ML environments for Dipper.
+
+            ### Platforms Included
+            Check the assets below for your platform:
+            - `conda-env-macos-x64` - macOS Intel
+            - `conda-env-macos-arm64` - macOS Apple Silicon
+            - `conda-env-windows-x64` - Windows
+            - `conda-env-linux-x64` - Linux
+
+            ### Installation
+            1. Download the `dipper_pytorch_env.tar.gz` for your platform
+            2. Extract using the provided `extract_and_test_env.sh` script
+            3. Test using the provided `test_environment.py` script
+
+            ### Contents
+            - PyTorch + dependencies
+            - OpenSoundscape
+            - Bioacoustics model zoo
+            - All ML training dependencies
+
+            Built on: ${{ steps.timestamp.outputs.date }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

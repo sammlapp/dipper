@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, develop ]
     tags:
-      - 'v*-review'
+      - 'v*-review'  # Only tags ending with -review (e.g., v0.0.6-review)
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -17,9 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-13  # Intel
+          - os: macos-15-large  # Intel (macos-15-intel)
             artifact_name: lightweight_server-macos-x64
-          - os: macos-14  # ARM
+          - os: macos-latest  # ARM (macos-15)
             artifact_name: lightweight_server-macos-arm64
           - os: windows-latest
             artifact_name: lightweight_server-windows-x64
@@ -39,14 +39,16 @@ jobs:
         run: |
           cd backend
           python build_pyinstaller.py
+        env:
+          PYTHONIOENCODING: utf-8
 
       - name: Verify executable exists
         shell: bash
         run: |
           if [ -f "frontend/python-dist/lightweight_server" ] || [ -f "frontend/python-dist/lightweight_server.exe" ]; then
-            echo "✅ PyInstaller executable built successfully"
+            echo "[SUCCESS] PyInstaller executable built successfully"
           else
-            echo "❌ PyInstaller executable not found"
+            echo "[ERROR] PyInstaller executable not found"
             exit 1
           fi
 
@@ -62,16 +64,18 @@ jobs:
     name: Build Tauri Review App - ${{ matrix.platform }}
     needs: build-pyinstaller
     runs-on: ${{ matrix.os }}
+    # Run even if some PyInstaller builds failed (but not if they were cancelled/skipped)
+    if: success() || failure()
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: macos-x64
-            os: macos-13
+            os: macos-15-large  # Intel (macos-15-intel)
             rust_target: x86_64-apple-darwin
             pyinstaller_artifact: lightweight_server-macos-x64
           - platform: macos-arm64
-            os: macos-14
+            os: macos-latest  # ARM (macos-15)
             rust_target: aarch64-apple-darwin
             pyinstaller_artifact: lightweight_server-macos-arm64
           - platform: windows-x64
@@ -119,6 +123,14 @@ jobs:
         with:
           name: ${{ matrix.pyinstaller_artifact }}
           path: frontend/src-tauri/bin/
+        continue-on-error: true
+        id: download_pyinstaller
+
+      - name: Check if PyInstaller artifact exists
+        if: steps.download_pyinstaller.outcome == 'failure'
+        run: |
+          echo "::error::PyInstaller artifact for ${{ matrix.platform }} not found. Skipping Tauri build."
+          exit 1
 
       - name: Make PyInstaller executable (Unix)
         if: matrix.platform != 'windows-x64'
