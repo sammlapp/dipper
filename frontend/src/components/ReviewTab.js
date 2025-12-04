@@ -1821,7 +1821,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           </div>
         )}
 
-        <div className="annotation-grid-container" style={{ position: 'relative' }}>
+        <div className="annotation-grid-container">
           <div
             className="annotation-grid"
             style={{
@@ -1865,25 +1865,6 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
             })}
           </div>
 
-          {/* Loading overlay - show when server is initializing */}
-          {serverInitializing && (
-            <div className="loading-overlay">
-              <div className="loading-content">
-                <p>Initializing audio processing server...</p>
-                <p style={{ fontSize: '0.9em', color: '#666', marginTop: '8px' }}>
-                  This may take a few seconds on first load while Python libraries are loaded.
-                </p>
-                {httpLoader.progress > 0 && (
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${httpLoader.progress}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </>
     );
@@ -1891,6 +1872,25 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
 
   return (
     <div className="review-tab-layout">
+      {/* Global loading overlay - covers main content area while server initializes */}
+      {serverInitializing && (
+        <div className="loading-overlay">
+          <div className="loading-content">
+            <p>Initializing audio processing server...</p>
+            <p style={{ fontSize: '0.9em', color: '#666', marginTop: '8px' }}>
+              This may take a few seconds on first load while Python libraries are loaded.
+            </p>
+            {httpLoader.progress > 0 && (
+              <div className="progress-bar">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${httpLoader.progress}%` }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {/* Left Tray */}
       <Drawer
         anchor="left"
