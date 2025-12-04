@@ -502,7 +502,8 @@ const AnnotationCard = memo(function AnnotationCard({
                   style={{
                     backgroundColor: annotation_status === option.value ? option.color : 'transparent',
                     borderColor: option.color,
-                    color: annotation_status === option.value ? 'white' : option.color
+                    color: annotation_status === option.value ? 'white' : option.color,
+                    border: 'none'
                   }}
                   onClick={() => handleAnnotationStatusChange(option.value)}
                   title={option.label}
