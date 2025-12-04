@@ -118,7 +118,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     // If grid size changed, recalculate page and position to preserve active clip
     const newItemsPerPage = newSettings.grid_rows * newSettings.grid_columns;
     const layoutChanged = (newSettings.grid_rows !== settings.grid_rows ||
-                          newSettings.grid_columns !== settings.grid_columns);
+      newSettings.grid_columns !== settings.grid_columns);
 
     if (layoutChanged && annotationData.length > 0) {
       // Set flag to prevent page-change useEffect from resetting active clip
@@ -1281,6 +1281,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
 
       const isMac = navigator.userAgent.includes('Mac') || navigator.userAgent.includes('macOS');
       const cmdOrCtrl = isMac ? event.metaKey : event.ctrlKey;
+
+      // Always allow standard copy/paste/cut shortcuts to work normally
+      if (cmdOrCtrl && ['c', 'v', 'x'].includes(event.key.toLowerCase())) {
+        return;
+      }
 
       // Handle Escape key for focus/grid toggle (works in both modes)
       if (event.key === 'Escape') {
