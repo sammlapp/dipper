@@ -29,6 +29,11 @@
       "providerShortName": null,
       "signingIdentity": "-"
     },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    },
     "resources": [],
     "externalBin": [
       "bin/lightweight_server"
