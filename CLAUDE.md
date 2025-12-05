@@ -227,6 +227,38 @@ Managed through Settings tab, saved/loaded via HTTP endpoints.
 **Build:**
 - electron-builder, PyInstaller, conda-pack
 
+## Version Management
+
+### Bumping Version
+
+Version numbers are defined in three places:
+1. `frontend/package.json` (line 3)
+2. `frontend/src-tauri/Cargo.toml` (line 3)
+3. `frontend/src-tauri/tauri.conf.json` (line 10)
+
+To update all three at once:
+```bash
+cd frontend
+npm run version-bump <new-version>
+```
+
+Examples:
+```bash
+npm run version-bump 0.0.7       # Next patch
+npm run version-bump 0.1.0       # Next minor
+npm run version-bump 1.0.0       # Next major
+npm run version-bump 1.0.0-beta  # Pre-release
+```
+
+The script automatically updates all files and shows next steps:
+1. Review changes: `git diff`
+2. Update Cargo.lock: `cd frontend/src-tauri && cargo check`
+3. Commit: `git add -A && git commit -m "bump version to X.Y.Z"`
+4. Tag: `git tag vX.Y.Z`
+5. Build: `npm run tauri:build:all`
+
+See `scripts/README.md` for more details.
+
 ## Troubleshooting
 
 **Issue**: Electron doesn't start
