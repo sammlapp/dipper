@@ -10,7 +10,9 @@ function ClassifierGuidedPanel({
   reviewMode,
   currentBinIndex,
   totalBins,
-  currentBinInfo
+  currentBinInfo,
+  onSaveConfig,
+  onLoadConfig
 }) {
   const handleToggleEnabled = (enabled) => {
     onConfigChange({ ...config, enabled });
@@ -258,8 +260,55 @@ function ClassifierGuidedPanel({
             <p className="help-text">Maximum number of clips to display per bin (default: 20)</p>
           </div>
 
-
         </>
+      )}
+
+      {/* Config file management - always visible */}
+      {onSaveConfig && onLoadConfig && (
+        <div className="panel-section" style={{
+          marginTop: '20px',
+          paddingTop: '20px',
+          borderTop: '1px solid var(--border)'
+        }}>
+          <h4>Config File</h4>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+            <button
+              onClick={onSaveConfig}
+              style={{
+                flex: 1,
+                padding: '10px',
+                backgroundColor: 'var(--accent)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontFamily: 'Rokkitt, sans-serif',
+                fontWeight: 500
+              }}
+            >
+              💾 Save Config
+            </button>
+            <button
+              onClick={onLoadConfig}
+              style={{
+                flex: 1,
+                padding: '10px',
+                backgroundColor: 'var(--dark-accent)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontFamily: 'Rokkitt, sans-serif',
+                fontWeight: 500
+              }}
+            >
+              📂 Load Config
+            </button>
+          </div>
+          <p className="help-text">Save/load both view and CGL settings</p>
+        </div>
       )}
     </div>
   );

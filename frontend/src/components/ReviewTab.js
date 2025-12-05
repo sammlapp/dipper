@@ -13,7 +13,7 @@ import {
   getAvailableColumns,
   getNumericColumns
 } from '../utils/stratificationUtils';
-import { selectCSVFiles, selectFolder, saveFile, writeFile } from '../utils/fileOperations';
+import { selectCSVFiles, selectFolder, selectJSONFiles, saveFile, writeFile, readFile } from '../utils/fileOperations';
 import { useBackendUrl } from '../hooks/useBackendUrl';
 import { dirname, basename } from 'pathe';
 
@@ -105,6 +105,88 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         return { width: 1200, height: 500 };
       default:
         return { width: 900, height: 400 };
+    }
+  };
+
+  // Helper functions for unified config management
+  const getUnifiedConfig = () => ({
+    view_settings: settings,
+    cgl_settings: classifierGuidedMode
+  });
+
+  const saveConfigToLocalStorage = (config) => {
+    localStorage.setItem('review_unified_config', JSON.stringify(config));
+  };
+
+  const loadConfigFromLocalStorage = () => {
+    try {
+      const saved = localStorage.getItem('review_unified_config');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (err) {
+      console.warn('Failed to load config from localStorage:', err);
+    }
+    return null;
+  };
+
+  const saveConfigToFile = async () => {
+    try {
+      const config = getUnifiedConfig();
+      const configJson = JSON.stringify(config, null, 2);
+
+      const filePath = await saveFile('review_config.json');
+      if (filePath) {
+        const result = await writeFile(filePath, configJson);
+        if (result.success) {
+          console.log('Config saved to:', filePath);
+          return true;
+        } else {
+          throw new Error(result.error || 'Failed to write file');
+        }
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to save config to file:', err);
+      setError('Failed to save config: ' + err.message);
+      return false;
+    }
+  };
+
+  const loadConfigFromFile = async () => {
+    try {
+      const files = await selectJSONFiles();
+      if (files && files.length > 0) {
+        const filePath = files[0];
+
+        // Read file using standard file operations (works in both Tauri and server mode)
+        const configContent = await readFile(filePath);
+        const config = JSON.parse(configContent);
+
+        // Validate config structure
+        if (config.view_settings && config.cgl_settings) {
+          setSettings(config.view_settings);
+          setClassifierGuidedMode(config.cgl_settings);
+          saveConfigToLocalStorage(config);
+
+          // Force spectrogram re-render after state updates are applied
+          // Use setTimeout to ensure settings state has updated before reloading
+          setTimeout(() => {
+            setCurrentDataVersion(prev => prev + 1);
+            loadCurrentPageSpectrograms();
+          }, 100);
+
+          console.log('Config loaded from:', filePath);
+          return true;
+        } else {
+          throw new Error('Invalid config file format. Expected view_settings and cgl_settings keys.');
+        }
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to load config from file:', err);
+      setError('Failed to load config: ' + err.message);
+      return false;
     }
   };
 
@@ -629,6 +711,26 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     }
   }, [settings.manual_classes, settings.review_mode]);
 
+  // Load unified config from localStorage on mount
+  useEffect(() => {
+    const config = loadConfigFromLocalStorage();
+    if (config) {
+      if (config.view_settings) {
+        setSettings(config.view_settings);
+      }
+      if (config.cgl_settings) {
+        setClassifierGuidedMode(config.cgl_settings);
+      }
+      console.log('Loaded config from localStorage');
+    }
+  }, []);
+
+  // Save unified config to localStorage whenever settings or CGL config changes
+  useEffect(() => {
+    const config = getUnifiedConfig();
+    saveConfigToLocalStorage(config);
+  }, [settings, classifierGuidedMode]);
+
   const handleLoadAnnotationTask = async () => {
     try {
       const files = await selectCSVFiles();
@@ -671,8 +773,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       setLoadedPageData([]);
       // Clear filters when new file is loaded
       clearFilters();
-      // Disable classifier-guided mode when new file is loaded
-      setClassifierGuidedMode(prev => ({ ...prev, enabled: false }));
+      // Restore CGL config from localStorage
+      const config = loadConfigFromLocalStorage();
+      if (config && config.cgl_settings) {
+        setClassifierGuidedMode(config.cgl_settings);
+      }
       setStratifiedBins([]);
       setCurrentBinIndex(0);
       // Clear save path when new annotation file is loaded
@@ -774,8 +879,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         setLoadedPageData([]);
         // Clear filters when new file is loaded
         clearFilters();
-        // Disable classifier-guided mode when new file is loaded
-        setClassifierGuidedMode(prev => ({ ...prev, enabled: false }));
+        // Restore CGL config from localStorage
+        const config = loadConfigFromLocalStorage();
+        if (config && config.cgl_settings) {
+          setClassifierGuidedMode(config.cgl_settings);
+        }
         setStratifiedBins([]);
         setCurrentBinIndex(0);
         // Clear save path when new annotation file is loaded
@@ -2092,6 +2200,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 onReRenderSpectrograms={loadCurrentPageSpectrograms}
                 onClearCache={httpLoader.clearCache}
                 currentSettings={settings}
+                onSaveConfig={saveConfigToFile}
+                onLoadConfig={loadConfigFromFile}
               />
               <HttpServerStatus
                 serverUrl={backendUrl}
@@ -2484,6 +2594,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
               currentBinIndex={currentBinIndex}
               totalBins={stratifiedBins.length}
               currentBinInfo={stratifiedBins[currentBinIndex]}
+              onSaveConfig={saveConfigToFile}
+              onLoadConfig={loadConfigFromFile}
             />
           )}
         </div>

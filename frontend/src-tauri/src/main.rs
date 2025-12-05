@@ -173,6 +173,13 @@ async fn write_file(file_path: String, content: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to write file: {}", e))
 }
 
+/// Read text content from a file
+#[tauri::command]
+async fn read_text_file(file_path: String) -> Result<String, String> {
+    fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to read file: {}", e))
+}
+
 /// Generate a unique folder name by appending numeric suffix if needed
 #[tauri::command]
 async fn generate_unique_folder_name(base_path: String, folder_name: String) -> Result<String, String> {
@@ -541,6 +548,7 @@ fn main() {
             select_model_files,
             save_file,
             write_file,
+            read_text_file,
             generate_unique_folder_name,
             get_backend_port
         ])

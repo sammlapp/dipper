@@ -15,8 +15,6 @@ allow up to N background tasks to run in parallel if user clicks run in parallel
 
 ## known bugs
 
-backend lightweight_server still does not terminate on app termination
-
 When using remote file explorer, "save" dialogue is incorrect - cannot create file
 
 Need to test training (failed, fixed bug in script, didn't try again)
@@ -40,11 +38,13 @@ Extraction results in an error, somewhere we get a pd.Series instead of pd.DataF
 AttributeError: 'Series' object has no attribute 'columns'
 
 ## next steps:
+
+Let's prepare to fix up server mode. First, remove outdated markdown documents, review and update
+  README..md, SERVER_AND_TAURI.md, ARCHITECTURE.md. Propose a plan for running in server mode with a
+  configuration file. We should be able to run the app server-side without too much hassle. Something like
+  `dipper --config ~/dipper_server_config.yml` where the config file specifies ports, file access scope for
+  remote user.  
 server configuration and connection; test remote access; fix file save (create file) dialog
-
-- CGL true/false should persist across app restart
-
-lightweight_server backend not properly terminating when app terminates. Add a parent process listener in lightweight_server.py that will terminate the lightweight_server if the parent process disappears. Make sure the parent process ID is passed to lightweight_server regardless of how it is launched. 
 
 Save view + CGL settings in config file alongside annotation csv. Load settings from config file if found when opening the annotation csv
 
@@ -58,18 +58,17 @@ add alternative "view mode" for multi-class annotation: instead of a multi-selec
 
 - PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules. 
 
-- Review saving/loading annotation settings to json: includes view settings and CGL
-
-
 - stratification by arbitrary columns in metadata for clip extraction
 
 - delete archive file of pytorch env after unpacking
 
 - download the correct pytorch .tar.gz conda-pack env based on the operating system
 
-Review tab status bar: if we are in the full app (not review-only), the review status bar is covered by the global app status bar, it should be bumped up so that it is not hidden. 
+Review tab status bar (review-status-bar): if we are in the full app (not review-only), the review status bar is covered by the global app status bar (status-bar). In this case it should be bumped up so that it is not hidden. 
 
 separate HopLite Database-oriented embed, train, and predict into its own app
+
+The splash screen displays on top of all other apps, which is annoying. If user navigates to another application the splash screen should not be displayed on top
 
 ## general feature request list 
 

@@ -222,6 +222,35 @@ export const writeFile = async (filePath, content) => {
 };
 
 /**
+ * Read content from a file
+ * @param {string} filePath - File path to read from
+ * @returns {Promise<string>} Content of the file
+ */
+export const readFile = async (filePath) => {
+  if (isLocalMode()) {
+    if (isTauriAvailable()) {
+      return await invokeTauri('read_text_file', { filePath });
+    }
+    throw new Error('Local mode file read not available');
+  } else {
+    // Server mode: Use HTTP endpoint
+    const backendUrl = await getBackendUrl();
+    const response = await fetch(`${backendUrl}/files/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_path: filePath })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to read file: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result.content;
+  }
+};
+
+/**
  * Default export with all file operations
  */
 const fileOperations = {
@@ -233,7 +262,8 @@ const fileOperations = {
   selectModelFiles,
   generateUniqueFolderName,
   saveFile,
-  writeFile
+  writeFile,
+  readFile
 };
 
 export default fileOperations;

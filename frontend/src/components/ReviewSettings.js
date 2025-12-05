@@ -49,7 +49,7 @@ const StyledSlider = styled(Slider)({
   },
 });
 
-function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache, currentSettings }) {
+function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache, currentSettings, onSaveConfig, onLoadConfig }) {
   const [settings, setSettings] = useState({
     // Spectrogram settings
     spec_window_size: 512,
@@ -681,13 +681,68 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
           
           {/* Simplified settings actions */}
           <div className="settings-actions">
-            <button 
+            <button
               className="defaults-button"
               onClick={resetToDefaults}
             >
               Reset to Defaults
             </button>
           </div>
+
+          {/* Config file management */}
+          {onSaveConfig && onLoadConfig && (
+            <div className="config-file-actions" style={{
+              marginTop: '20px',
+              paddingTop: '20px',
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              gap: '10px',
+              flexDirection: 'column'
+            }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '5px', color: 'var(--dark)' }}>
+                Config File
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  className="config-button"
+                  onClick={onSaveConfig}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--accent)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontFamily: 'Rokkitt, sans-serif'
+                  }}
+                >
+                  💾 Save Config
+                </button>
+                <button
+                  className="config-button"
+                  onClick={onLoadConfig}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--dark-accent)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontFamily: 'Rokkitt, sans-serif'
+                  }}
+                >
+                  📂 Load Config
+                </button>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--medium)', marginTop: '5px' }}>
+                Save/load both view and CGL settings
+              </div>
+            </div>
+          )}
     </div>
   );
 }
