@@ -283,6 +283,7 @@ def extract_random_clips(
                     "end_time": row["end_time"],
                     "class": class_name,
                     "method": "random",
+                    "score": row[class_name],
                 }
 
                 # Add individual class scores
@@ -357,11 +358,11 @@ def extract_score_bin_stratified(
                     # For binary mode, keep original format
                     clip_data["class"] = class_name
                     clip_data["score"] = row[class_name]
-                    clip_data["all_scores"] = (
-                        row[class_list].to_dict()
-                        if all(c in row for c in class_list)
-                        else {}
-                    )
+                    # clip_data["all_scores"] = (
+                    #     row[class_list].to_dict()
+                    #     if all(c in row for c in class_list)
+                    #     else {}
+                    # )
                 else:
                     # For multiclass mode, store individual class scores directly
                     for class_name_inner in class_list:
@@ -465,16 +466,16 @@ def extract_clips_from_groups(
         group_clips = []
 
         # Apply each enabled extraction method
-        if extraction.get("random_clips", {}).get("enabled", False):
-            group_clips.extend(extract_random_clips(filtered_df, class_list, config))
+        if extraction.get("highest_scoring", {}).get("enabled", False):
+            group_clips.extend(extract_highest_scoring(filtered_df, class_list, config))
 
         if extraction.get("score_bin_stratified", {}).get("enabled", False):
             group_clips.extend(
                 extract_score_bin_stratified(filtered_df, class_list, config)
             )
 
-        if extraction.get("highest_scoring", {}).get("enabled", False):
-            group_clips.extend(extract_highest_scoring(filtered_df, class_list, config))
+        if extraction.get("random_clips", {}).get("enabled", False):
+            group_clips.extend(extract_random_clips(filtered_df, class_list, config))
 
         # Add group info to clips
         for clip in group_clips:
@@ -482,7 +483,8 @@ def extract_clips_from_groups(
 
         all_selected_clips.extend(group_clips)
 
-    # remove duplicates
+    # remove duplicates #TODO - this can make it look like clips are missing from some
+    # extraction strategies (eg kept random but not highest / score-bin stratified)
     clip_df = pd.DataFrame.from_records(all_selected_clips)
     clip_df = clip_df.drop_duplicates(subset=["file", "start_time", "end_time"])
 
@@ -623,19 +625,22 @@ def create_extraction_csvs(
                     clip_start = clip["start_time"]
                     clip_end = clip["end_time"]
 
-                row_data = {
-                    "file": file_path,
-                    "start_time": clip_start,
-                    "end_time": clip_end,
-                    "annotation": "",  # Empty for user to fill
-                    "score": clip.get("score", ""),
-                }
+                # keep all info from clip, updating file and times
+                extracted_clip_info = clip.copy()
+                extracted_clip_info.update(
+                    {
+                        "file": file_path,
+                        "start_time": clip_start,
+                        "end_time": clip_end,
+                        "annotation": "",  # Empty for user to fill
+                    }
+                )
 
                 # Add subfolder column if stratification by subfolder is enabled
                 if config.get("stratification", {}).get("by_subfolder", False):
-                    row_data["subfolder"] = clip.get("group", "")
+                    extracted_clip_info["subfolder"] = clip.get("group", "")
 
-                csv_data.append(row_data)
+                csv_data.append(extracted_clip_info)
 
             # Create DataFrame and save
             df = pd.DataFrame(csv_data)
@@ -744,6 +749,12 @@ def extract_clips(config_path: str):
             raise ValueError(
                 f"No prediction files found in {config['predictions_folder']}"
             )
+        # up to 5 classes
+        cls_str = ", ".join(scan_result["available_classes"][:5])
+        logging.info(
+            f"Found {len(prediction_files)} prediction files with classes: {cls_str}"
+        )
+        logging.info(f"First prediction file: {prediction_files[0]}")
 
         # Load all prediction files
         combined_df = load_prediction_files(prediction_files)
