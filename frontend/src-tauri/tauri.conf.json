@@ -67,7 +67,7 @@
         "resizable": false,
         "decorations": false,
         "transparent": true,
-        "alwaysOnTop": true,
+        "alwaysOnTop": false,
         "visible": false
       }
     ],
