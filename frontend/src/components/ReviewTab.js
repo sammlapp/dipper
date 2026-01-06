@@ -754,13 +754,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     }
   };
 
-  const handleCloseAnnotationTask = () => {
-    // Confirm if there are unsaved changes
-    if (hasUnsavedChanges) {
-      const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to close this annotation task?');
-      if (!confirmClose) {
-        return;
-      }
+  const handleCloseAnnotationTask = (event) => {
+    // Prevent any default behavior
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
     }
 
     // Reset all state to initial values
@@ -2167,6 +2165,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                     {hasUnsavedChanges ? 'Save Annotations *' : 'Save Annotations'}
                   </button>
                   <button
+                    type="button"
                     onClick={handleCloseAnnotationTask}
                     className="secondary-button"
                     title="Close current annotation task and return to landing page"
