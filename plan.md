@@ -3,8 +3,6 @@ This project will create a cross-platform desktop app that runs pytorch machine 
 ## claude start up prompt
 take a close look at this codebase, especially documentation markdowns such as readme.md claude.md build.md. We're going to work from plan.md on ## next steps but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, lightweight_server.py, scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
 
-## minimal changes:
-
 # Build and release
 - lightweight python executable for GUI back-end is built with pyinstaller
 - heavy python environment is built with conda-pack (inference, train scripts)
@@ -18,12 +16,7 @@ take a close look at this codebase, especially documentation markdowns such as r
 
 When using remote file explorer, "save" dialogue is incorrect - cannot create file
 
-Need to test training (failed, fixed bug in script, didn't try again)
-
-Extraction load config is not working
-
 Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl+s doesn't work for save (applies the No label instead, which should be the S shortcut but not ctrl/cmd + S)
-
 
 Extraction by subfolder: keep entire relative path of subfolder rather than just Path(audio_file).parent.name. That way, folder structures like project/recorder1/wavs/a.wav, project/recorder2/wavs/a.wav are maintained as distinct folders.
 
@@ -48,15 +41,12 @@ add alternative "view mode" for multi-class annotation: instead of a multi-selec
 
 - PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules.  [wip]
 
-
 - delete archive file of pytorch env after unpacking
 - download the correct pytorch .tar.gz conda-pack env based on the operating system
 
 separate HopLite Database-oriented embed, train, and predict into its own app
 
 The splash screen during initialization displays on top of all other apps, which is annoying. If user navigates to another application the splash screen should not be displayed on top
-
-Tabs should persist in state when user navigates to another tab and back. Currently, the tab gets completely reset - for instance, if I'm working in the review tab then navigate to another tab and back, it goes back to the landing page. It should retain the full state of the currently displayed clips and display settings while the Dipper main app is running. The same is true for other tabs (should retain the parameters/state of the task configuration panels)
 
 In train/inference, add an option to specify device name for the ML model (typically selects gpu if available, otherwise cpu; advanced users might want to specify a device using torch's conventions, like "cuda:0"). This can be placed in an "advanced settings" sub-panel along with the option to select a custom python environment. 
 

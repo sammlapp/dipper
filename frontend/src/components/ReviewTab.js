@@ -38,9 +38,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     focus_size: 'medium',
     keyboard_shortcuts_enabled: true,
     manual_classes: '',
-    clip_duration: 3.0
+    clip_duration: 3.0,
+    annotation_column: 'annotation'  // Column to use for binary annotations
   });
   const [availableClasses, setAvailableClasses] = useState([]);
+  const [csvColumns, setCsvColumns] = useState([]);  // Store CSV column headers
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [loadedPageData, setLoadedPageData] = useState([]);
   const [lastRenderedPage, setLastRenderedPage] = useState(0); // Track which page we last rendered to prevent flashing
@@ -61,6 +63,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isClassifierGuidedPanelOpen, setIsClassifierGuidedPanelOpen] = useState(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
+  const [isFormatInfoExpanded, setIsFormatInfoExpanded] = useState(false);
 
   // Classifier-guided listening state
   const [classifierGuidedMode, setClassifierGuidedMode] = useState({
@@ -715,12 +718,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     filteredAnnotationData
   ]);
 
-  // Re-extract available classes when manual classes change
-  useEffect(() => {
-    if (annotationData.length > 0) {
-      extractAvailableClasses(annotationData);
-    }
-  }, [settings.manual_classes, settings.review_mode]);
+  // Note: Manual classes are now applied via explicit button clicks in ReviewSettings
+  // No automatic updates when manual_classes changes
 
   // Load unified config from localStorage on mount
   useEffect(() => {
@@ -747,7 +746,19 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       const files = await selectCSVFiles();
       if (files && files.length > 0) {
         setSelectedFile(files[0]);
-        await loadAndProcessCSV(files[0]);
+        await loadAndProcessCSV(files[0], false); // false = not wide format
+      }
+    } catch (err) {
+      setError('Failed to select file: ' + err.message);
+    }
+  };
+
+  const handleLoadWideFormatCSV = async () => {
+    try {
+      const files = await selectCSVFiles();
+      if (files && files.length > 0) {
+        setSelectedFile(files[0]);
+        await loadAndProcessCSV(files[0], true); // true = wide format
       }
     } catch (err) {
       setError('Failed to select file: ' + err.message);
@@ -859,7 +870,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     }
   };
 
-  const loadAndProcessCSV = async (filePath) => {
+  const loadAndProcessCSV = async (filePath, wideFormat = false) => {
     setLoading(true);
     setError('');
 
@@ -890,7 +901,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         },
         body: JSON.stringify({
           csv_path: filePath,
-          threshold: 0
+          threshold: 0,
+          wide_format: wideFormat
         })
       });
 
@@ -995,17 +1007,18 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
     }
 
+    // Store CSV columns for annotation column selector
+    setCsvColumns(headers);
+
     // Auto-detect review mode based on available columns
     const hasAnnotationColumn = headers.includes('annotation');
     const hasLabelsColumn = headers.includes('labels');
 
     let detectedReviewMode = 'binary'; // default
-    if (hasLabelsColumn && !hasAnnotationColumn) {
-      detectedReviewMode = 'multiclass';
-    } else if (hasAnnotationColumn && !hasLabelsColumn) {
+    if (hasAnnotationColumn) {
+      // If annotation column exists, prefer binary mode
       detectedReviewMode = 'binary';
-    } else if (hasLabelsColumn && hasAnnotationColumn) {
-      // Both columns exist, prefer labels for multiclass
+    } else if (hasLabelsColumn && !hasAnnotationColumn) {
       detectedReviewMode = 'multiclass';
     }
 
@@ -1031,8 +1044,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         rowData[header] = values[i];
       });
 
-      // Parse numeric values
+      // Parse numeric values and preserve all CSV columns
       const clip = {
+        ...rowData,  // Preserve all CSV columns including metadata
         file: rowData.file || '',
         start_time: parseFloat(rowData.start_time) || 0,
         end_time: parseFloat(rowData.end_time) || parseFloat(rowData.start_time) + 3, // Default 3 sec if no end_time
@@ -1093,6 +1107,83 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
 
     setAvailableClasses(Array.from(classSet).sort());
   };
+
+  // Subset clip labels to only include classes in availableClasses
+  const subsetClipLabels = useCallback((clips, availableClassesArray) => {
+    if (settings.review_mode !== 'multiclass') {
+      return clips; // Only applies to multiclass mode
+    }
+
+    return clips.map(clip => {
+      const labelsValue = clip.labels || '';
+      if (!labelsValue || labelsValue === '' || labelsValue === 'nan') {
+        return clip; // No labels to subset
+      }
+
+      try {
+        // Parse multiclass labels
+        let classes = [];
+        if (labelsValue.startsWith('[') && labelsValue.endsWith(']')) {
+          classes = JSON.parse(labelsValue.replace(/'/g, '"'));
+        } else {
+          classes = labelsValue.split(',').map(s => s.trim()).filter(s => s);
+        }
+
+        // Filter to only include classes in availableClassesArray
+        const filteredClasses = classes.filter(cls => availableClassesArray.includes(cls));
+
+        // Convert back to string format
+        const newLabelsValue = filteredClasses.length > 0
+          ? JSON.stringify(filteredClasses)
+          : '';
+
+        return {
+          ...clip,
+          labels: newLabelsValue
+        };
+      } catch (e) {
+        // Fallback: treat as single class
+        const isValidClass = availableClassesArray.includes(labelsValue);
+        return {
+          ...clip,
+          labels: isValidClass ? labelsValue : ''
+        };
+      }
+    });
+  }, [settings.review_mode]);
+
+  // Handler for "Change Visible Classes" button - only updates the class list
+  const handleApplyClassesOnly = useCallback((manualClassesText) => {
+    // Update settings with new manual_classes
+    setSettings(prev => ({ ...prev, manual_classes: manualClassesText }));
+
+    // Re-extract available classes (this will include both manual and CSV classes)
+    extractAvailableClasses(annotationData);
+
+    console.log('Applied visible classes only (no label subsetting)');
+  }, [annotationData]);
+
+  // Handler for "Change Classes + Subset Labels" button - updates classes AND subsets labels
+  const handleApplyClassesAndSubset = useCallback((manualClassesText) => {
+    // Update settings with new manual_classes
+    setSettings(prev => ({ ...prev, manual_classes: manualClassesText }));
+
+    // Get the new class list
+    const manualClasses = manualClassesText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+
+    // Set as available classes (only manual classes, no CSV extraction)
+    setAvailableClasses(manualClasses.sort());
+
+    // Subset the clip labels to only include the new classes
+    const subsetData = subsetClipLabels(annotationData, manualClasses);
+    setAnnotationData(subsetData);
+    setHasUnsavedChanges(true);
+
+    console.log('Applied classes and subset labels to:', manualClasses);
+  }, [annotationData, subsetClipLabels]);
 
   const handleAnnotationChange = useCallback((clipId, newAnnotation, newAnnotationStatus) => {
     setAnnotationData(prev => {
@@ -2144,12 +2235,25 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           {/* Load Annotation Task Section */}
           <div className="tray-section">
             <h4>Load Annotation Task</h4>
-            <p>Load a CSV file with columns: file, start_time, end_time (optional), annotation, comments (optional)</p>
+            <p>Load a CSV file for annotation review</p>
 
             <div className="button-group">
               <button onClick={handleLoadAnnotationTask} disabled={loading}>
                 {loading ? 'Loading...' : 'Load Annotation CSV'}
               </button>
+              <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: '4px 0' }}>
+                Standard format: Uses <strong>annotation</strong> column (binary) or <strong>labels</strong> column (multiclass)
+              </p>
+              <button
+                onClick={handleLoadWideFormatCSV}
+                disabled={loading}
+                style={{ marginTop: '8px' }}
+              >
+                {loading ? 'Loading...' : 'Open Wide-format CSV'}
+              </button>
+              <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: '4px 0' }}>
+                Wide format: Each column represents a class with one-hot encoding
+              </p>
               {selectedFile && (
                 <span className="selected-file">
                   Loaded: {basename(selectedFile)}
@@ -2279,6 +2383,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 currentSettings={settings}
                 onSaveConfig={saveConfigToFile}
                 onLoadConfig={loadConfigFromFile}
+                csvColumns={csvColumns}
+                onApplyClassesOnly={handleApplyClassesOnly}
+                onApplyClassesAndSubset={handleApplyClassesAndSubset}
               />
               <HttpServerStatus
                 serverUrl={backendUrl}
@@ -3109,7 +3216,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
               <div className="placeholder-container">
                 <div className="placeholder-content">
                   {/* <h3>Ready for Annotation Review 📝 <HelpIcon section="review" /></h3> */}
-                  {/* Load CSV Button */}
+                  {/* Load CSV Buttons */}
                   <div className="placeholder-actions">
                     <button
                       onClick={handleLoadAnnotationTask}
@@ -3118,40 +3225,71 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                     >
                       {loading ? 'Loading...' : 'Load Annotation CSV'}
                     </button>
+                    <button
+                      onClick={handleLoadWideFormatCSV}
+                      disabled={loading}
+                      className="primary-button load-csv-button"
+                      style={{ margin: '10px', backgroundColor: 'var(--dark-accent)' }}
+                    >
+                      {loading ? 'Loading...' : 'Open Wide-format CSV'}
+                    </button>
                     <p className="load-button-help">
-                      <small>You can also use the menu button in the top-left to access loading and filtering options.</small>
+                      <small>You can also use the menu button in the top-left to access loading and root audio path options.</small>
                     </p>
                   </div>
-                  <p>Load a CSV file to begin reviewing and annotating audio clips. Supported formats:</p>
 
-                  <div className="format-section">
-                    <h4>Columns used in all formats</h4>
-                    <ul>
-                      <li>Required: <strong>file</strong>: Path to audio file; <strong>start_time, end_time</strong>: Clip time (seconds) relative to file start</li>
-                      <li>Optional: <strong>comments</strong>: Text comments (optional)</li>
-                    </ul>
+                  {/* Collapsible Format Information */}
+                  <div style={{ marginTop: '20px', marginBottom: '20px' }}>
+                    <button
+                      onClick={() => setIsFormatInfoExpanded(!isFormatInfoExpanded)}
+                      style={{
+                        background: 'none',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontFamily: 'Rokkitt, sans-serif',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        width: '100%',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <span>{isFormatInfoExpanded ? '▼' : '▶'}</span>
+                      <span>Supported CSV Formats</span>
+                    </button>
 
-                    <h4>Format 1: Binary Review</h4>
-                    <ul>
-                      <li><strong>annotation</strong>: Binary labels (yes/no/uncertain/empty)</li>
-                    </ul>
-                    <p><em>Example: file,start_time,end_time,annotation,comments<br /> /path/to/file.wav,5,8,Yes,Primary song</em></p>
+                    {isFormatInfoExpanded && (
+                      <div className="format-section" style={{ marginTop: '15px' }}>
+                        <h4>Standard Formats (use "Load Annotation CSV" button)</h4>
 
-                    <h4>Format 2: Multi-class with Labels Column</h4>
-                    <ul>
-                      <li><strong>labels</strong>: Comma-separated or JSON list of classes</li>
-                      <li><strong>annotation_status</strong>: complete/unreviewed/uncertain</li>
-                    </ul>
-                    <p><em>Example: file,start_time,end_time,labels,annotation_status,comments<br />/path/to/file.wav,5,8,"[AMRO,NOCA]",complete,Alarm calls</em></p>
+                        <p><strong>Required columns:</strong> file, start_time, end_time</p>
+                        <p><strong>Optional columns:</strong> comments, and any metadata columns</p>
 
-                    <h4>Format 3: Multi-hot (One Column Per Class)</h4>
-                    <ul>
-                      <li>One column per class with 0/1 values or continuous scores</li>
-                    </ul>
-                    <p><em>Example: file,start_time,end_time,robin,cardinal,blue_jay,comments<br />/path/to/file.wav,5,8,1,0,0,"Very distant"</em></p>
+                        <p><strong>Binary Review:</strong></p>
+                        <ul>
+                          <li><strong>annotation</strong>: Binary labels (yes/no/uncertain/empty)</li>
+                        </ul>
+                        <p><em>Example: file,start_time,end_time,annotation,comments<br /> /path/to/file.wav,5,8,yes,Primary song</em></p>
+
+                        <p><strong>Multi-class Review:</strong></p>
+                        <ul>
+                          <li><strong>labels</strong>: Comma-separated or JSON list of classes</li>
+                          <li><strong>annotation_status</strong>: complete/unreviewed/uncertain</li>
+                        </ul>
+                        <p><em>Example: file,start_time,end_time,labels,annotation_status,comments<br />/path/to/file.wav,5,8,"[AMRO,NOCA]",complete,Alarm calls</em></p>
+
+                        <h4 style={{ marginTop: '20px' }}>Wide Format (use "Open Wide-format CSV" button)</h4>
+                        <ul>
+                          <li>One column per class with 0/1 values or continuous scores</li>
+                          <li>Each extra column (beyond file, start_time, end_time, comments) is treated as a class</li>
+                        </ul>
+                        <p><em>Example: file,start_time,end_time,robin,cardinal,blue_jay,comments<br />/path/to/file.wav,5,8,1,0,0,"Very distant"</em></p>
+                      </div>
+                    )}
                   </div>
-
-                  <p><strong>The system auto-detects the format and switches to the appropriate review mode.</strong></p>
 
 
                 </div>

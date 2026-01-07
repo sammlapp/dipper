@@ -1387,6 +1387,7 @@ class LightweightServer:
             data = await request.json()
             csv_path = data.get("csv_path")
             threshold = data.get("threshold", 0)
+            wide_format = data.get("wide_format", False)  # New parameter for multi-hot format
 
             if not csv_path:
                 return web.json_response({"error": "csv_path is required"}, status=400)
@@ -1437,24 +1438,9 @@ class LightweightServer:
             else:
                 df["comments"] = ""
 
-            # Check for conflicting columns
-            if "annotation" in df.columns and "labels" in df.columns:
-                return web.json_response(
-                    {
-                        "error": """Found columns for both 'annotation' (yes/no/uncertain) and
-                        'labels' (lists of classes present) which could lead to mass
-                        confusion and is not allowed. Consider creating a version of the
-                        annotation file in which only one of these columns is present.
-                        If you are performing single-class annotation, retain the
-                        'annotation' column and delete the 'labels' column. If you are
-                        performing multi-class annotation, retain the 'labels'
-                        column and remove the 'annotation' column."""
-                    },
-                    status=400,
-                )
-
             classes = None
 
+            # Priority: annotation column > labels column > wide format
             if "annotation" in df.columns:
                 # Binary classification format
                 df["annotation"].fillna("", inplace=True)
@@ -1553,8 +1539,8 @@ class LightweightServer:
                     lambda x: json.dumps(x) if isinstance(x, list) else "[]"
                 )
 
-            else:
-                # Multi-hot format (one column per class)
+            elif wide_format:
+                # Multi-hot format (one column per class) - only used when explicitly requested
                 classes = list(
                     set(df.columns)
                     - set(["file", "start_time", "end_time", "comments", "id"])
@@ -1585,6 +1571,15 @@ class LightweightServer:
                     if col not in standard_cols and col not in classes and col != "id"
                 ]
                 df = df[standard_cols + extra_cols + ["id"]]
+
+            else:
+                # No annotation or labels column, and not wide format - error
+                return web.json_response(
+                    {
+                        "error": "CSV must have either 'annotation' column (for binary review) or 'labels' column (for multiclass review). For wide-format CSV with one-hot encoded columns, use 'Open Wide-format CSV' button."
+                    },
+                    status=400,
+                )
 
             # Convert to JSON
             clips = df.to_dict(orient="records")
