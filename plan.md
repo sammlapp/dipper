@@ -26,6 +26,9 @@ Completed tasks in task manager should have a button for the next step in the wo
 - completed extraction task: button on the completed task panel to open the first created task in review tab
 
 ## next steps:
+debug/fix building conda-pack environment for Linux and Windows
+
+rename lightweight-server (pyinstaller executable) and lightweight_server.py to dipper_pybackend. Make sure this is thoroughly updated throughout the codebase, build scripts, and documentation. 
 
 Let's prepare to fix up server mode. Propose a plan for running in server mode with a configuration file. We should be able to run the app server-side without too much hassle. Something like  `dipper --config ~/dipper_server_config.yml` where the config file specifies port, file access scope for remote user, and max concurrent jobs. This takes the place of --port argument. 
 

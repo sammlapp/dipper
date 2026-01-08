@@ -18,9 +18,9 @@
     "tauri:dev:full": "concurrently \"python ../backend/lightweight_server.py --port 8000\" \"wait-on http://localhost:8000/health && tauri dev\"",
     "tauri:dev:review": "cross-env REACT_APP_REVIEW_ONLY=true tauri dev",
     "tauri:dev:review:full": "concurrently \"python ../backend/lightweight_server.py --port 8000\" \"wait-on http://localhost:8000/health && cross-env REACT_APP_REVIEW_ONLY=true tauri dev\"",
-    "tauri:build": "npm run build && tauri build",
-    "tauri:build:all": "npm run build:all && tauri build",
-    "tauri:build:review": "npm run build:review && tauri build",
+    "tauri:build": "node ../scripts/set-product-name.js full && npm run build && tauri build",
+    "tauri:build:all": "node ../scripts/set-product-name.js full && npm run build:all && tauri build",
+    "tauri:build:review": "node ../scripts/set-product-name.js review && npm run build:review && tauri build",
     "version-bump": "node ../scripts/bump-version.js"
   },
   "dependencies": {
