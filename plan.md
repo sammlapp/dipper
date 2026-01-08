@@ -14,6 +14,8 @@ take a close look at this codebase, especially documentation markdowns such as r
 
 ## known bugs
 
+Training is failing
+
 When using remote file explorer, "save" dialogue is incorrect - cannot create file
 
 Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl+s doesn't work for save (applies the No label instead, which should be the S shortcut but not ctrl/cmd + S)
@@ -32,24 +34,32 @@ rename lightweight-server (pyinstaller executable) and lightweight_server.py to 
 
 Let's prepare to fix up server mode. Propose a plan for running in server mode with a configuration file. We should be able to run the app server-side without too much hassle. Something like  `dipper --config ~/dipper_server_config.yml` where the config file specifies port, file access scope for remote user, and max concurrent jobs. This takes the place of --port argument. 
 
-server configuration and connection; test remote access; fix file save (create file) dialog: currently does not work at all, not opening a file save dialogue
+Config items:
+- Front-end port for remote web browser access/forwarding
+- default conda environment path (if None/null, uses typical behavior of desktop app)
+- directories in which file read access is allowed
+- directories in which file write access is allowed
+- model cache directory (in None/null, uses typical behavior of selecting default cache dir)
+Two that are already in global setting panel
+- max concurrent jobs
+- boolean whether extraction tasks towards concurrent job task
+Let's have all of these settings to the global settings page as well, _except the frontend port specification_. When booting server mode, the settings are filled from the config file. 
+
 
 test inference with custom/local models
-
-test builds that allow inference and training
 
 get feedback on inference and training builds
 
 add alternative "view mode" for multi-class annotation: instead of a multi-select box, each class has a button that can be toggled (clicked) for present (green) or absent (no color). Class buttons are floated in a wrapping div, such that multiple can appear side by side if there is enough horizontal space; vertical space is added to the clip panel as needed to display all options. 
 
-- PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules.  [wip]
+- PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules.  [done?]
 
 - delete archive file of pytorch env after unpacking
 - download the correct pytorch .tar.gz conda-pack env based on the operating system
 
 separate HopLite Database-oriented embed, train, and predict into its own app
 
-The splash screen during initialization displays on top of all other apps, which is annoying. If user navigates to another application the splash screen should not be displayed on top
+completed task pane should display full path to job folder containing the outputs of the task
 
 In train/inference, add an option to specify device name for the ML model (typically selects gpu if available, otherwise cpu; advanced users might want to specify a device using torch's conventions, like "cuda:0"). This can be placed in an "advanced settings" sub-panel along with the option to select a custom python environment. 
 

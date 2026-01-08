@@ -790,7 +790,7 @@ open src-tauri/target/release/bundle/macos/Dipper.app
 ### Server Mode Testing
 ```bash
 # Build
-npm run server:build
+npm run build:server
 
 # Start backend
 python backend/lightweight_server.py --mode server --port 8000

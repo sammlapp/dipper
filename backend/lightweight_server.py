@@ -1197,8 +1197,9 @@ def _get_scripts_path():
 
 
 class LightweightServer:
-    def __init__(self, port=8000):
+    def __init__(self, port=8000, host="localhost"):
         self.port = port
+        self.host = host
         self.app = web.Application()
         self.running_jobs = (
             {}
@@ -1288,6 +1289,7 @@ class LightweightServer:
         # Server mode file browsing routes
         self.app.router.add_post("/files/browse", self.browse_files)
         self.app.router.add_post("/files/save", self.save_file_server)
+        self.app.router.add_post("/files/read", self.read_file_server)
         self.app.router.add_post("/files/unique-name", self.generate_unique_name)
 
     async def root_handler(self, request):
@@ -2699,6 +2701,52 @@ class LightweightServer:
             logger.error(f"Error saving file: {e}")
             return web.json_response({"error": str(e)}, status=500)
 
+    async def read_file_server(self, request):
+        """Read file content (server mode only)"""
+        try:
+            data = await request.json()
+            file_path = data.get("file_path")
+
+            if not file_path:
+                return web.json_response({"error": "Missing file_path"}, status=400)
+
+            # Security: Validate path is under allowed directories
+            allowed_paths = [
+                os.path.expanduser("~"),
+                "/data",
+                "/mnt",
+                "/media",
+                "/Users",
+                "/home",
+            ]
+
+            normalized_path = os.path.normpath(os.path.abspath(file_path))
+            is_allowed = any(
+                normalized_path.startswith(os.path.normpath(os.path.abspath(base)))
+                for base in allowed_paths
+            )
+
+            if not is_allowed:
+                return web.json_response(
+                    {"error": "Access denied to this location"}, status=403
+                )
+
+            # Check if file exists
+            if not os.path.exists(normalized_path):
+                return web.json_response(
+                    {"error": f"File does not exist: {file_path}"}, status=404
+                )
+
+            # Read file content
+            with open(normalized_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            return web.json_response({"content": content})
+
+        except Exception as e:
+            logger.error(f"Error reading file: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
     async def generate_unique_name(self, request):
         """Generate unique folder/file name (server mode only)"""
         try:
@@ -2736,16 +2784,22 @@ class LightweightServer:
         runner = web.AppRunner(self.app)
         await runner.setup()
 
-        site = web.TCPSite(runner, "localhost", self.port)
+        site = web.TCPSite(runner, self.host, self.port)
         await site.start()
 
-        logger.info(f"Lightweight server started on http://localhost:{self.port}")
+        logger.info(f"Lightweight server started on http://{self.host}:{self.port}")
         return runner
 
 
 def main():
     parser = argparse.ArgumentParser(description="Lightweight bioacoustics server")
     parser.add_argument("--port", type=int, default=8000, help="Port to run on")
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="localhost",
+        help="Host to bind to (use 0.0.0.0 for server mode)",
+    )
     parser.add_argument(
         "--parent-pid",
         type=int,
@@ -2771,7 +2825,7 @@ def main():
         return 0
 
     async def run_server():
-        server = LightweightServer(args.port)
+        server = LightweightServer(port=args.port, host=args.host)
         runner = await server.start_server()
 
         # Get parent process ID for heartbeat monitoring

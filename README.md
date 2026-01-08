@@ -75,14 +75,52 @@ pip install -r requirements.txt
 
 ### Running the Application
 
-1. Start the backend services (if needed)
-2. Start the frontend:
+#### Local Mode (Default)
+
+Start the desktop application:
 ```bash
 cd frontend
 npm run dev
 ```
 
-The application will open in a new desktop window.
+The application will open in a new desktop window with full functionality.
+
+#### Server Mode
+
+Run on a remote machine and access via web browser from your laptop. Server mode uses two processes:
+- **Python backend** (port 8000) - ML tasks and API
+- **Static file server** (port 3000) - React app
+
+This is useful for:
+- Running ML tasks on a remote GPU server
+- Accessing large datasets stored on remote machines
+- Working with audio files located on a server
+- Single-user remote access (no multi-user support)
+
+**On the remote server:**
+```bash
+# Terminal 1: Start Python backend (ML/API)
+cd backend
+python lightweight_server.py --host 0.0.0.0 --port 8000
+
+# Terminal 2: Build and serve React app
+cd frontend
+REACT_APP_MODE=server npm run build
+npx serve -s build -p 3000
+```
+
+**On your laptop:**
+```bash
+# Create SSH tunnels for both servers
+ssh -L 3000:localhost:3000 -L 8000:localhost:8000 user@remote-server
+
+# Open browser to access the React app
+open http://localhost:3000
+```
+
+The React app runs in your browser and makes API calls to the Python backend for ML tasks and file operations.
+
+**Note:** Each Dipper instance supports one user at a time. For multiple users, run separate instances on different ports.
 
 ## Building for Production
 

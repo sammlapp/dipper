@@ -82,6 +82,13 @@ const ServerFileBrowser = ({
       const result = await response.json();
       setCurrentPath(result.path);
 
+      // Save last browsed path to localStorage
+      try {
+        localStorage.setItem('serverFileBrowser_lastPath', result.path);
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+
       // Parse path for breadcrumbs (handle both Unix / and Windows \ separators)
       const parts = result.path.split(/[\\/]/).filter(p => p);
       setPathParts(parts);
@@ -109,10 +116,21 @@ const ServerFileBrowser = ({
     }
   };
 
-  // Load home directory when dialog opens
+  // Load last used directory or home directory when dialog opens
   useEffect(() => {
     if (open) {
-      loadDirectory('');
+      // Try to get last browsed path from localStorage
+      let startPath = '';
+      try {
+        const lastPath = localStorage.getItem('serverFileBrowser_lastPath');
+        if (lastPath) {
+          startPath = lastPath;
+        }
+      } catch (e) {
+        // Ignore localStorage errors, use home directory
+      }
+
+      loadDirectory(startPath);
       setSelected([]);
     }
   }, [open]);
