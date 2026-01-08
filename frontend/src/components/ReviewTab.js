@@ -6,6 +6,7 @@ import ReviewSettings from './ReviewSettings';
 import FocusView from './FocusView';
 import HelpIcon from './HelpIcon';
 import ClassifierGuidedPanel from './ClassifierGuidedPanel';
+import ScoreHistogram from './ScoreHistogram';
 import { useHttpAudioLoader, HttpServerStatus } from './HttpAudioLoader';
 import {
   createStratifiedBins,
@@ -64,6 +65,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const [isClassifierGuidedPanelOpen, setIsClassifierGuidedPanelOpen] = useState(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [isFormatInfoExpanded, setIsFormatInfoExpanded] = useState(false);
+  const [isScoreHistogramOpen, setIsScoreHistogramOpen] = useState(false);
 
   // Classifier-guided listening state
   const [classifierGuidedMode, setClassifierGuidedMode] = useState({
@@ -1549,8 +1551,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       const cmdOrCtrl = isMac ? event.metaKey : event.ctrlKey;
 
       // Always allow standard copy/paste/cut shortcuts to work normally
+      // BUT allow Ctrl/Cmd+Shift+C for toggling comments
       if (cmdOrCtrl && ['c', 'v', 'x'].includes(event.key.toLowerCase())) {
-        return;
+        if (!(event.key.toLowerCase() === 'c' && event.shiftKey)) {
+          return;
+        }
       }
 
       // Handle Escape key for focus/grid toggle (works in both modes)
@@ -1585,6 +1590,13 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
             // Ctrl/Cmd+,: Open settings panel
             setIsSettingsPanelOpen(true);
             return;
+          case 'c':
+            if (event.shiftKey && !isFocusMode) {
+              // Cmd/Ctrl+Shift+C: toggle comments (grid mode only)
+              handleSettingsChange({ ...settings, show_comments: !settings.show_comments });
+              return;
+            }
+            break;
           case 'k':
             if (event.shiftKey) {
               // Cmd/Ctrl+Shift+K: jump to next incomplete bin (CGL mode only, works in both grid and focus)
@@ -1624,12 +1636,6 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                   setCurrentPage(prev => prev + 1);
                 }
               }
-            }
-            break;
-          case 'c':
-            if (event.shiftKey) {
-              // Cmd/Ctrl+Shift+C: toggle comments
-              handleSettingsChange({ ...settings, show_comments: !settings.show_comments });
             }
             break;
           default:
@@ -2585,6 +2591,15 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         </Box>
       </Modal>
 
+      {/* Score Histogram Modal */}
+      <ScoreHistogram
+        open={isScoreHistogramOpen}
+        onClose={() => setIsScoreHistogramOpen(false)}
+        clips={annotationData}
+        reviewMode={settings.review_mode}
+        annotationColumn={settings.annotation_column}
+      />
+
       {/* Filter Panel Drawer */}
       <Drawer
         anchor="right"
@@ -3041,6 +3056,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           </div>
 
           <div className="toolbar-right">
+            {/* Score Histogram Button */}
+            {annotationData.length > 0 && (
+              <button
+                onClick={() => setIsScoreHistogramOpen(true)}
+                className="toolbar-btn"
+                title="Score Histogram"
+              >
+                <span className="material-symbols-outlined">bar_chart</span>
+              </button>
+            )}
+
             {/* Classifier-Guided Listening Button */}
             {annotationData.length > 0 && (
               <button
@@ -3298,11 +3324,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           )}
         </div>
 
-      </div >
+      </div>
       {/* Status Bar - Always visible when data is loaded */}
       {
         annotationData.length > 0 && (
-          <div className="review-status-bar">
+          <div
+            className="review-status-bar"
+            style={{
+              bottom: isReviewOnly ? '0' : '30px',
+              left: isReviewOnly ? '0' : (drawerOpen ? '240px' : '65px')
+            }}
+          >
             <div className="status-section">
               <span className="status-label">Current Page:</span>
               <span className="status-value">{currentPage + 1} of {totalPages}</span>
@@ -3336,7 +3368,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           </div>
         )
       }
-    </div >
+    </div>
   );
 }
 
