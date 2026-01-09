@@ -12,6 +12,8 @@ take a close look at this codebase, especially documentation markdowns such as r
 
 # Incomplete items / TODO /feature request
 
+Select custom model for inference! 
+
 ## known bugs
 
 Training is failing
@@ -21,6 +23,9 @@ When using remote file explorer, "save" dialogue is incorrect - cannot create fi
 Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl+s doesn't work for save (applies the No label instead, which should be the S shortcut but not ctrl/cmd + S)
 
 Extraction by subfolder: keep entire relative path of subfolder rather than just Path(audio_file).parent.name. That way, folder structures like project/recorder1/wavs/a.wav, project/recorder2/wavs/a.wav are maintained as distinct folders.
+
+Cannot specify custom python environment for Extraction
+- maybe move to a global setting? 
 
 ## Intuitive workflows from task manager pane
 Completed tasks in task manager should have a button for the next step in the workflow:

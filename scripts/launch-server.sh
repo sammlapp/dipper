@@ -77,10 +77,12 @@ fi
 
 echo -e "${GREEN}✓ Config file: $CONFIG_FILE${NC}"
 
-# Parse config file for ports
-PYTHON_PORT=$(grep -A2 "^server:" "$CONFIG_FILE" | grep "port:" | head -1 | awk '{print $2}')
-STATIC_PORT=$(grep -A3 "^server:" "$CONFIG_FILE" | grep "static_port:" | awk '{print $2}')
-HOST=$(grep -A1 "^server:" "$CONFIG_FILE" | grep "host:" | awk '{print $2}')
+# Parse config file for host and ports (simple YAML-style parsing)
+# We intentionally avoid full YAML parsing here and just look for
+# top-level keys "host:", "port:", and "static_port:" under "server:".
+HOST=$(awk 'section=="server" && $1=="host:" {print $2; exit} /^server:/ {section="server"; next} /^[^[:space:]]/ && $1!="server:" {section=""}' "$CONFIG_FILE")
+PYTHON_PORT=$(awk 'section=="server" && $1=="port:" {print $2; exit} /^server:/ {section="server"; next} /^[^[:space:]]/ && $1!="server:" {section=""}' "$CONFIG_FILE")
+STATIC_PORT=$(awk 'section=="server" && $1=="static_port:" {print $2; exit} /^server:/ {section="server"; next} /^[^[:space:]]/ && $1!="server:" {section=""}' "$CONFIG_FILE")
 
 # Set defaults if not found in config
 PYTHON_PORT=${PYTHON_PORT:-8000}
@@ -100,9 +102,9 @@ if [ ! -d "$PROJECT_ROOT/frontend/build" ]; then
     echo ""
 fi
 
-# Check if Python backend exists
-if [ ! -f "$PROJECT_ROOT/backend/lightweight_server.py" ]; then
-    echo -e "${RED}✗ Python backend not found at: $PROJECT_ROOT/backend/lightweight_server.py${NC}"
+# Check if pyinstaller executable backend exists
+if [ ! -f "$PROJECT_ROOT/frontend/python-dist/lightweight_server" ]; then
+    echo -e "${RED}✗ Python backend not found at:$PROJECT_ROOT/frontend/python-dist/lightweight_server${NC}"
     exit 1
 fi
 
@@ -125,8 +127,11 @@ echo ""
 
 # Start Python backend
 echo -e "${YELLOW}[1/2] Starting Python backend...${NC}"
-cd "$PROJECT_ROOT/backend"
-$PYTHON_CMD lightweight_server.py --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
+# cd "$PROJECT_ROOT/backend"
+# $PYTHON_CMD lightweight_server.py --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
+# launch pyinstaller executable
+cd "$PROJECT_ROOT/frontend/python-dist/"
+./lightweight_server --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
 PYTHON_PID=$!
 
 # Wait a bit for Python to start

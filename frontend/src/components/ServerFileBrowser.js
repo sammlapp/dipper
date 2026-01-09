@@ -68,10 +68,12 @@ const ServerFileBrowser = ({
     setSearchText(''); // Clear search when navigating
     try {
       const backendUrl = await getBackendUrl();
+      // Send path only if it's truthy, otherwise backend will use home directory
+      const payload = path ? { path } : {};
       const response = await fetch(`${backendUrl}/files/browse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: path || '' })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -120,7 +122,7 @@ const ServerFileBrowser = ({
   useEffect(() => {
     if (open) {
       // Try to get last browsed path from localStorage
-      let startPath = '';
+      let startPath = null;  // null will make backend use home directory
       try {
         const lastPath = localStorage.getItem('serverFileBrowser_lastPath');
         if (lastPath) {

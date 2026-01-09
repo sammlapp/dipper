@@ -118,6 +118,7 @@ Run on a remote machine and access via web browser. Perfect for:
    ```bash
    # Create SSH tunnel
    ssh -L 3000:localhost:3000 -L 8000:localhost:8000 user@remote-server
+   ssh -L 3111:localhost:3000 -L 8111:localhost:8000 sml161@10.226.187.22
 
    # Open browser
    open http://localhost:3000

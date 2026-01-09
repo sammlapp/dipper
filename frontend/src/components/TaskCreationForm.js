@@ -443,7 +443,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         {/* File Selection Mode */}
         <div className="form-group full-width">
           <label>Audio File Selection <HelpIcon section="inference-file-selection" /></label>
-          <div className="segmented-control">
+          <div className="segmented-control not-too-big">
             <button
               type="button"
               className={`segment ${fileSelectionMode === 'files' ? 'active' : ''}`}
@@ -680,13 +680,13 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         {/* Model Source Selection */}
         <div className="form-group full-width">
           <label>Model Source <HelpIcon section="inference-model-source" /></label>
-          <div className="segmented-control">
+          <div className="segmented-control not-too-big">
             <button
               type="button"
               className={`segment ${config.model_source === 'bmz' ? 'active' : ''}`}
               onClick={() => {
-                setConfig(prev => ({ 
-                  ...prev, 
+                setConfig(prev => ({
+                  ...prev,
                   model_source: 'bmz',
                   model: 'BirdSetEfficientNetB1' // Reset to default BMZ model
                 }));
@@ -698,8 +698,8 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
               type="button"
               className={`segment ${config.model_source === 'local_file' ? 'active' : ''}`}
               onClick={() => {
-                setConfig(prev => ({ 
-                  ...prev, 
+                setConfig(prev => ({
+                  ...prev,
                   model_source: 'local_file',
                   model: '' // Clear model path when switching to local file
                 }));

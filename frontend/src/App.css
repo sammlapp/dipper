@@ -4817,6 +4817,10 @@ button:disabled {
   font-size: 1.1rem;
 }
 
+.not-too-big {
+  max-width: 400px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

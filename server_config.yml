@@ -1,0 +1,37 @@
+# Dipper Server Mode Configuration
+#
+# Copy this file to server_config.yml and customize for your setup
+#
+
+server:
+  # Host to bind Python backend to
+  # Use 0.0.0.0 to accept connections from any network interface
+  # Use 127.0.0.1 for localhost only
+  host: 0.0.0.0
+
+  # Port for Python backend (pyinstaller executable generating spectrograms/audio)
+  port: 8000
+
+  # Port for static file server (React app)
+  static_port: 3000
+
+file_access:
+  # List of base directories that the app can access
+  # Add your audio data directories here
+  allowed_base_paths:
+    - /Users/SML161/
+
+jobs:
+  # Maximum number of concurrent ML tasks (inference, training, extraction)
+  # Adjust based on your server's RAM and CPU
+  # Each task typically uses 2-4GB RAM
+  max_concurrent: 1
+
+logging:
+  # Logging level: DEBUG, INFO, WARNING, ERROR
+  level: INFO
+
+  # Log file locations (optional)
+  # If not specified, logs go to stdout/stderr
+  # python_backend: /var/log/dipper/backend.log
+  # static_server: /var/log/dipper/static.log
