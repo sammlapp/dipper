@@ -1,6 +1,6 @@
 # Bioacoustics Training GUI
 
-A cross-platform desktop application for bioacoustics machine learning with active learning capabilities. Built with Electron and React for the frontend, and Python for the ML backend.
+A cross-platform desktop application for bioacoustics machine learning with active learning capabilities. Built with Tauri and React for the frontend, and Python for the ML backend.
 
 ## Features
 

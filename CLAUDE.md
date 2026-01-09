@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Dipper is a bioacoustics machine learning desktop application built with:
-- **Frontend**: Electron + React with Material-UI
+- **Frontend**: Tauri + React with Material-UI
 - **Backend**: Python HTTP server (aiohttp) on port 8000
 - **Communication**: HTTP REST API (frontend → backend)
 - **ML Processing**: Separate Python subprocesses for inference, training, and extraction
@@ -16,10 +16,10 @@ Dipper is a bioacoustics machine learning desktop application built with:
 ```bash
 cd frontend
 npm install                                # Install dependencies
-npm run electron-dev-pyinstaller           # Full dev mode with backend (recommended)
-npm run electron-dev                       # Frontend only (limited functionality)
+npm run tauri:dev:full                     # Full dev mode with backend (recommended)
+npm run tauri:dev                          # Frontend only (limited functionality)
 npm run build                              # Build React app
-npm run dist:mac                           # Build macOS app
+npm run tauri:build:all                    # Build desktop app with PyInstaller backend
 ```
 
 ### Backend Development
@@ -52,15 +52,13 @@ All ML scripts are in `backend/scripts/`:
 
 ### File Structure
 ```
-training_gui/
+dipper/
 ├── frontend/
 │   ├── src/
 │   │   ├── App.js                    # Main React app
-│   │   ├── main.js                   # Electron main (full app)
-│   │   ├── main-review.js            # Electron main (review-only)
-│   │   ├── preload.js                # IPC bridge (mostly unused)
 │   │   ├── components/               # React tabs (Inference, Training, etc.)
 │   │   └── utils/TaskManager.js      # Task orchestration
+│   ├── src-tauri/                    # Tauri Rust backend (desktop builds)
 │   ├── python-dist/                  # PyInstaller backend executable
 │   └── package.json
 ├── backend/
@@ -113,46 +111,63 @@ Backend reads these files and returns via status endpoints. Frontend displays in
 
 ## Development Modes
 
-### Recommended: PyInstaller Dev Mode
-```bash
-npm run electron-dev-pyinstaller
-```
-- Starts React dev server (localhost:3000)
-- Starts lightweight_server (localhost:8000)
-- Launches Electron with full functionality
-- Hot reload for React changes
-- **Note**: Must rebuild PyInstaller exe after backend changes
+### Desktop Mode
 
-### Limited: Frontend Only Mode
+#### Recommended: Full Dev Mode with Backend
 ```bash
-npm run electron-dev
+npm run tauri:dev:full
+```
+- Starts Python backend from source (localhost:8000)
+- Starts React dev server with hot reload
+- Launches Tauri desktop app with full functionality
+- Backend changes apply immediately (no rebuild needed)
+
+#### Limited: Frontend Only Mode
+```bash
+npm run tauri:dev
 ```
 - Only starts React dev server
 - No backend running (HTTP calls fail)
 - Use for UI-only testing
 
+### Server Mode
+
+#### Development (Hot Reload)
+```bash
+./scripts/launch-server-dev.sh [config_file]
+```
+- Starts Python backend from source
+- Starts React dev server with hot reload
+- No Tauri compilation
+- Access via web browser
+
+#### Production
+```bash
+./scripts/launch-server.sh [config_file]
+```
+- Uses PyInstaller backend executable
+- Serves built React app
+- Requires PyInstaller rebuild after backend changes
+
 ## Build System
 
-### Full Application
+### Full Desktop Application
 ```bash
-npm run dist:mac          # macOS (both Intel + ARM)
-npm run dist:mac-arm64    # macOS ARM only
-npm run dist:win          # Windows
-npm run dist:linux        # Linux
+npm run tauri:build:all   # Build for current platform
 ```
 
 Builds include:
 - React app (built static files)
-- Electron framework
+- Tauri framework (Rust-based)
 - PyInstaller backend executable
 - Does NOT include conda environment (downloaded on-demand)
 
-### Review-Only Application
+### Review-Only Desktop Application
 ```bash
-npm run dist:review-mac   # Smaller app with only ReviewTab
+npm run tauri:build:review
 ```
 
-Uses `REACT_APP_REVIEW_ONLY=true` environment variable.
+Smaller app with only ReviewTab functionality. Uses `REACT_APP_REVIEW_ONLY=true` environment variable.
 
 ## Common Development Tasks
 
@@ -186,11 +201,11 @@ Uses `REACT_APP_REVIEW_ONLY=true` environment variable.
 # Test React app in browser
 cd frontend && npm start
 
-# Test Electron app
-cd frontend && npm run build && npx electron .
+# Test Tauri desktop app
+cd frontend && npm run tauri:dev:full
 
-# Test Python backend
-cd backend && ./pyinstaller-venv-light/bin/python lightweight_server.py --port 8000
+# Test Python backend standalone
+cd backend && python lightweight_server.py --port 8000
 ```
 
 ### Backend Health Check
@@ -210,22 +225,23 @@ Managed through Settings tab, saved/loaded via HTTP endpoints.
 
 ## Important Notes
 
-1. **IPC is mostly unused**: Communication is primarily HTTP, not Electron IPC
-2. **Two Python environments**: PyInstaller for server, conda for ML tasks
+1. **HTTP-based communication**: Frontend communicates with backend via HTTP REST API, not Tauri commands
+2. **Two Python environments**: PyInstaller for lightweight server, conda for ML tasks
 3. **Status polling**: Frontend polls every 2 seconds for job updates
 4. **Subprocess isolation**: Each job runs in separate Python process
 5. **Review-only build**: Conditional rendering based on REACT_APP_REVIEW_ONLY
+6. **Desktop vs Server mode**: Desktop uses Tauri wrapper, server mode runs React + backend without Tauri
 
 ## Dependencies
 
 **Frontend:**
-- React 18.3.1, Material-UI 5.15.0, Electron 28.3.3
+- React 18.3.1, Material-UI 5.15.0, Tauri 2.x
 
 **Backend:**
 - Python 3.11, aiohttp, PyTorch, OpenSoundscape, librosa, pandas
 
 **Build:**
-- electron-builder, PyInstaller, conda-pack
+- Tauri CLI, PyInstaller, conda-pack
 
 ## Version Management
 
@@ -261,17 +277,20 @@ See `scripts/README.md` for more details.
 
 ## Troubleshooting
 
-**Issue**: Electron doesn't start
-**Fix**: Build React app first: `npm run build`
+**Issue**: Tauri dev mode shows blank screen
+**Fix**: Ensure backend is running on port 8000. Try `npm run tauri:dev:full`
 
 **Issue**: Backend API not responding
-**Fix**: Check if lightweight_server is running on port 8000
+**Fix**: Check if lightweight_server is running on port 8000: `curl http://localhost:8000/health`
 
 **Issue**: ML tasks fail
 **Fix**: Check if conda environment downloaded: `~/Library/Caches/Dipper/envs/`
 
-**Issue**: PyInstaller changes not reflected
+**Issue**: PyInstaller changes not reflected in desktop build
 **Fix**: Rebuild and copy: `cd backend && python build_pyinstaller.py && cp dist/lightweight_server ../frontend/python-dist/`
 
 **Issue**: Status messages not showing in UI
 **Fix**: Check `.status` file exists in job folder and backend logs show file reads
+
+**Issue**: Server mode: `npm start` tries to build Tauri desktop app
+**Fix**: Use `./scripts/launch-server-dev.sh` instead for server mode development

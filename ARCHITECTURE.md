@@ -1,20 +1,24 @@
 # Dipper - Application Architecture
 
-**Last Updated:** November 2025
+**Last Updated:** January 2026
 
 ## Overview
 
-Dipper is a cross-platform bioacoustics machine learning application built with:
-- **Frontend**: Electron + React desktop application
+Dipper is a cross-platform bioacoustics machine learning application with two deployment modes:
+
+- **Desktop Mode**: Tauri + React desktop application
+- **Server Mode**: React web app + Python backend (no Tauri)
 - **Backend**: Python HTTP server (aiohttp) for ML processing
-- **Communication**: HTTP REST API (port 8000)
+- **Communication**: HTTP REST API
 - **Process Model**: Separate Python subprocesses for ML tasks (inference, training, extraction)
 
 ## Architecture Diagram
 
+### Desktop Mode
+
 ```
 ┌─────────────────────────────────────────────┐
-│         Electron Desktop App                │
+│         Tauri Desktop App                   │
 │  ┌───────────────────────────────────────┐  │
 │  │   React UI (Material-UI)              │  │
 │  │   - InferenceTab, TrainingTab, etc.   │  │
@@ -22,15 +26,15 @@ Dipper is a cross-platform bioacoustics machine learning application built with:
 │  └───────────────┬───────────────────────┘  │
 │                  │ fetch() HTTP calls        │
 │  ┌───────────────▼───────────────────────┐  │
-│  │   Electron Main Process               │  │
-│  │   - main.js / main-review.js          │  │
-│  │   - preload.js (IPC bridge)           │  │  #simplify - IPC is mostly unused now
-│  └───────────────┬───────────────────────┘  │
+│  │   Tauri Core (Rust)                   │  │
+│  │   - Window management                 │  │
+│  │   - Native file dialogs               │  │
+│  └───────────────────────────────────────┘  │
 └──────────────────┼───────────────────────────┘
                    │ HTTP (localhost:8000)
        ┌───────────▼──────────────────────────┐
        │   Python HTTP Server                 │
-       │   (lightweight_server.py - PyInstaller) │
+       │   (lightweight_server - PyInstaller) │
        │   - aiohttp web server               │
        │   - Audio processing (librosa, etc.) │
        │   - Job tracking & status            │
@@ -41,127 +45,145 @@ Dipper is a cross-platform bioacoustics machine learning application built with:
        │   ML Task Processes (separate)       │
        │   - inference.py                     │
        │   - train_model.py                   │
-       │   - clip_extraction.py        │
+       │   - clip_extraction.py               │
        │   (Run in conda environment)         │
        └──────────────────────────────────────┘
 ```
 
-## Communication Flow
+### Server Mode
 
-### Current Architecture (HTTP-based)
+```
+┌─────────────────┐
+│  Web Browser    │
+│  (React App)    │
+└────────┬────────┘
+         │ HTTP/HTTPS
+┌────────▼────────────────┐
+│  Static File Server     │
+│  (npx serve or nginx)   │
+│  - Serves React build   │
+│  - Port 3001            │
+└─────────────────────────┘
+         │ fetch() API calls
+┌────────▼────────────────┐
+│  Python HTTP Server     │
+│  (lightweight_server)   │
+│  - Port 8001            │
+│  - CORS enabled         │
+│  - File access controls │
+└────────┬────────────────┘
+         │ subprocess
+┌────────▼────────────────┐
+│  ML Task Processes      │
+│  (inference, training)  │
+└─────────────────────────┘
+```
+
+## Communication Flow
 
 1. **User Action** → React component event
 2. **React → Frontend Task Manager** → TaskManager.js manages tasks
-3. **Frontend → Backend** → `fetch('http://localhost:8000/...')` HTTP POST/GET
+3. **Frontend → Backend** → `fetch('http://localhost:PORT/...')` HTTP POST/GET
 4. **Backend Server** → Receives HTTP request, validates, starts subprocess
 5. **Subprocess** → Runs ML script in separate conda environment
 6. **Status Updates** → Frontend polls HTTP endpoint every 2 seconds
 7. **Results** → Subprocess writes to files, frontend fetches via HTTP
 
-### Legacy IPC (Mostly Unused) #simplify
+## Server Configuration
 
-The application still has Electron IPC infrastructure (preload.js, main.js IPC handlers) but **most communication now goes through HTTP**. The IPC layer is largely vestigial and could be removed.
+Server mode uses a YAML configuration file for settings:
 
-**Remaining IPC Usage:**
-- File/folder dialogs (could be replaced with web-based file pickers) #server_mode
-- Window management
-- App lifecycle events
+```yaml
+server:
+  host: 0.0.0.0              # Host to bind to
+  port: 8001                 # Python backend port
+  static_port: 3001          # React static server port
 
-## Components
+file_access:
+  allowed_base_paths:        # Directories accessible to users
+    - /home/username/data
+    - /media/audio
 
-### Frontend (Electron + React)
+jobs:
+  max_concurrent: 2          # Max simultaneous ML tasks
 
-**Location:** `/frontend/src/`
+logging:
+  level: INFO                # Log level
+```
 
-**Main Files:**
-- `App.js` - Main React component with tab navigation
-- `main.js` - Electron main process (full app)
-- `main-review.js` - Electron main process (review-only app)
-- `preload.js` - IPC bridge (mostly unused) #simplify
+**Launch Commands:**
+- Development: `./scripts/launch-server-dev.sh [config_file]`
+- Production: `./scripts/launch-server.sh [config_file]`
 
-**React Components:**
-- `components/InferenceTab.js` - Model inference UI
-- `components/TrainingTab.js` - Model training UI
-- `components/ExtractionTab.js` - Clip extraction/annotation task creation
-- `components/ExploreTab.js` - Results exploration and visualization
-- `components/ReviewTab.js` - Audio clip annotation interface
-- `components/TaskMonitor.js` - Task queue and status display
-- `utils/TaskManager.js` - Task orchestration and HTTP communication
+## HTTP API Endpoints
 
-**Environment Variable:**
-- `REACT_APP_REVIEW_ONLY=true` - Builds review-only version (no nav, single tab)
+### Health & Utility
 
-### Backend (Python HTTP Server)
-
-**Location:** `/backend/`
-
-**Main Server:**
-- `lightweight_server.py` - aiohttp HTTP server on port 8000
-  - Handles all HTTP endpoints
-  - Manages running jobs in `running_jobs` dict
-  - Spawns ML task subprocesses
-  - Serves audio clips and spectrograms
-  - Reads `.status` files for detailed task progress
-
-**Build:**
-- `build_pyinstaller.py` - Builds standalone executable
-- `http_server.spec` - PyInstaller specification
-- Output: `frontend/python-dist/lightweight_server` (bundled with Electron app)
-
-**ML Task Scripts:** `/backend/scripts/`
-- `inference.py` - Run model inference
-- `train_model.py` - Train custom models
-- `clip_extraction.py` - Create annotation tasks from detections
-- `load_model.py` - Model loading utilities
-- `file_selection.py` - Audio file resolution (glob patterns, file lists)
-- `config_utils.py` - Configuration file handling
-
-**Status Tracking:**
-- Each job writes `.status` JSON file in job folder
-- Contains: status, stage, progress %, message, metadata
-- Backend reads and returns via HTTP status endpoints
-- Frontend polls and displays in TaskMonitor
-
-### HTTP API Endpoints
-
-**Health & Utility:**
-- `GET /` - Root handler
 - `GET /health` - Health check
 - `POST /scan_folder` - Scan directory for audio files
 - `DELETE /cache` - Clear audio cache
 
-**Audio Processing:**
-- `GET /clip` - Get single audio clip/spectrogram
+### Audio Processing
+
+- `GET /clip` - Get audio clip with spectrogram
+  - Query params: `file`, `start_time`, `end_time`, `sr`, `spec_height`
 - `POST /clips/batch` - Get multiple clips
-- `POST /get_sample_detections` - Sample detections from CSV
+- `POST /get_sample_detections` - Sample detections from predictions
 - `POST /load_scores` - Load prediction scores
 
-**Configuration:**
+### Configuration
+
 - `POST /config/save` - Save configuration to file
 - `POST /config/load` - Load configuration from file
 - `POST /config/validate` - Validate configuration
 
-**Environment Management:**
-- `POST /env/check` - Check Python environment
+### Environment Management
+
+- `POST /env/check` - Check Python environment availability
 - `POST /env/setup` - Setup/download conda environment
 
-**ML Tasks:**
+### ML Tasks - Inference
+
 - `POST /inference/run` - Start inference job
+  - Body: `{config: {...}, env_path: "..."}`
+  - Returns: `{job_id: "...", job_folder: "..."}`
 - `GET /inference/status/{job_id}` - Check inference status
-- `POST /inference/cancel/{job_id}` - Cancel inference
+  - Returns: `{status, stage, progress, message, metadata}`
+- `POST /inference/cancel/{job_id}` - Cancel inference job
+
+### ML Tasks - Training
 
 - `POST /training/run` - Start training job
+  - Body: `{config: {...}, env_path: "..."}`
+  - Returns: `{job_id: "...", job_folder: "..."}`
 - `GET /training/status/{job_id}` - Check training status
-- `POST /training/cancel/{job_id}` - Cancel training
+- `POST /training/cancel/{job_id}` - Cancel training job
 
-- `POST /extraction/run` - Start extraction job
+### ML Tasks - Extraction
+
+- `POST /extraction/run` - Start clip extraction job
+  - Body: `{config: {...}, env_path: "..."}`
+  - Returns: `{job_id: "...", job_folder: "..."}`
 - `GET /extraction/status/{job_id}` - Check extraction status
-- `POST /extraction/cancel/{job_id}` - Cancel extraction
+- `POST /extraction/cancel/{job_id}` - Cancel extraction job
 
-**Annotation (Review Tab):**
+### Annotation (Review Tab)
+
 - `POST /annotation/load` - Load annotation task
+  - Body: `{csv_file, audio_folder, ...}`
 - `POST /annotation/save` - Save annotations
+  - Body: `{csv_file, data: [{...}, ...]}`
 - `POST /annotation/export` - Export annotations
+- `POST /annotation/stats` - Get annotation statistics
+
+### File Management (Server Mode)
+
+- `POST /files/browse` - Browse files on server
+  - Body: `{path: "/path/to/dir"}`
+  - Returns: `{current_path, parent_path, items: [{name, type, ...}]}`
+- `POST /files/save` - Save file to server
+  - Body: `{file_path, content}`
+- `POST /files/validate_path` - Check if path is accessible
 
 ## Python Environment Strategy
 
@@ -170,23 +192,25 @@ The application still has Electron IPC infrastructure (preload.js, main.js IPC h
 **Purpose:** HTTP server and basic audio processing
 **Build:** PyInstaller bundles Python + dependencies into standalone executable
 **Location:** `frontend/python-dist/lightweight_server`
-**Included in:** All Electron builds
+**Included in:** All desktop builds
 **Size:** ~50MB
 
 **Dependencies:**
 - aiohttp, pandas, numpy, librosa, soundfile, Pillow, scipy
 - gdown (for environment downloads)
 - appdirs (for cache directories)
+- PyYAML (for config file parsing)
 
-### Heavy Environment (Conda) #simplify
+### Heavy Environment (Conda)
 
 **Purpose:** ML model training and inference (PyTorch, OpenSoundscape)
 **Build:** conda-pack creates portable conda environment
 **Download:** Auto-downloaded from Google Drive on first use
 **Location:** System cache directory via `appdirs.user_cache_dir("Dipper")`
-  - macOS: `~/Library/Caches/Dipper/envs/dipper_pytorch_env`
-  - Linux: `~/.cache/Dipper/envs/dipper_pytorch_env`
-  - Windows: `C:\Users\<user>\AppData\Local\BioacousticsApp\Dipper\Cache\envs\dipper_pytorch_env`
+- macOS: `~/Library/Caches/Dipper/envs/dipper_pytorch_env`
+- Linux: `~/.cache/Dipper/envs/dipper_pytorch_env`
+- Windows: `C:\Users\<user>\AppData\Local\BioacousticsApp\Dipper\Cache\envs\dipper_pytorch_env`
+
 **Size:** ~700MB compressed, ~2GB extracted
 
 **Dependencies:**
@@ -195,53 +219,48 @@ The application still has Electron IPC infrastructure (preload.js, main.js IPC h
 - librosa, pandas, numpy, matplotlib, seaborn
 - scikit-learn, scikit-image
 
-**Download System:**
-- Google Drive file ID: `1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O`
-- Uses `gdown` library for download
-- Downloads to cache on first inference/training job
-- Reused across app restarts
-
 **Custom Environment:**
 - Users can specify custom Python environment path in settings
 - Bypasses default cache environment
+- Useful for development or custom package installations
 
 ## Process Management
 
 ### Job Lifecycle
 
-1. **Job Creation:**
+1. **Job Creation**
    - Frontend creates config JSON with job parameters
    - Sends to `/inference/run`, `/training/run`, or `/extraction/run`
 
-2. **Job Start:**
-   - Backend generates unique `job_id`
+2. **Job Start**
+   - Backend generates unique `job_id` (timestamp-based)
    - Creates job folder: `<output_dir>/<task_name>_<timestamp>/`
    - Writes config to `job_folder/config.json`
    - Creates log file: `job_folder/logs.txt`
    - Spawns subprocess: `python <script> --config <config_path>`
-   - Stores job info in `running_jobs[job_id]`
+   - Stores job info in `running_jobs[job_id]` dict
 
-3. **Job Execution:**
+3. **Job Execution**
    - Subprocess runs in separate process
    - Writes `.status` file with progress updates
-   - Logs to `logs.txt`
+   - Logs to `logs.txt` (stdout/stderr)
    - Generates outputs in job folder
 
-4. **Status Polling:**
+4. **Status Polling**
    - Frontend polls status endpoint every 2 seconds
    - Backend reads `.status` file and process state
    - Returns: status, stage, progress %, message, metadata
 
-5. **Job Completion:**
+5. **Job Completion**
    - Subprocess exits with code 0 (success) or non-zero (error)
-   - Backend reads final status
-   - Frontend displays results or error
+   - Backend reads final status from `.status`
+   - Frontend displays results or error message
 
-6. **Cancellation:**
+6. **Cancellation**
    - User clicks cancel in TaskMonitor
    - Frontend sends cancel request
    - Backend kills subprocess via `process.terminate()`
-   - Marks job as cancelled
+   - Status marked as cancelled
 
 ### Job Storage Structure
 
@@ -256,242 +275,168 @@ The application still has Electron IPC infrastructure (preload.js, main.js IPC h
       └── extraction_task_*.csv     # Extraction output
 ```
 
+### Status File Format
+
+```json
+{
+  "status": "running",
+  "stage": "processing_files",
+  "progress": 45,
+  "message": "Processing 100 audio files",
+  "timestamp": 1699564829.123,
+  "metadata": {
+    "files_processed": 45,
+    "total_files": 100
+  }
+}
+```
+
 ## Build System
 
-### Full Application (Dipper)
+### Desktop Application
 
-**Build Command:** `npm run dist:mac` (or `:win`, `:linux`)
+**Full App:**
+```bash
+cd frontend
+npm run tauri:build:all
+```
 
-**Steps:**
-1. `npm run build` - Build React app
-2. `npm run build:python-pyinstaller` - Build Python server with PyInstaller
-3. `electron-builder` - Package Electron app
+**Review-Only App:**
+```bash
+cd frontend
+npm run tauri:build:review
+```
+
+**Build Process:**
+1. Build React app to `frontend/build/`
+2. Build PyInstaller executable (if using `:build:all`)
+3. Tauri packages everything into platform-specific installer
 
 **Output:**
 - macOS: `.dmg` installer
-- Windows: `.exe` NSIS installer
-- Linux: `.AppImage`
+- Windows: `.msi` or `.exe` installer
+- Linux: `.AppImage` or `.deb`
 
 **Bundled:**
 - React app (built, static HTML/CSS/JS)
-- Electron framework
+- Tauri framework (Rust-based)
 - PyInstaller Python server executable
-- Node.js (via Electron)
+- NOT bundled: Heavy conda environment (downloaded on-demand)
 
-**NOT Bundled:**
-- Heavy conda environment (downloaded on-demand)
+### Server Mode Build
 
-### Review-Only Application (Dipper Review)
+**Build React app for server:**
+```bash
+cd frontend
+npm run build:server
+```
 
-**Build Command:** `npm run dist:review-mac`
-
-**Differences:**
-- `REACT_APP_REVIEW_ONLY=true` environment variable
-- Uses `main-review.js` instead of `main.js`
-- No navigation drawer
-- Only ReviewTab component
-- Smaller bundle size (~31KB less JavaScript)
-- Different app ID: `com.bioacoustics.traininggui.review`
-
-**Build Script:** `scripts/build-review.js`
+**Build PyInstaller backend:**
+```bash
+cd backend
+python build_pyinstaller.py
+cp dist/lightweight_server ../frontend/python-dist/
+```
 
 ## Development Modes
 
-### Standard Development
+### Desktop Mode
 
-**Command:** `npm run electron-dev`
-
-**Process:**
-1. Start React dev server on http://localhost:3000 (hot reload)
-2. Wait for server to be ready
-3. Start Electron pointing to localhost:3000
-4. Backend server NOT running (HTTP calls will fail) #simplify
-
-**Problem:** Most features don't work without backend
-**Limitation:** Can only test UI, not functionality
-
-### PyInstaller Development
-
-**Command:** `npm run electron-dev-pyinstaller`
-
-**Process:**
-1. Start React dev server on http://localhost:3000
-2. Start lightweight_server on http://localhost:8000
-3. Wait for both servers
-4. Start Electron
-
-**Advantage:** Full functionality with hot reload
-**Limitation:** Must rebuild PyInstaller exe after backend changes
-
-## Complexity Analysis & Simplification Opportunities
-
-### #simplify - Electron IPC Layer
-
-**Current State:**
-- Electron IPC (main.js, preload.js) exists but mostly unused
-- Communication primarily via HTTP to localhost:8000
-- IPC only used for file dialogs and window management
-
-**Simplification:**
-- Remove unused IPC handlers
-- Use web-based file pickers instead of native dialogs
-- Consider removing Electron entirely for server mode
-
-### #simplify - Dual Environment System
-
-**Current State:**
-- Two separate Python environments (lightweight + heavy)
-- PyInstaller for HTTP server
-- Conda for ML tasks
-- Complex download/caching system
-
-**Simplification Options:**
-1. Single conda environment with all dependencies
-2. Docker container with everything pre-installed
-3. Cloud-based ML backend (no local Python)
-
-**Trade-offs:**
-- Simplicity vs. app size
-- Download time vs. bundled size
-- User control vs. ease of deployment
-
-### #simplify - Build Complexity
-
-**Current State:**
-- Multiple build scripts (build_pyinstaller.py, build-review.js)
-- Complex PyInstaller spec with script bundling
-- Separate builds for review vs. full app
-- Cross-platform builds require platform-specific steps
-
-**Simplification:**
-- Unified build script
-- Docker-based builds for consistency
-- Single codebase with feature flags instead of separate builds
-
-## Server Mode Requirements #server_mode
-
-To run Dipper as a web application (browser-based, no Electron):
-
-### Required Changes
-
-**1. Remove Electron Dependencies**
-- ❌ Remove: main.js, preload.js, Electron-specific code
-- ✅ Keep: React app, all components
-- ✅ Use: Create React App or Vite for web builds
-
-**2. Replace File Selection** #server_mode
-- ❌ Remove: Electron file dialogs (`window.electronAPI.selectFile()`)
-- ✅ Replace: Web file pickers (`<input type="file">`)
-- ⚠️ Limitation: No directory selection in web browsers
-- ✅ Alternative: Server-side file browsing API
-
-**3. Backend Modifications**
-- ✅ Keep: aiohttp server (already web-compatible)
-- ✅ Add: CORS headers (already implemented)
-- ✅ Add: Authentication/authorization
-- ✅ Add: Session management
-- ✅ Add: Multi-user job isolation
-
-**4. Deployment Architecture** #server_mode
-
+**Full dev mode (recommended):**
+```bash
+cd frontend
+npm run tauri:dev:full
 ```
-┌─────────────────┐
-│  Web Browser    │
-│  (React App)    │
-└────────┬────────┘
-         │ HTTPS
-┌────────▼────────────────┐
-│  Web Server (nginx)     │
-│  - Static files (React) │
-│  - Reverse proxy        │
-└────────┬────────────────┘
-         │ Proxy
-┌────────▼────────────────┐
-│  Backend Server         │
-│  (lightweight_server)   │
-│  - Port 8000            │
-│  - HTTP API             │
-└────────┬────────────────┘
-         │ subprocess
-┌────────▼────────────────┐
-│  ML Task Processes      │
-│  (inference, training)  │
-└─────────────────────────┘
+- Starts Python backend from source (localhost:8000)
+- Starts React dev server with hot reload
+- Launches Tauri desktop app with full functionality
+- Backend changes apply immediately (no rebuild needed)
+
+**Frontend-only mode:**
+```bash
+cd frontend
+npm run tauri:dev
 ```
+- Only starts React dev server
+- No backend running (HTTP calls fail)
+- Use for UI-only testing
 
-**5. Multi-User Considerations** #server_mode
+### Server Mode
 
-**Critical Issues:**
-- Job ID conflicts between users
-- Shared file system access
-- Concurrent ML task execution
-- Resource limits (CPU, GPU, memory)
+**Development (hot reload):**
+```bash
+./scripts/launch-server-dev.sh [config_file]
+```
+- Starts Python backend from source
+- Starts React dev server with hot reload
+- No Tauri compilation
+- Access via web browser at `http://localhost:3001`
 
-**Solutions:**
-- User sessions with unique namespaces
-- Per-user job directories
-- Job queue with resource allocation
-- User authentication and quotas
+**Production:**
+```bash
+./scripts/launch-server.sh [config_file]
+```
+- Uses PyInstaller backend executable
+- Serves built React app via `npx serve`
+- Requires PyInstaller rebuild after backend changes
 
-**6. File Access** #server_mode
+## Components
 
-**Desktop Mode:**
-- Direct file system access via native dialogs
-- User browses local files
+### Frontend (React)
 
-**Server Mode Options:**
+**Location:** `frontend/src/`
 
-**Option A: Upload-based**
-- Users upload audio files to server
-- Server stores in temporary directory
-- Process uploaded files
-- Download results
+**Main Files:**
+- `App.js` - Main React component with tab navigation
+- `components/` - All React components
 
-**Option B: Server-side browsing**
-- Users browse server file system via web UI
-- Server provides file tree API
-- Security: Restrict to allowed directories
+**React Components:**
+- `InferenceTab.js` - Model inference UI
+- `TrainingTab.js` - Model training UI
+- `ExtractionTab.js` - Clip extraction/annotation task creation
+- `ExploreTab.js` - Results exploration and visualization
+- `ReviewTab.js` - Audio clip annotation interface
+- `TaskMonitor.js` - Task queue and status display
+- `ServerFileBrowser.js` - Server-side file browsing (server mode)
+- `utils/TaskManager.js` - Task orchestration and HTTP communication
 
-**Option C: Cloud storage integration**
-- Integration with S3, Google Drive, etc.
-- Users select files from cloud storage
-- Server downloads and processes
+**Environment Variables:**
+- `REACT_APP_MODE=server` - Enable server mode (no native file dialogs)
+- `REACT_APP_BACKEND_PORT=8001` - Backend port (defaults to 8000)
+- `REACT_APP_REVIEW_ONLY=true` - Build review-only version
 
-**7. Authentication & Security** #server_mode
+### Backend (Python)
 
-**Required:**
-- User login system
-- Session management (JWT tokens)
-- API authentication on all endpoints
-- File access permissions
-- Job ownership validation
+**Location:** `backend/`
 
-**Considerations:**
-- Single-user vs. multi-user mode
-- Public vs. private instances
-- Resource quotas per user
-- Data isolation and privacy
+**Main Server:**
+- `lightweight_server.py` - aiohttp HTTP server
+  - Handles all HTTP endpoints (30+ routes)
+  - Manages running jobs in `running_jobs` dict
+  - Spawns ML task subprocesses
+  - Serves audio clips and spectrograms
+  - Reads `.status` files for detailed task progress
+  - Implements file access controls for server mode
 
-### Server Mode Feature Matrix
+**Build:**
+- `build_pyinstaller.py` - Builds standalone executable
+- `http_server.spec` - PyInstaller specification
+- Output: `frontend/python-dist/lightweight_server`
 
-| Feature | Desktop (Electron) | Server (Web) | Notes |
-|---------|-------------------|--------------|-------|
-| File browsing | ✅ Native dialogs | ⚠️ Server-side or upload | #server_mode |
-| Audio playback | ✅ Direct file access | ✅ HTTP streaming | Already works |
-| ML inference | ✅ Local processing | ✅ Server processing | Same backend |
-| Model training | ✅ Local processing | ✅ Server processing | Same backend |
-| Multi-user | ❌ Single user | ⚠️ Needs implementation | #server_mode |
-| Authentication | ❌ Not needed | ✅ Required | #server_mode |
-| File uploads | ❌ Not needed | ✅ Required | #server_mode |
-| GPU access | ✅ User's GPU | ⚠️ Shared server GPU | Resource management |
-| Offline use | ✅ Fully offline | ❌ Requires connection | - |
+**ML Task Scripts:** `backend/scripts/`
+- `inference.py` - Run model inference
+- `train_model.py` - Train custom models
+- `clip_extraction.py` - Create annotation tasks from detections
+- `load_model.py` - Model loading utilities
+- `file_selection.py` - Audio file resolution (glob patterns, file lists)
+- `config_utils.py` - Configuration file handling
 
 ## Technology Stack
 
 **Frontend:**
 - React 18.3.1
 - Material-UI 5.15.0
-- Electron 28.3.3
+- Tauri 2.x
 - react-select 5.10.1
 
 **Backend:**
@@ -500,29 +445,76 @@ To run Dipper as a web application (browser-based, no Electron):
 - PyTorch (ML framework)
 - OpenSoundscape (bioacoustics)
 - librosa (audio processing)
-- pandas, numpy (data)
+- pandas, numpy (data processing)
+- PyYAML (config files)
 - gdown (Google Drive downloads)
 - appdirs (system paths)
 
 **Build Tools:**
-- electron-builder 24.9.0
+- Tauri CLI 2.x
 - PyInstaller
 - conda-pack
 - concurrently, wait-on (dev orchestration)
 
-## Codebase Statistics
+## Server Mode Features
 
-**Frontend:**
-- ~15 React components
-- ~3,000 lines of component code
-- ~2,000 lines of CSS
-- 2 Electron main processes
+### File Access Control
 
-**Backend:**
-- ~2,500 lines in lightweight_server.py
-- ~10 Python ML scripts
-- ~30 HTTP endpoints
+Server mode restricts file system access to configured directories:
 
-**Documentation:**
-- 13 markdown files
-- ~2,000 lines of documentation
+```yaml
+file_access:
+  allowed_base_paths:
+    - /home/username/data
+    - /media/audio
+```
+
+**Security:**
+- All file paths normalized and validated
+- Paths outside allowed directories are rejected
+- Symlinks resolved and checked
+- Directory traversal attacks prevented
+
+### Server File Browser
+
+Server mode provides a file browser UI component for remote file selection:
+
+**Features:**
+- Browse directories on server
+- Navigate with breadcrumbs or text input
+- Filter by file type (audio, csv, folders)
+- Save mode with filename input
+- Load mode for selecting existing files
+
+**API:**
+- `POST /files/browse` - List directory contents
+- `POST /files/validate_path` - Check if path is accessible
+
+### Multi-User Considerations
+
+**Current Implementation:**
+- Single-user design (no authentication)
+- Job IDs are globally unique
+- No user isolation
+
+**Future Enhancements:**
+- User authentication and sessions
+- Per-user job namespaces
+- Resource quotas
+- Job queue with priority
+- User-specific file access controls
+
+## Version Management
+
+Version numbers defined in three files:
+1. `frontend/package.json` (line 3)
+2. `frontend/src-tauri/Cargo.toml` (line 3)
+3. `frontend/src-tauri/tauri.conf.json` (line 10)
+
+**Update all versions:**
+```bash
+cd frontend
+npm run version-bump 0.1.0
+```
+
+See `scripts/README.md` for details.
