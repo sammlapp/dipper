@@ -24,7 +24,7 @@ export async function getBackendUrl() {
 
   // Check if running in Tauri
   const isTauri = typeof window !== 'undefined' &&
-                  (window.__TAURI__ || window.__TAURI_INTERNALS__);
+    (window.__TAURI__ || window.__TAURI_INTERNALS__);
 
   if (isTauri) {
     try {

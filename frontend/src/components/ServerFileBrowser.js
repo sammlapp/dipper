@@ -61,6 +61,7 @@ const ServerFileBrowser = ({
   const [pathParts, setPathParts] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [allItems, setAllItems] = useState([]); // Store all items before filtering
+  const [pathInputText, setPathInputText] = useState(''); // For manual path entry
 
   // Load directory contents from server
   const loadDirectory = async (path) => {
@@ -83,6 +84,7 @@ const ServerFileBrowser = ({
 
       const result = await response.json();
       setCurrentPath(result.path);
+      setPathInputText(result.path); // Update path input field with current path
 
       // Save last browsed path to localStorage
       try {
@@ -208,6 +210,16 @@ const ServerFileBrowser = ({
     }
   };
 
+  // Handle manual path input (Enter key)
+  const handlePathInputKeyPress = (event) => {
+    if (event.key === 'Enter') {
+      const enteredPath = pathInputText.trim();
+      if (enteredPath) {
+        loadDirectory(enteredPath);
+      }
+    }
+  };
+
   // Handle OK button click
   const handleOk = () => {
     if (selected.length > 0) {
@@ -253,6 +265,18 @@ const ServerFileBrowser = ({
             ))}
           </Breadcrumbs>
         </Box>
+
+        {/* Path input field */}
+        <TextField
+          fullWidth
+          size="small"
+          label="Go to path (press Enter)"
+          placeholder="/path/to/directory"
+          value={pathInputText}
+          onChange={(e) => setPathInputText(e.target.value)}
+          onKeyDown={handlePathInputKeyPress}
+          sx={{ mb: 2 }}
+        />
 
         {/* Search bar */}
         <TextField
