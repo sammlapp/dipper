@@ -40,10 +40,11 @@ import { getBackendUrl } from '../utils/backendConfig';
  * - open: boolean - Whether the dialog is open
  * - onClose: function - Called when dialog is closed (no selection)
  * - onSelect: function - Called when files/folders are selected
- * - mode: 'file' | 'folder' - Selection mode
+ * - mode: 'file' | 'folder' | 'save' - Selection mode
  * - multiple: boolean - Allow multiple selection (default: false)
  * - filters: array - File type filters (e.g., ['.csv', '.json'])
  * - title: string - Dialog title
+ * - defaultName: string - Default filename for save mode
  */
 const ServerFileBrowser = ({
   open,
@@ -52,7 +53,8 @@ const ServerFileBrowser = ({
   mode = 'file',
   multiple = false,
   filters = [],
-  title = 'Select File'
+  title = 'Select File',
+  defaultName = ''
 }) => {
   const [currentPath, setCurrentPath] = useState('');
   const [selected, setSelected] = useState([]);
@@ -62,6 +64,7 @@ const ServerFileBrowser = ({
   const [searchText, setSearchText] = useState('');
   const [allItems, setAllItems] = useState([]); // Store all items before filtering
   const [pathInputText, setPathInputText] = useState(''); // For manual path entry
+  const [saveFilename, setSaveFilename] = useState(defaultName); // For save mode
 
   // Load directory contents from server
   const loadDirectory = async (path) => {
@@ -136,8 +139,9 @@ const ServerFileBrowser = ({
 
       loadDirectory(startPath);
       setSelected([]);
+      setSaveFilename(defaultName); // Reset filename for save mode
     }
-  }, [open]);
+  }, [open, defaultName]);
 
   // Filter items based on search text
   useEffect(() => {
@@ -222,8 +226,19 @@ const ServerFileBrowser = ({
 
   // Handle OK button click
   const handleOk = () => {
-    if (selected.length > 0) {
-      onSelect(multiple ? selected : selected[0]);
+    if (mode === 'save') {
+      // Save mode: return current path + filename
+      if (saveFilename && saveFilename.trim()) {
+        const savePath = currentPath.endsWith('/')
+          ? `${currentPath}${saveFilename.trim()}`
+          : `${currentPath}/${saveFilename.trim()}`;
+        onSelect(savePath);
+      }
+    } else {
+      // File/folder selection mode
+      if (selected.length > 0) {
+        onSelect(multiple ? selected : selected[0]);
+      }
     }
   };
 
@@ -266,11 +281,11 @@ const ServerFileBrowser = ({
           </Breadcrumbs>
         </Box>
 
-        {/* Path input field */}
+        {/* Path inpt field */}
         <TextField
           fullWidth
           size="small"
-          label="Go to path (press Enter)"
+          label="Go to path"
           placeholder="/path/to/directory"
           value={pathInputText}
           onChange={(e) => setPathInputText(e.target.value)}
@@ -294,6 +309,20 @@ const ServerFileBrowser = ({
           }}
           sx={{ mb: 2 }}
         />
+
+        {/* Filename input (save mode only) */}
+        {mode === 'save' && (
+          <TextField
+            fullWidth
+            size="small"
+            label="Filename"
+            placeholder="Enter filename"
+            value={saveFilename}
+            onChange={(e) => setSaveFilename(e.target.value)}
+            sx={{ mb: 2 }}
+            required
+          />
+        )}
 
         {/* Select all checkbox (only show for multiple selection) */}
         {multiple && (
@@ -397,9 +426,13 @@ const ServerFileBrowser = ({
         <Button
           onClick={handleOk}
           variant="contained"
-          disabled={selected.length === 0}
+          disabled={
+            mode === 'save'
+              ? !saveFilename || !saveFilename.trim()
+              : selected.length === 0
+          }
         >
-          Select
+          {mode === 'save' ? 'Save' : 'Select'}
         </Button>
       </DialogActions>
     </Dialog>

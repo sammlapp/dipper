@@ -98,24 +98,38 @@ export const showFolderPicker = (options = {}) => {
  * @param {string} options.title - Dialog title
  * @returns {Promise<string|null>} Save file path or null if cancelled
  */
-export const showSaveDialog = async (options = {}) => {
-  // For server mode, we first let user pick a folder, then append the filename
-  const folder = await showFolderPicker({
-    title: options.title || 'Select Save Location'
+export const showSaveDialog = (options = {}) => {
+  return new Promise((resolve) => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = ReactDOM.createRoot(container);
+
+    const cleanup = () => {
+      root.unmount();
+      document.body.removeChild(container);
+    };
+
+    const handleSelect = (path) => {
+      cleanup();
+      resolve(path);
+    };
+
+    const handleClose = () => {
+      cleanup();
+      resolve(null);
+    };
+
+    root.render(
+      <ServerFileBrowser
+        open={true}
+        onClose={handleClose}
+        onSelect={handleSelect}
+        mode="save"
+        defaultName={options.defaultName || 'file.json'}
+        title={options.title || 'Save File'}
+      />
+    );
   });
-
-  if (!folder) {
-    return null;
-  }
-
-  // Prompt for filename
-  const filename = prompt('Enter filename:', options.defaultName || 'file.json');
-  if (!filename) {
-    return null;
-  }
-
-  // Combine folder and filename
-  return `${folder}/${filename}`;
 };
 
 /**

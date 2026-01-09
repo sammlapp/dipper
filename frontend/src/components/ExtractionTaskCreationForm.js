@@ -30,7 +30,9 @@ const DEFAULT_VALUES = {
     output_dir: '',
     export_audio_clips: false,
     clip_duration: 5.0,
-    extraction_mode: 'binary' // 'binary' or 'multiclass'
+    extraction_mode: 'binary', // 'binary' or 'multiclass'
+    use_custom_python_env: false,
+    custom_python_env_path: ''
   }
 };
 
@@ -95,6 +97,17 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   const handleClassListChange = (selectedOptions) => {
     const classes = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
     setConfig(prev => ({ ...prev, class_list: classes }));
+  };
+
+  const handleCustomPythonEnvSelection = async () => {
+    try {
+      const folder = await selectFolder();
+      if (folder) {
+        setConfig(prev => ({ ...prev, custom_python_env_path: folder }));
+      }
+    } catch (error) {
+      console.error('Failed to select Python environment folder:', error);
+    }
   };
 
   const validatePercentileBins = (binsText) => {
@@ -185,7 +198,11 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           output_dir: config.output_dir,
           export_audio_clips: config.export_audio_clips,
           clip_duration: config.clip_duration,
-          extraction_mode: config.extraction_mode
+          extraction_mode: config.extraction_mode,
+          python_environment: {
+            use_custom: config.use_custom_python_env,
+            custom_path: config.custom_python_env_path
+          }
         };
 
         const backendUrl = await getBackendUrl();
@@ -242,7 +259,9 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             output_dir: configData.output_dir || '',
             export_audio_clips: configData.export_audio_clips || false,
             clip_duration: configData.clip_duration || 5.0,
-            extraction_mode: configData.extraction_mode || configData.annotation_mode || 'binary'
+            extraction_mode: configData.extraction_mode || configData.annotation_mode || 'binary',
+            use_custom_python_env: configData.python_environment?.use_custom || false,
+            custom_python_env_path: configData.python_environment?.custom_path || ''
           }));
 
           // Re-scan predictions folder if it was loaded
@@ -592,6 +611,50 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
               <div className="help-text">
                 Total duration of extracted clips, centered on prediction interval
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Python Environment */}
+        <div className="form-group full-width">
+          <label>
+            <input
+              type="checkbox"
+              checked={config.use_custom_python_env}
+              onChange={(e) => setConfig(prev => ({ ...prev, use_custom_python_env: e.target.checked }))}
+              style={{ marginRight: '8px' }}
+            />
+            Use Custom Python Environment <HelpIcon section="extraction-python-env" />
+          </label>
+          <div className="help-text">
+            Use a custom Python environment instead of the default dipper_pytorch_env
+          </div>
+          {config.use_custom_python_env && (
+            <div style={{ marginLeft: '24px', marginTop: '8px' }}>
+              <div className="file-selection-buttons" style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <button
+                  type="button"
+                  onClick={handleCustomPythonEnvSelection}
+                  className="button-secondary"
+                >
+                  Select Python Environment Folder
+                </button>
+                {config.custom_python_env_path && (
+                  <button
+                    type="button"
+                    onClick={() => setConfig(prev => ({ ...prev, custom_python_env_path: '' }))}
+                    className="button-clear"
+                    title="Clear selected Python environment"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {config.custom_python_env_path && (
+                <span className="selected-path">
+                  {config.custom_python_env_path}
+                </span>
+              )}
             </div>
           )}
         </div>
