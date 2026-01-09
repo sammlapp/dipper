@@ -692,7 +692,13 @@ def create_extraction_csvs(
                 clip_end = clip["end_time"]
 
             # Create row with basic columns
-            row = {"file": file_path, "start_time": clip_start, "end_time": clip_end}
+            row = {
+                "file": file_path,
+                "start_time": clip_start,
+                "end_time": clip_end,
+                "labels": "",
+                "annotation_status": "",
+            }
 
             # Add subfolder column if stratification by subfolder is enabled
             if config.get("stratification", {}).get("by_subfolder", False):

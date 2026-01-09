@@ -12,10 +12,13 @@ take a close look at this codebase, especially documentation markdowns such as r
 
 # Incomplete items / TODO /feature request
 
+Location to download pytorch-dipper-env from depends on current operating system
+- need to resovle issues with building conda-pack env for Windows
+
 Select custom model for inference! 
 
 
-Task status updates: little "toast" notifications appear regardless of which tab you are viewing; go away after a few seconds or user can x it
+Task status updates: "toast" notifications appear regardless of which tab you are viewing; go away after a few seconds or user can x it
 https://mui.com/material-ui/react-snackbar/
 - [task name] started (task type)
 - [task name] queued (task type)

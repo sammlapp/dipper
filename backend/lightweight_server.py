@@ -38,8 +38,10 @@ from scripts import clip_extraction
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Google Drive file ID for PyTorch environment
-PYTORCH_ENV_FILE_ID = "1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O"
+# Google Drive file IDs for PyTorch environment (OS-specific)
+MACOS_PYTORCH_ENV_FILE_ID = "1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O"
+LINUX_PYTORCH_ENV_FILE_ID = "PLACEHOLDER"  # TODO: Add Linux environment file ID
+WINDOWS_PYTORCH_ENV_FILE_ID = "PLACEHOLDER"  # TODO: Add Windows environment file ID
 
 
 def is_process_alive(pid):
@@ -242,12 +244,34 @@ def download_environment_from_gdrive():
     try:
         import gdown
 
+        # Detect operating system and select appropriate file ID
+        system = platform.system()
+        if system == "Darwin":  # macOS
+            file_id = MACOS_PYTORCH_ENV_FILE_ID
+            os_name = "macOS"
+        elif system == "Linux":
+            file_id = LINUX_PYTORCH_ENV_FILE_ID
+            os_name = "Linux"
+        elif system == "Windows":
+            file_id = WINDOWS_PYTORCH_ENV_FILE_ID
+            os_name = "Windows"
+        else:
+            error_msg = f"Unsupported operating system: {system}"
+            logger.error(error_msg)
+            return {"status": "error", "error": error_msg}
+
+        # Check if file ID is placeholder
+        if file_id == "PLACEHOLDER":
+            error_msg = f"PyTorch environment download not yet available for {os_name}. Please use a custom Python environment or contact support."
+            logger.error(error_msg)
+            return {"status": "error", "error": error_msg}
+
         archive_path = get_default_env_archive_path()
-        logger.info(f"Downloading PyTorch environment to {archive_path}...")
+        logger.info(f"Downloading PyTorch environment for {os_name} to {archive_path}...")
         os.makedirs(os.path.dirname(archive_path), exist_ok=True)
 
         # Download using gdown with file ID
-        url = f"https://drive.google.com/uc?id={PYTORCH_ENV_FILE_ID}"
+        url = f"https://drive.google.com/uc?id={file_id}"
         gdown.download(url, archive_path, quiet=False)
 
         logger.info(f"Download complete: {archive_path}")
