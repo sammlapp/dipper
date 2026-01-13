@@ -1,6 +1,6 @@
 {
   "name": "dipper",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Cross-platform desktop app for bioacoustics ML training and inference",
   "scripts": {
     "start": "react-scripts start",

@@ -13,28 +13,38 @@ take a close look at this codebase, especially documentation markdowns such as r
 
 # Incomplete items / TODO /feature request
 
-Need to be able to resume inference task if interrupted: 
-- button in Inference Tab for "resume incomplete inference task"; separate from task creation form
-- user selects the config file associated with the incomplete task via file selection dialogue
-- Dipper uses the config file for the inference parameterization and to know which output folder results should be saved to
-- instead of making a new folder for the job's outputs, Dipper will add additional outputs to the selected folder
-- inference script skips inference/subfolder inference if the corresponding output predictions file already exists
-I implemented this behavior in inference.py with "if output_file.exists():..." for both subfolder prediction and prediction on everything together. So you just need to implement the frontend and functionality to "resume" by launching an inference job from selected config file of the incomplete task, where it continues using the same output folder instead of creating a new one. 
-Here's an example of the inference_config.json file that the user could select for resuming a task: 
-/Users/SML161/Downloads/Inference_BirdSetEfficientNetB1_-_2_files_-_182026_104626_AM
-note in particular the 'job_folder' field with the absolute path to the folder where outputs are saved. 
-
 - need to resovle issues with building conda-pack env for Windows
 
-test downloading/using default conda-pack env on linux! 
+test downloading/using default conda-pack env on linux! (updated conda pack env; need to rerun github runner and re-upload to onedrive)
 
-Task status updates: "toast" notifications appear regardless of which tab you are viewing; go away after a few seconds or user can x it
+Task status updates: "toast" notifications appear regardless of which tab you are viewing; go away after a few seconds, or user can dismiss 
 https://mui.com/material-ui/react-snackbar/
-- [task name] started (task type)
-- [task name] queued (task type)
-- [task name] created (Waiting on user to start)
-- [task name] completed  (task type)
-- [task name] failed (task type)
+Colors match coloring of tasks in task pane for running (started)/queued/canceled/failed/pending/completed
+- [task name] started (<task type>) (blue)
+- [task name] queued (task type) (purple)
+- [task name] created (Waiting on user to start) (grey)
+- [task name] completed  (task type) (green)
+- [task name] failed (task type) (red)
+- [task name] canceled (task type) (yellow)
+
+### User feature requests
+JT Larkin:
+- CGL stopping criterion for number of negative clips in bin
+
+Weldy:
+GCL: Sort by score without any stratification
+
+Chronister:
+should not create annotation_status column when using binary annotation
+(creates it if you flip the UI to multi-class annotation, even if you don't add any annotations)
+
+Davis Hines:
+when you annotate, it continues playing the old clip even after youve selected a label with asdf-keys, which plays overtop of the other clip, which detracted from the softwares intended function of fast review
+- I actually like this feature, but we could make it configurable
+
+would be nice to have a audacity esq bar that tranverses the entire spectrogram to visualize what part of clip is playing (visual scroll bar; this exists in 
+would be nice to have arrow key functionality
+would be nice to have multi selection feature (shift-click)
 
 ## known bugs
 
@@ -43,9 +53,7 @@ in server mode, after creating csv file to save annotations to with SVAR dialogu
 "explore" failing to display audio clips (in server mode at least)
 (Error: Failed to load clip: Cannot read properties of undefined (reading 'toString'))
 
-not all components of config are re-loaded for extraction/inference/train config. Review for completeness. These are currently not retained/reloaded: task name, custom python environment
-
-Clip extraction: add "annotation" (if single-target) or "labels","annotation_status" (if multi-target) columns to the created csv so that the csv can be opened in the review tab. Tried to fix this but still not working? double check if it works now. 
+Clip extraction: add "annotation" (if single-target) or "labels","annotation_status" (if multi-target) columns to the created csv so that the csv can be opened in the review tab. Tried to fix this but still not working
 
 When app reloads, tasks are re-started; background tasks should continue and the app should simply check on their status when reopening. This implies that the task manager should have a cached on-disk record of active tasks.
 
@@ -53,20 +61,17 @@ When task is restarted from task manager, two issues with tracking info:
 - error messages from previous task are still shown
 - time is incorrect negative value
 
-When globbing/recursive search for files is occurring, need to show user that something is happening rather than just looking like it found 0 files instantly. For instance, in the inference tab file selection. 
-
 server mode SVAR dialogue when selecting a _folder_: works if you click on a folder in the current view; but if you open a folder and have nothing selected, you should be able to complete the dialogue by clicking "Select Current Folder" to choose the current folder you are viewing at that moment. 
 
 Training is failing 
-
-When using remote file explorer, "save" dialogue is incorrect - cannot create file
 
 Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl+s doesn't work for save (applies the No label instead, which should be the S shortcut but not ctrl/cmd + S)
 
 current numeric form input fields are very bad, hard to type into and hard to use buttons to change values; sometimes typing a new value doesn't correctly replace the old value. Use the Material UI Spinner element for numeric configuration fields, or something equivalently simple and easy to interact with that doesn't add complexity to the codebase.  
 
-Extraction by subfolder: keep entire relative path of subfolder rather than just Path(audio_file).parent.name. That way, folder structures like project/recorder1/wavs/a.wav, project/recorder2/wavs/a.wav are maintained as distinct folders rather than looking like the same folder ("wavs")
+Extraction by subfolder: keep entire relative path of subfolder rather than just `Path(audio_file).parent.name`. That way, folder structures like project/recorder1/wavs/a.wav, project/recorder2/wavs/a.wav are maintained as distinct folders rather than looking like the same folder ("wavs")
 
+server mode port specification turned out to be a hassle. the frontend and backend ports should instead by automatically selected to be on an unused port, and clearly reported so that the user can see which ports are being used. 
 
 ### server mode installation
 - should skip `npm install -g serve` if serve is already installed, this will avoid unnecessary permissions error for non-sudo user
@@ -83,34 +88,17 @@ debug/fix building conda-pack environment for Linux and Windows
 
 rename lightweight-server (pyinstaller executable) and lightweight_server.py to dipper_pybackend. Make sure this is thoroughly updated throughout the codebase, build scripts, and documentation. 
 
-Let's prepare to fix up server mode. Propose a plan for running in server mode with a configuration file. We should be able to run the app server-side without too much hassle. Something like  `dipper --config ~/dipper_server_config.yml` where the config file specifies port, file access scope for remote user, and max concurrent jobs. This takes the place of --port argument. 
-
-Config items:
-- Front-end port for remote web browser access/forwarding
-- default conda environment path (if None/null, uses typical behavior of desktop app)
-- directories in which file read access is allowed
-- directories in which file write access is allowed
-- model cache directory (in None/null, uses typical behavior of selecting default cache dir)
-Two that are already in global setting panel
-- max concurrent jobs
-- boolean whether extraction tasks towards concurrent job task
-Let's have all of these settings to the global settings page as well, _except the frontend port specification_. When booting server mode, the settings are filled from the config file. 
-
-
 test inference with custom/local models
 
 get feedback on inference and training builds
 
 add alternative "view mode" for multi-class annotation: instead of a multi-select box, each class has a button that can be toggled (clicked) for present (green) or absent (no color). Class buttons are floated in a wrapping div, such that multiple can appear side by side if there is enough horizontal space; vertical space is added to the clip panel as needed to display all options. 
 
-- PyInstaller build is likely overly complicated: I think we should be able to use other modules without the "sys.path.append" workarounds to find the modules.  [done?]
-
 - delete archive file of pytorch env after unpacking
-- download the correct pytorch .tar.gz conda-pack env based on the operating system
 
 separate HopLite Database-oriented embed, train, and predict into its own app
 
-completed task pane should display full path to job folder containing the outputs of the task
+completed task pane should display full path to job folder containing the outputs of the task, with a little button to copy the path to the clipboard
 
 In train/inference, add an option to specify device name for the ML model (typically selects gpu if available, otherwise cpu; advanced users might want to specify a device using torch's conventions, like "cuda:0"). This can be placed in an "advanced settings" sub-panel along with the option to select a custom python environment. 
 
