@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { basename } from 'pathe';
-import { FormControl, Select, MenuItem } from '@mui/material';
+import { FormControl, Select, MenuItem, Tabs, Tab, Box } from '@mui/material';
 import HelpIcon from './HelpIcon';
 import { selectFiles, selectFolder, selectTextFiles, selectModelFiles, saveFile, selectJSONFiles } from '../utils/fileOperations';
 import { getBackendUrl } from '../utils/backendConfig';
@@ -32,7 +32,7 @@ const DEFAULT_VALUES = {
   }
 };
 
-function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
+function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
   const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
   const [fileSelectionMode, setFileSelectionMode] = useState(DEFAULT_VALUES.fileSelectionMode);
   const [globPatterns, setGlobPatterns] = useState(DEFAULT_VALUES.globPatterns);
@@ -288,6 +288,10 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
     const taskConfig = {
       ...config,
+      // Add form-level state that isn't in config object
+      file_selection_mode: fileSelectionMode,
+      selected_extensions: selectedExtensions,
+      glob_patterns_text: globPatterns,
       // Convert sparse outputs settings for TaskManager
       sparse_save_threshold: config.sparse_outputs_enabled ? config.sparse_save_threshold : null
     };
@@ -983,6 +987,145 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       <div className="form-actions">
         
       </div> */}
+    </div>
+  );
+}
+
+// Separate component for resuming incomplete tasks
+function ResumeInferenceTask({ onResumeTask }) {
+  const handleResumeTask = async () => {
+    try {
+      const configFile = await selectJSONFiles();
+      if (!configFile || configFile.length === 0) {
+        return; // User cancelled
+      }
+
+      // Load the config file
+      const backendUrl = await getBackendUrl();
+      const response = await fetch(`${backendUrl}/config/load`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config_path: configFile[0]
+        })
+      });
+
+      const result = await response.json();
+      if (result.status !== 'success') {
+        console.error(`Failed to load config: ${result.error}`);
+        alert(`Failed to load config file: ${result.error}`);
+        return;
+      }
+
+      const configData = result.config;
+
+      // Validate that this is an inference config with a job_folder
+      if (!configData.job_folder) {
+        console.error('Selected config does not contain a job_folder field. Cannot resume.');
+        alert('This config file does not appear to be from an inference task. Please select an inference_config.json file from an incomplete task folder.');
+        return;
+      }
+
+      // Validate required fields exist
+      const requiredFields = ['model', 'model_source', 'inference_settings', 'sparse_outputs', 'python_environment', 'testing_mode'];
+      for (const field of requiredFields) {
+        if (!(field in configData)) {
+          throw new Error(`Missing required field in config: ${field}`);
+        }
+      }
+
+      // Build the task config from the loaded data - no fallbacks for config fields
+      const taskConfig = {
+        model_source: configData.model_source,
+        model: configData.model,
+        files: configData.files,
+        file_globbing_patterns: configData.file_globbing_patterns,
+        file_list: configData.file_list,
+        file_selection_mode: configData.file_selection_mode,
+        selected_extensions: configData.selected_extensions,
+        glob_patterns_text: configData.glob_patterns_text,
+        output_dir: configData.output_dir,
+        split_by_subfolder: configData.split_by_subfolder,
+        overlap: configData.inference_settings.clip_overlap,
+        batch_size: configData.inference_settings.batch_size,
+        worker_count: configData.inference_settings.num_workers,
+        sparse_outputs_enabled: configData.sparse_outputs.enabled,
+        sparse_save_threshold: configData.sparse_outputs.threshold,
+        use_custom_python_env: configData.python_environment.use_custom,
+        custom_python_env_path: configData.python_environment.custom_path,
+        testing_mode_enabled: configData.testing_mode.enabled,
+        subset_size: configData.testing_mode.subset_size,
+        // Critical: pass the existing job_folder to resume in same location
+        job_folder: configData.job_folder
+      };
+
+      const taskName = configData.task_name || 'Resumed Inference';
+
+      console.log(`Resuming inference task from: ${basename(configFile[0])}`);
+      console.log(`Job folder: ${configData.job_folder}`);
+
+      // Immediately create and run the task
+      onResumeTask(taskConfig, taskName);
+
+    } catch (err) {
+      console.error('Failed to resume task: ' + err.message);
+      alert(`Failed to resume task: ${err.message}`);
+    }
+  };
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <p style={{ fontSize: '1em', color: '#333', marginBottom: '20px' }}>
+        Resume an interrupted inference task by selecting its config file. The task will continue from where it left off, skipping already-processed files.
+      </p>
+      <button
+        className="button-primary"
+        onClick={handleResumeTask}
+        style={{ fontSize: '0.95rem', padding: '12px 24px' }}
+      >
+        Select Config File to Resume
+      </button>
+    </div>
+  );
+}
+
+// Wrapper component with tabs for creating or resuming inference tasks
+function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
+  const [tabValue, setTabValue] = useState(0);
+
+  const handleTabChange = (_event, newValue) => {
+    setTabValue(newValue);
+  };
+
+  return (
+    <div>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Tabs value={tabValue} onChange={handleTabChange}>
+          <Tab label="Create New Task" />
+          <Tab label="Resume Task" />
+        </Tabs>
+      </Box>
+
+      {/* Tab Panel 0: Create New Task */}
+      <div role="tabpanel" hidden={tabValue !== 0}>
+        {tabValue === 0 && (
+          <CreateInferenceTaskForm
+            onTaskCreate={onTaskCreate}
+            onTaskCreateAndRun={onTaskCreateAndRun}
+          />
+        )}
+      </div>
+
+      {/* Tab Panel 1: Resume Task */}
+      <div role="tabpanel" hidden={tabValue !== 1}>
+        {tabValue === 1 && (
+          <ResumeInferenceTask
+            onResumeTask={onTaskCreateAndRun}
+          />
+        )}
+      </div>
     </div>
   );
 }

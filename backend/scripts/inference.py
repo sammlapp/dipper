@@ -65,23 +65,24 @@ def update_status(
 def run_inference(files, model, config_data):
     """Run inference on audio files using the model's predict method"""
     logger.info(f"Processing {len(files)} audio files")
-    logger.info(f"Inference config: {config_data.get('inference_settings', {})}")
+    logger.info(f"Inference config: {config_data['inference_settings']}")
 
     try:
         # Progress tracking
         total_files = len(files)
-        job_folder = config_data.get("job_folder")
+        job_folder = config_data["job_folder"]
 
         # Use the model's predict method with the configuration
         # This matches the streamlit implementation: model.predict(ss.selected_files, **ss.cfg["inference"])
         logger.info("Starting model prediction...")
 
+        # Note: mode field is optional, defaults to normal classification
         if config_data.get("mode") == "classify_from_hoplite":
             # run shallow classifier on features retrieved from hoplite db
             predictions = classify_from_hoplite_embeddings(files, model, config_data)
         else:  # run full forward pass of model
             predictions = model.predict(
-                files, **config_data.get("inference_settings", {})
+                files, **config_data["inference_settings"]
             )
 
         logger.info(f"Progress: 100% ({total_files}/{total_files})")
@@ -113,12 +114,14 @@ def run_inference(files, model, config_data):
 def save_results(predictions, output_file, config_data):
     """Save predictions to file, optionally as sparse format"""
 
-    sparse_threshold = config_data.get("sparse_save_threshold")
-    # None -> save all scores
+    # Check sparse outputs configuration (no defaults - require field to exist)
+    sparse_outputs = config_data["sparse_outputs"]
+    sparse_enabled = sparse_outputs["enabled"]
+    sparse_threshold = sparse_outputs["threshold"]
 
     if output_file:
         try:
-            job_folder = config_data.get("job_folder")
+            job_folder = config_data["job_folder"]
             update_status(
                 job_folder,
                 "running",
@@ -126,7 +129,7 @@ def save_results(predictions, output_file, config_data):
                 message=f"Saving predictions to {os.path.basename(output_file)}",
             )
 
-            if sparse_threshold is None:
+            if not sparse_enabled:
                 # save all scores for all classes and clips
                 predictions.to_csv(output_file)
             else:
@@ -194,21 +197,20 @@ def group_files_by_subfolder(files):
 
 
 def run_classification(model, files, config_data):
-    # Extract values from config file
-    inference_config = config_data.get("inference_settings", {})
+    # Extract values from config file (no defaults - require fields to exist)
+    inference_config = config_data["inference_settings"]
     logger.info(f"Inference Configuration: {inference_config}")
 
-    job_folder = config_data.get("job_folder")
+    job_folder = config_data["job_folder"]
 
-    out_name = (
-        "predictions.csv"
-        if config_data.get("sparse_save_threshold") is None
-        else "sparse_preds.pkl"
-    )
+    # Determine output filename based on sparse outputs configuration
+    sparse_outputs = config_data["sparse_outputs"]
+    sparse_enabled = sparse_outputs["enabled"]
+    out_name = "sparse_preds.pkl" if sparse_enabled else "predictions.csv"
     summary = {}
 
     # Check if we should split by subfolder
-    split_by_subfolder = config_data.get("split_by_subfolder", False)
+    split_by_subfolder = config_data["split_by_subfolder"]
 
     if split_by_subfolder:
         logger.info("Splitting inference task by subfolders")
@@ -239,6 +241,20 @@ def run_classification(model, files, config_data):
             output_files.append(str(output_file))
 
             # Run inference on this subset
+            # check if output file already exists; if so, skip
+            if output_file.exists():
+                logger.info(
+                    f"Output file {output_file} already exists; skipping inference for this subfolder"
+                )
+                all_results.append(
+                    {
+                        "subfolder": subfolder_name,
+                        "file_count": len(files_subset),
+                        "output_file": str(output_file),
+                        "status": "skipped",
+                    }
+                )
+                continue
             try:
                 predictions = run_inference(files_subset, model, config_data)
                 save_results(
@@ -283,11 +299,30 @@ def run_classification(model, files, config_data):
     else:
         # Run inference normally (single output)
         model_name = (
-            config_data.get("model")
-            if config_data.get("model_source", "bmz") == "bmz"
+            config_data["model"]
+            if config_data["model_source"] == "bmz"
             else "local model"
         )
         logger.info(f"Starting inference with model: {model_name}")
+
+        # Define output file path
+        output_file = Path(job_folder) / out_name
+
+        # Check if output file already exists (resume mode)
+        if output_file.exists():
+            logger.info(f"Output file {output_file} already exists; skipping inference")
+            summary.update(
+                {
+                    "split_by_subfolder": False,
+                    "total_files": len(files),
+                    "output_file": str(output_file),
+                    "status": "skipped",
+                    "files_processed": 0,
+                }
+            )
+            print(json.dumps(summary))
+            return
+
         # Show progress
         total_files = len(files)
         logger.info(f"Progress: 0% (0/{total_files})")
@@ -298,9 +333,8 @@ def run_classification(model, files, config_data):
             progress=0,
             message=f"Processing {total_files} audio files",
         )
-        predictions = run_inference(files, model, config_data)
 
-        output_file = Path(job_folder) / out_name
+        predictions = run_inference(files, model, config_data)
         save_results(predictions, output_file, config_data)
 
         # summary of task completed
@@ -400,7 +434,7 @@ def main():
     config_data = load_config_file(args.config, logger=logger)
 
     # Get job folder for status updates
-    job_folder = Path(config_data.get("job_folder"))
+    job_folder = Path(config_data["job_folder"])
 
     try:
 
@@ -429,7 +463,7 @@ def main():
         )
         model = load_model(config_data, logger)
 
-        logger.info(f"Output directory: {config_data.get('output_dir')}")
+        logger.info(f"Output directory: {config_data['output_dir']}")
 
         # missing_files = [f for f in files if not os.path.exists(f)]
         # if missing_files:
@@ -437,15 +471,16 @@ def main():
         #     raise FileNotFoundError(f"Missing {len(missing_files)} files")
 
         # Save config to the output directory
-        job_dir = Path(config_data.get("job_folder"))
+        job_dir = Path(config_data["job_folder"])
         config_save_path = job_dir / "inference_config.json"
         Path(config_save_path).parent.mkdir(parents=True, exist_ok=True)
         with open(config_save_path, "w") as f:
             json.dump(config_data, f, indent=4)
 
         # Run on a small subset of data if specified
-        if "subset_size" in config_data and config_data["subset_size"] is not None:
-            subset_size = min(config_data["subset_size"], len(files))
+        testing_mode = config_data["testing_mode"]
+        if testing_mode["enabled"] and testing_mode["subset_size"] is not None:
+            subset_size = min(testing_mode["subset_size"], len(files))
             logger.info(f"Using a SUBSET of {subset_size} files as a test run")
             files = np.random.choice(files, size=subset_size, replace=False).tolist()
         else:

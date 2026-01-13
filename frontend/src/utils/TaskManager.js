@@ -272,12 +272,18 @@ class TaskManager {
       // Update progress
       this.updateTask(task.id, { progress: 'Preparing configuration...' });
 
-      // Create job folder and output paths with unique name
-      const jobFolderName = await this.generateUniqueJobFolderName(config.output_dir, task.name);
-      const jobFolder = config.output_dir ? `${config.output_dir}/${jobFolderName}` : '';
-
-      // Determine output file based on sparse threshold setting
-      const isSparseOutput = config.sparse_save_threshold !== null && config.sparse_save_threshold !== undefined;
+      // If resuming a task, use the existing job folder
+      // Otherwise, create a new job folder with unique name
+      let jobFolder;
+      if (config.job_folder) {
+        // Resume mode: use existing job folder
+        jobFolder = config.job_folder;
+        this.updateTask(task.id, { progress: 'Resuming task in existing folder...' });
+      } else {
+        // Normal mode: create new unique job folder
+        const jobFolderName = await this.generateUniqueJobFolderName(config.output_dir, task.name);
+        jobFolder = config.output_dir ? `${config.output_dir}/${jobFolderName}` : '';
+      }
 
       const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
       const logFilePath = jobFolder ? `${jobFolder}/inference_log.txt` : '';
@@ -285,22 +291,36 @@ class TaskManager {
       // Create temporary config file
       const tempConfigPath = `/tmp/inference_config_${processId}.json`;
       const configData = {
+        task_name: task.name,
         model_source: config.model_source || 'bmz',
         model: config.model,
         files: config.files || [],
         file_globbing_patterns: config.file_globbing_patterns || [],
         file_list: config.file_list || '',
+        file_selection_mode: config.file_selection_mode || 'files',
+        selected_extensions: config.selected_extensions || ['wav', 'mp3', 'flac'],
+        glob_patterns_text: config.glob_patterns_text || '',
         output_dir: config.output_dir,
-        sparse_save_threshold: config.sparse_save_threshold || null,
         job_folder: jobFolder,
         config_output_path: configJsonPath,
         log_file_path: logFilePath,
         split_by_subfolder: config.split_by_subfolder || false,
-        subset_size: config.testing_mode_enabled ? config.subset_size : null,
         inference_settings: {
           clip_overlap: config.overlap || 0.0,
           batch_size: config.batch_size || 1,
           num_workers: config.worker_count || 1
+        },
+        sparse_outputs: {
+          enabled: config.sparse_outputs_enabled || false,
+          threshold: config.sparse_save_threshold || -3.0
+        },
+        python_environment: {
+          use_custom: config.use_custom_python_env || false,
+          custom_path: config.custom_python_env_path || ''
+        },
+        testing_mode: {
+          enabled: config.testing_mode_enabled || false,
+          subset_size: config.subset_size || 10
         }
       };
 

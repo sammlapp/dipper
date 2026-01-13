@@ -42,10 +42,12 @@ body {
 .MuiFormControl-root,
 .MuiTypography-root,
 .MuiButton-root,
+.MuiTab-root,
 .MuiListItemText-root {
   font-family: 'Rokkitt', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
   font-size: 0.85rem !important;
 }
+
 
 /* MUI Select styling to match app */
 .MuiSelect-select {

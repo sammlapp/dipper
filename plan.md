@@ -8,15 +8,25 @@ take a close look at this codebase, especially documentation markdowns such as r
 - heavy python environment is built with conda-pack (inference, train scripts)
 - inference, train, extraction scripts run in separate processes and are tracked by task manager
 - these run with the built-in heavier conda env (downloaded on demand to application cache dir) unless the user specifies a custom python env to use
-- an annotation-only version of the app can be built
+- an annotation-only version of the app can be 
+- server mode: user clones github repo, runs install script, edits config file, launches server that can be accessed on web browser via port forwarding
 
 # Incomplete items / TODO /feature request
 
-Location to download pytorch-dipper-env from depends on current operating system
+Need to be able to resume inference task if interrupted: 
+- button in Inference Tab for "resume incomplete inference task"; separate from task creation form
+- user selects the config file associated with the incomplete task via file selection dialogue
+- Dipper uses the config file for the inference parameterization and to know which output folder results should be saved to
+- instead of making a new folder for the job's outputs, Dipper will add additional outputs to the selected folder
+- inference script skips inference/subfolder inference if the corresponding output predictions file already exists
+I implemented this behavior in inference.py with "if output_file.exists():..." for both subfolder prediction and prediction on everything together. So you just need to implement the frontend and functionality to "resume" by launching an inference job from selected config file of the incomplete task, where it continues using the same output folder instead of creating a new one. 
+Here's an example of the inference_config.json file that the user could select for resuming a task: 
+/Users/SML161/Downloads/Inference_BirdSetEfficientNetB1_-_2_files_-_182026_104626_AM
+note in particular the 'job_folder' field with the absolute path to the folder where outputs are saved. 
+
 - need to resovle issues with building conda-pack env for Windows
 
-Select custom model for inference! 
-
+test downloading/using default conda-pack env on linux! 
 
 Task status updates: "toast" notifications appear regardless of which tab you are viewing; go away after a few seconds or user can x it
 https://mui.com/material-ui/react-snackbar/
@@ -28,7 +38,14 @@ https://mui.com/material-ui/react-snackbar/
 
 ## known bugs
 
-Clip extraction: add "annotation" (if single-target) or "labels","annotation_status" (if multi-target) columns to the created csv so that the csv can be opened in the review tab. 
+in server mode, after creating csv file to save annotations to with SVAR dialogue, the dialogue doesn't close itself. User has to click cancel even though clicking save already successfully created the file. Or maybe there are two dialogues opening on top of each other. 
+
+"explore" failing to display audio clips (in server mode at least)
+(Error: Failed to load clip: Cannot read properties of undefined (reading 'toString'))
+
+not all components of config are re-loaded for extraction/inference/train config. Review for completeness. These are currently not retained/reloaded: task name, custom python environment
+
+Clip extraction: add "annotation" (if single-target) or "labels","annotation_status" (if multi-target) columns to the created csv so that the csv can be opened in the review tab. Tried to fix this but still not working? double check if it works now. 
 
 When app reloads, tasks are re-started; background tasks should continue and the app should simply check on their status when reopening. This implies that the task manager should have a cached on-disk record of active tasks.
 
@@ -50,6 +67,11 @@ current numeric form input fields are very bad, hard to type into and hard to us
 
 Extraction by subfolder: keep entire relative path of subfolder rather than just Path(audio_file).parent.name. That way, folder structures like project/recorder1/wavs/a.wav, project/recorder2/wavs/a.wav are maintained as distinct folders rather than looking like the same folder ("wavs")
 
+
+### server mode installation
+- should skip `npm install -g serve` if serve is already installed, this will avoid unnecessary permissions error for non-sudo user
+- lightweight_server is not included when cloning the repo; should we download it from github builds/other source? build it locally? (building locally requires creating conda env with relevant packages) can't just provide built executable because won't work across platforms 
+- to launch server in dev mode, the user needs a python env with relevant packages
 
 ## Intuitive workflows from task manager pane
 Completed tasks in task manager should have a button for the next step in the workflow:

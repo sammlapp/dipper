@@ -505,8 +505,9 @@ def start_inference_process(job_id, config_path, env_python_path):
         if log_file_path:
             # Ensure the directory exists
             os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-            # Open log file for writing
-            log_file = open(log_file_path, "w")
+            # Open log file for writing or appending (append if resuming existing task)
+            file_mode = "a" if os.path.exists(log_file_path) else "w"
+            log_file = open(log_file_path, file_mode)
             stdout_target = log_file
             stderr_target = (
                 subprocess.STDOUT
@@ -705,8 +706,9 @@ def start_training_process(job_id, config_path, env_python_path):
         if log_file_path:
             # Ensure the directory exists
             os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-            # Open log file for writing
-            log_file = open(log_file_path, "w")
+            # Open log file for writing or appending (append if resuming existing task)
+            file_mode = "a" if os.path.exists(log_file_path) else "w"
+            log_file = open(log_file_path, file_mode)
             stdout_target = log_file
             stderr_target = (
                 subprocess.STDOUT
@@ -792,8 +794,9 @@ def start_extraction_process(job_id, config_path, env_python_path):
         if log_file_path:
             # Ensure the directory exists
             os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-            # Open log file for writing
-            log_file = open(log_file_path, "w")
+            # Open log file for writing or appending (append if resuming existing task)
+            file_mode = "a" if os.path.exists(log_file_path) else "w"
+            log_file = open(log_file_path, file_mode)
             stdout_target = log_file
             stderr_target = (
                 subprocess.STDOUT
