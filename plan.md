@@ -31,47 +31,74 @@ Colors match coloring of tasks in task pane for running (started)/queued/cancele
 JT Larkin:
 - CGL stopping criterion for number of negative clips in bin
 
-Weldy:
-GCL: Sort by score without any stratification
+Matt Weldy:
+GCL should work without stratification; eg should be able to sort by score (be cautious: sorting could be slow for large set of clips; but maybe we don't really use clip tables that big)
 
-Chronister:
+Lauren Chronister:
 should not create annotation_status column when using binary annotation
-(creates it if you flip the UI to multi-class annotation, even if you don't add any annotations)
+(currently creates it if you flip the UI to multi-class annotation, even if you don't add any annotations)
 
 Davis Hines:
+- clip download from focus view (esp in remote mode)
 when you annotate, it continues playing the old clip even after youve selected a label with asdf-keys, which plays overtop of the other clip, which detracted from the softwares intended function of fast review
 - I actually like this feature, but we could make it configurable
 
-would be nice to have a audacity esq bar that tranverses the entire spectrogram to visualize what part of clip is playing (visual scroll bar; this exists in 
-would be nice to have arrow key functionality
-would be nice to have multi selection feature (shift-click)
+would be nice to have a audacity esq bar that tranverses the entire spectrogram to visualize what part of clip is playing (vertical scroll bar shows playback position; this exists in focus mode already)
+would be nice to have arrow key functionality to navigate active clip (j/k navigate next/previous, but arrows navigate up/down/left/right for active clip in grid mode)
+
+would be nice to have multi selection feature (shift-click) to annotate a string of clips with the same label
+
+Santiago:
+frequency axis kHz ticks and tick labels on spectrograms
+- configurable to show/hide
+configurable color for referecne frequency line
+
+Louis/Lauren/lab:
+- alternative multi-class annotation mode: button for each class, click for present (green)/not (grey), or to be most general, click through yes/no/uncertain/unlabeled on each class
+- the latter suggests an extension of binary annotation mode where you add a multi-select for each class; settings panel choose column(s) for annotation
+
+### Allowing multiple active clips in grid mode:
+Selection:
+- if user holds shift and clicks clip other than active clip, all clips between them inclusive become active (in displayed order)
+- if user holds ctrl/cmd while clicking a clip, the clicked clip is added to the set of currently active clips
+- if a user clicks a clip without cmd/ctrl or shift held, that clip becomes the only active clip
+Display:
+- when multiple clips are active, active clip border-glow changes color and playback is disabled; all selected clips show the border-glow to indicate they are selected
+Annotation:
+when multiple clips are active, changes made to the annotations of any single clip are applied to all active clips
+Binary mode: annotating A/S/D/F or clicking yes/no/uncertain/unlabeled applies this label to all active clips
+Multiclass mode: adding or removing a class adds/removes the class from all active clips; changes to annotation status segmented control are applied to all active clips
 
 ## known bugs
 
-in server mode, after creating csv file to save annotations to with SVAR dialogue, the dialogue doesn't close itself. User has to click cancel even though clicking save already successfully created the file. Or maybe there are two dialogues opening on top of each other. 
+in server mode, new file dialogue to save the csv of annotations opens three dialogues on top of eachother, such that once use speifies file once there are still two open windows. SHould only show one window. 
 
 "explore" failing to display audio clips (in server mode at least)
 (Error: Failed to load clip: Cannot read properties of undefined (reading 'toString'))
 
-Clip extraction: add "annotation" (if single-target) or "labels","annotation_status" (if multi-target) columns to the created csv so that the csv can be opened in the review tab. Tried to fix this but still not working
+Clip extraction: add "annotation" (if single-target) or "labels","annotation_status" (if multi-target) columns to the created csv so that the csv can be opened in the review tab. I tried to fix this but it is still not actually exporting csvs with these columns. 
 
 When app reloads, tasks are re-started; background tasks should continue and the app should simply check on their status when reopening. This implies that the task manager should have a cached on-disk record of active tasks.
 
-When task is restarted from task manager, two issues with tracking info:
+After clicking 'restart' task from task manager, two issues with tracking info in task manager panels:
 - error messages from previous task are still shown
 - time is incorrect negative value
 
-server mode SVAR dialogue when selecting a _folder_: works if you click on a folder in the current view; but if you open a folder and have nothing selected, you should be able to complete the dialogue by clicking "Select Current Folder" to choose the current folder you are viewing at that moment. 
+server mode SVAR dialogue when selecting a _folder_: works if you click on a folder in the current view; but if you open a folder and have nothing selected, you should be able to choose the current folder you are within at that moment as the selected folder. This actually does work in some folder selection dialogues but not in all of them. 
 
 Training is failing 
 
-Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl+s doesn't work for save (applies the No label instead, which should be the S shortcut but not ctrl/cmd + S)
+Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl+s doesn't work for save (applies the No label instead, which should be used fors the S shortcut but not ctrl/cmd + S)
 
 current numeric form input fields are very bad, hard to type into and hard to use buttons to change values; sometimes typing a new value doesn't correctly replace the old value. Use the Material UI Spinner element for numeric configuration fields, or something equivalently simple and easy to interact with that doesn't add complexity to the codebase.  
 
 Extraction by subfolder: keep entire relative path of subfolder rather than just `Path(audio_file).parent.name`. That way, folder structures like project/recorder1/wavs/a.wav, project/recorder2/wavs/a.wav are maintained as distinct folders rather than looking like the same folder ("wavs")
 
-server mode port specification turned out to be a hassle. the frontend and backend ports should instead by automatically selected to be on an unused port, and clearly reported so that the user can see which ports are being used. 
+Automatic port selection updates for server and local modes:
+Manual server mode port specification turned out to be a hassle. The frontend and backend ports should instead be automatically selected to be on an unused port, and clearly reported once running so that the user can see which ports are being used. This avoids accidental conflicts with overlapping ports. 
+Similarly, I don't want local mode to default to using port 8000. Currently, it checks if 8000 is a dipper server, if so uses it, if not finds an open port to run Dipper backend. Instead, should always launch the dipper backend on an open port. The reason the current behavior is a problem: user could be forwarding remote Dipper backend to port 8000, and also trying to run a separate instance of Dipper in local mode. The local mode should create its own local dipper backend on a unique port rather than using the 8000 port which happens to be a different Dipper instance. Despite this behavior, dev mode (npm run tauri:dev) should look for the backend running on the default 8000 port. 
+
+(BUT!! this makes me wonder: should we allow the set up of user launching local dipper, connecting to remote backend dipper port (eg 8001), then use server-mode file selection and essentially be running local app that runs tasks on the remote?)
 
 ### server mode installation
 - should skip `npm install -g serve` if serve is already installed, this will avoid unnecessary permissions error for non-sudo user

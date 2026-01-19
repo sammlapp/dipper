@@ -1945,31 +1945,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
 
   const handleSaveAs = async () => {
     try {
-      // Use functional setState to ensure we have the most current state
-      const saveAsWithCurrentState = (currentData, currentSettings) => {
-        return new Promise(async (resolve, reject) => {
-          try {
-            await handleSaveAsWithData(currentData, currentSettings);
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
-        });
-      };
-
-      // Access current state using functional setState pattern - get both data and settings
-      setAnnotationData(currentData => {
-        // Use functional setState to get current settings too
-        setSettings(currentSettings => {
-          saveAsWithCurrentState(currentData, currentSettings).catch(err => {
-            console.error('Save As failed:', err);
-            setError('Failed to export annotations: ' + err.message);
-          });
-          return currentSettings; // Don't modify the settings
-        });
-        return currentData; // Don't modify the data
-      });
+      // Simply use current state values directly
+      // The nested setState pattern was causing multiple calls
+      await handleSaveAsWithData(annotationData, settings);
     } catch (err) {
+      console.error('Save As failed:', err);
       setError('Failed to export annotations: ' + err.message);
     }
   };
