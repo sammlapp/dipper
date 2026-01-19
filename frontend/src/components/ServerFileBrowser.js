@@ -234,8 +234,17 @@ const ServerFileBrowser = ({
           : `${currentPath}/${saveFilename.trim()}`;
         onSelect(savePath);
       }
+    } else if (mode === 'folder') {
+      // Folder selection mode
+      if (selected.length > 0) {
+        // User selected specific folder(s)
+        onSelect(multiple ? selected : selected[0]);
+      } else {
+        // No selection: use current directory
+        onSelect(currentPath);
+      }
     } else {
-      // File/folder selection mode
+      // File selection mode
       if (selected.length > 0) {
         onSelect(multiple ? selected : selected[0]);
       }
@@ -429,7 +438,7 @@ const ServerFileBrowser = ({
           disabled={
             mode === 'save'
               ? !saveFilename || !saveFilename.trim()
-              : selected.length === 0
+              : mode === 'file' && selected.length === 0
           }
         >
           {mode === 'save' ? 'Save' : 'Select'}

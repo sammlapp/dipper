@@ -1840,48 +1840,27 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     if (!autoSaveEnabled || !hasUnsavedChanges) return;
 
     try {
-      // Use functional setState to ensure we have the most current state
-      const autoSaveWithCurrentState = (currentData, currentSettings) => {
-        return new Promise(async (resolve) => {
-          try {
-            let saveLocation = currentSavePath;
+      let saveLocation = currentSavePath;
 
-            // If no save path set, open save dialog
-            if (!saveLocation) {
-              const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-              const defaultName = `annotations_${timestamp}.csv`;
+      // If no save path set, open save dialog
+      if (!saveLocation) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const defaultName = `annotations_${timestamp}.csv`;
 
-              saveLocation = await saveFile(defaultName);
-              if (saveLocation) {
-                setCurrentSavePath(saveLocation);
-              } else {
-                resolve(); // User cancelled save dialog
-                return;
-              }
-            }
+        saveLocation = await saveFile(defaultName);
+        if (saveLocation) {
+          setCurrentSavePath(saveLocation);
+        } else {
+          return; // User cancelled save dialog
+        }
+      }
 
-            if (saveLocation) {
-              const csvContent = exportToCSV(currentData, currentSettings);
-              await writeFile(saveLocation, csvContent);
-              setHasUnsavedChanges(false);
-              console.log('Auto-saved to:', saveLocation);
-            }
-          } catch (err) {
-            console.error('Auto-save failed:', err);
-          }
-          resolve();
-        });
-      };
-
-      // Access current state using functional setState pattern - get both data and settings
-      setAnnotationData(currentData => {
-        // Use functional setState to get current settings too
-        setSettings(currentSettings => {
-          autoSaveWithCurrentState(currentData, currentSettings);
-          return currentSettings; // Don't modify the settings
-        });
-        return currentData; // Don't modify the data
-      });
+      if (saveLocation) {
+        const csvContent = exportToCSV(annotationData, settings);
+        await writeFile(saveLocation, csvContent);
+        setHasUnsavedChanges(false);
+        console.log('Auto-saved to:', saveLocation);
+      }
     } catch (err) {
       console.error('Auto-save failed:', err);
     }
@@ -1889,41 +1868,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
 
   const handleSave = async () => {
     try {
-      // Use functional setState to ensure we have the most current state
-      const saveWithCurrentState = (currentData, currentSettings) => {
-        return new Promise(async (resolve, reject) => {
-          try {
-            // If we have a save path, use it directly
-            if (currentSavePath) {
-              const csvContent = exportToCSV(currentData, currentSettings);
-              await writeFile(currentSavePath, csvContent);
-              setHasUnsavedChanges(false);
-              console.log('Saved to:', currentSavePath);
-              resolve();
-              return;
-            }
+      // If we have a save path, use it directly
+      if (currentSavePath) {
+        const csvContent = exportToCSV(annotationData, settings);
+        await writeFile(currentSavePath, csvContent);
+        setHasUnsavedChanges(false);
+        console.log('Saved to:', currentSavePath);
+        return;
+      }
 
-            // No save path set, fall back to Save As behavior
-            await handleSaveAsWithData(currentData, currentSettings);
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
-        });
-      };
-
-      // Access current state using functional setState pattern - get both data and settings
-      setAnnotationData(currentData => {
-        // Use functional setState to get current settings too
-        setSettings(currentSettings => {
-          saveWithCurrentState(currentData, currentSettings).catch(err => {
-            console.error('Save failed:', err);
-            setError('Save failed: ' + err.message);
-          });
-          return currentSettings; // Don't modify the settings
-        });
-        return currentData; // Don't modify the data
-      });
+      // No save path set, fall back to Save As behavior
+      await handleSaveAsWithData(annotationData, settings);
     } catch (err) {
       console.error('Save failed:', err);
       setError('Save failed: ' + err.message);
