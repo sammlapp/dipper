@@ -223,14 +223,10 @@ def _format_sampled_clips(
         cols.extend(class_list)
     for _, row in df.iterrows():
         clip_data = row[cols].to_dict()
-        clip_data.update(
-            {
-                "class": class_name,
-                "method": method,
-            }
-        )
+        clip_data["method"] = method
         if class_name:
             clip_data["score"] = row[class_name]
+            clip_data["class"] = class_name
         if extras:
             clip_data.update(extras)
         selected_clips.append(clip_data)
@@ -653,8 +649,7 @@ def create_extraction_csvs(
         csv_data = []
         all_classes = config["class_list"]
 
-        for original_key, clip in unique_clips.items():
-            row = clip.to_dict()
+        for original_key, row in unique_clips.items():
             row.update(
                 {
                     "labels": "",  # Empty for user to fill
@@ -669,10 +664,10 @@ def create_extraction_csvs(
 
                 # Use extracted clip path and adjust times
                 file_path = f"clips/{audio_clip_mapping[original_key]}"
-                detection_center = (clip["start_time"] + clip["end_time"]) / 2
+                detection_center = (row["start_time"] + row["end_time"]) / 2
                 clip_duration = config.get("clip_duration")
-                clip_start = clip_duration / 2 - (detection_center - clip["start_time"])
-                clip_end = clip_duration / 2 + (clip["end_time"] - detection_center)
+                clip_start = clip_duration / 2 - (detection_center - row["start_time"])
+                clip_end = clip_duration / 2 + (row["end_time"] - detection_center)
 
                 clip_start = max(0, clip_start)
                 clip_end = min(clip_duration, clip_end)
@@ -683,9 +678,9 @@ def create_extraction_csvs(
                         "file": file_path,
                         "start_time": clip_start,
                         "end_time": clip_end,
-                        "original_file": clip["file"],
-                        "original_start_time": clip["start_time"],
-                        "original_end_time": clip["end_time"],
+                        "original_file": row["file"],
+                        "original_start_time": row["start_time"],
+                        "original_end_time": row["end_time"],
                     }
                 )
             else:
@@ -694,13 +689,13 @@ def create_extraction_csvs(
 
             # Add subfolder column if stratification by subfolder is enabled
             if config.get("stratification", {}).get("by_subfolder", False):
-                row["subfolder"] = clip.get("group", "")
+                row["subfolder"] = row.get("group", "")
 
             # Add columns for each class with actual scores (not empty strings)
             for class_name in all_classes:
-                if class_name in clip and clip[class_name] is not None:
+                if class_name in row and row[class_name] is not None:
                     # Use the actual classifier score for this class
-                    row[class_name] = clip[class_name]
+                    row[class_name] = row[class_name]
                 else:
                     # Empty string for user annotation if no score available
                     row[class_name] = ""
