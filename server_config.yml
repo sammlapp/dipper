@@ -10,7 +10,7 @@ server:
   host: 0.0.0.0
 
   # Port for Python backend (pyinstaller executable generating spectrograms/audio)
-  port: 8005
+  port: 8006
 
   # Port for static file server (React app)
   static_port: 3005

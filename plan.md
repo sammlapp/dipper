@@ -84,8 +84,6 @@ After clicking 'restart' task from task manager, two issues with tracking info i
 - error messages from previous task are still shown
 - time is incorrect negative value
 
-server mode SVAR dialogue when selecting a _folder_: works if you click on a folder in the current view; but if you open a folder and have nothing selected, you should be able to choose the current folder you are within at that moment as the selected folder. This actually does work in some folder selection dialogues but not in all of them. 
-
 Training is failing 
 
 Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl+s doesn't work for save (applies the No label instead, which should be used fors the S shortcut but not ctrl/cmd + S)

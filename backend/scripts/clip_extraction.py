@@ -214,6 +214,29 @@ def apply_filtering(
     return df
 
 
+def _format_sampled_clips(
+    df, method, class_name=None, multiclass=False, class_list=[], extras=None
+):
+    selected_clips = []
+    cols = ["file", "start_time", "end_time", "source_file"]
+    if multiclass:
+        cols.extend(class_list)
+    for _, row in df.iterrows():
+        clip_data = row[cols].to_dict()
+        clip_data.update(
+            {
+                "class": class_name,
+                "method": method,
+            }
+        )
+        if class_name:
+            clip_data["score"] = row[class_name]
+        if extras:
+            clip_data.update(extras)
+        selected_clips.append(clip_data)
+    return selected_clips
+
+
 def extract_random_clips(
     group_df: pd.DataFrame, class_list: List[str], config: Dict[str, Any]
 ) -> List[Dict]:
@@ -240,24 +263,16 @@ def extract_random_clips(
 
         # Sample random clips across all classes
         n_sample = min(count, len(valid_predictions))
-        sampled = valid_predictions.sample(n=n_sample, random_state=42)
+        sampled = valid_predictions.sample(n=n_sample)
 
-        for _, row in sampled.iterrows():
-            # Create clip data with individual class scores
-            clip_data = row.copy()
-            clip_data.update({
-                "file": row["file"],
-                "start_time": row["start_time"],
-                "end_time": row["end_time"],
-                "method": "random",
-            })
-
-            # Add individual class scores
-            for class_name in class_list:
-                if class_name in row:
-                    clip_data[class_name] = row[class_name]
-
-            selected_clips.append(clip_data)
+        selected_clips.extend(
+            _format_sampled_clips(
+                sampled,
+                method="random",
+                multiclass=True,
+                class_list=class_list,
+            )
+        )
 
     else:  # binary mode
         # For binary: select N clips per class (original behavior)
@@ -275,22 +290,13 @@ def extract_random_clips(
 
             # Sample random clips
             n_sample = min(count, len(class_predictions))
-            sampled = class_predictions.sample(n=n_sample, random_state=42)
+            sampled = class_predictions.sample(n=n_sample)
 
-            for _, row in sampled.iterrows():
-                clip_data = row.copy()
-                clip_data.update({
-                    "class": class_name,
-                    "method": "random",
-                    "score": row[class_name],
-                })
-
-                # Add individual class scores
-                for class_name in class_list:
-                    if class_name in row:
-                        clip_data[class_name] = row[class_name]
-
-                selected_clips.append(clip_data)
+            selected_clips.extend(
+                _format_sampled_clips(
+                    sampled, method="random", class_name=class_name, multiclass=False
+                )
+            )
 
     logging.info(f"Random extraction: selected {len(selected_clips)} clips")
     return selected_clips
@@ -342,27 +348,20 @@ def extract_score_bin_stratified(
 
             # Sample from this bin
             n_sample = min(count_per_bin, len(bin_predictions))
-            sampled = bin_predictions.sample(n=n_sample, random_state=42)
+            sampled = bin_predictions.sample(n=n_sample)
 
-            for _, row in sampled.iterrows():
-                clip_data = row.copy()
-                clip_data.update({
-                    "method": f"score_bin_{bin_start}-{bin_end}",
-                    "percentile_bin": [bin_start, bin_end],
-                })
-
-                if extraction_mode == "binary":
-                    # For binary mode, keep original format
-                    clip_data["class"] = class_name
-                    clip_data["score"] = row[class_name]
-                else:
-                    # For multiclass mode, store individual class scores directly
-                    for class_name_inner in class_list:
-                        if class_name_inner in row:
-                            clip_data[class_name_inner] = row[class_name_inner]
-
-                selected_clips.append(clip_data)
-
+            selected_clips.extend(
+                _format_sampled_clips(
+                    sampled,
+                    method=f"score_bin_{bin_start}-{bin_end}",
+                    class_name=class_name,
+                    multiclass=(extraction_mode == "multiclass"),
+                    class_list=class_list,
+                    extras={
+                        "score_percentile_bin": [bin_start, bin_end],
+                    },
+                )
+            )
     logging.info(f"Score-bin extraction: selected {len(selected_clips)} clips")
     return selected_clips
 
@@ -391,29 +390,15 @@ def extract_highest_scoring(
         # Take top N
         n_sample = min(count, len(class_predictions))
         top_clips = class_predictions.head(n_sample)
-
-        for _, row in top_clips.iterrows():
-            clip_data = row.copy()
-            clip_data.update({
-                "method": "highest_scoring",
-            })
-
-            if extraction_mode == "binary":
-                # For binary mode, keep original format
-                clip_data["class"] = class_name
-                clip_data["score"] = row[class_name]
-                clip_data["all_scores"] = (
-                    row[class_list].to_dict()
-                    if all(c in row for c in class_list)
-                    else {}
-                )
-            else:
-                # For multiclass mode, store individual class scores directly
-                for class_name_inner in class_list:
-                    if class_name_inner in row:
-                        clip_data[class_name_inner] = row[class_name_inner]
-
-            selected_clips.append(clip_data)
+        selected_clips.extend(
+            _format_sampled_clips(
+                top_clips,
+                method="highest_scoring",
+                class_name=class_name,
+                multiclass=(extraction_mode == "multiclass"),
+                class_list=class_list,
+            )
+        )
 
     logging.info(f"Highest scoring extraction: selected {len(selected_clips)} clips")
     return selected_clips
@@ -591,11 +576,13 @@ def create_extraction_csvs(
             csv_data = []
             for clip in clips:
                 original_key = f"{clip['file']}_{clip['start_time']}_{clip['end_time']}"
-                extracted_clip_info = clip.copy()
-                extracted_clip_info.update({
-                    "annotation": "",  # Empty for user to fill
-                })
-                
+                extracted_clip_info = clip.to_dict()
+                extracted_clip_info.update(
+                    {
+                        "annotation": "",  # Empty for user to fill
+                    }
+                )
+
                 if (
                     config.get("export_audio_clips", False)
                     and original_key in audio_clip_mapping
@@ -629,7 +616,6 @@ def create_extraction_csvs(
                     # Use original file path and times
                     # start and end refer to the clip's offset from full audio file
                     pass
-                    
 
                 # Add subfolder column if stratification by subfolder is enabled
                 if config.get("stratification", {}).get("by_subfolder", False):
@@ -668,17 +654,19 @@ def create_extraction_csvs(
         all_classes = config["class_list"]
 
         for original_key, clip in unique_clips.items():
-            row = clip.copy()
-            row.update({
-                "labels": "",  # Empty for user to fill
-                "annotation_status": "",  # Empty for user to fill
-            })
-            
+            row = clip.to_dict()
+            row.update(
+                {
+                    "labels": "",  # Empty for user to fill
+                    "annotation_status": "",  # Empty for user to fill
+                }
+            )
+
             if (
                 config.get("export_audio_clips", False)
                 and original_key in audio_clip_mapping
             ):
-                
+
                 # Use extracted clip path and adjust times
                 file_path = f"clips/{audio_clip_mapping[original_key]}"
                 detection_center = (clip["start_time"] + clip["end_time"]) / 2
@@ -703,7 +691,6 @@ def create_extraction_csvs(
             else:
                 # Use original file path and times
                 pass
-
 
             # Add subfolder column if stratification by subfolder is enabled
             if config.get("stratification", {}).get("by_subfolder", False):
