@@ -13,7 +13,9 @@ take a close look at this codebase, especially documentation markdowns such as r
 
 # Incomplete items / TODO /feature request
 
-- need to resovle issues with building conda-pack env for Windows
+WandB integration: need to allow user to provide API key and configure group name and project name for a run. Run name should match the dipper run name. 
+
+- need to resolve issues with building conda-pack env for Windows
 
 test downloading/using default conda-pack env on linux! (updated conda pack env; need to rerun github runner and re-upload to onedrive)
 
@@ -27,7 +29,15 @@ Colors match coloring of tasks in task pane for running (started)/queued/cancele
 - [task name] failed (task type) (red)
 - [task name] canceled (task type) (yellow)
 
+Task manager status updates for training tasks: similar to inference tasks, status updates during training should be posted to .status file in the job output folder and read by the task manager to show the user a useful message about the current status/progress of training. Currently always just says training task is still running
+
 ### User feature requests
+
+** Download clip (in server mode)  **
+
+Jeff Larkin: 
+- ecological inference, basics like map, modelled occupancy in two treatment groups 
+
 JT Larkin:
 - CGL stopping criterion for number of negative clips in bin
 
@@ -57,6 +67,8 @@ Louis/Lauren/lab:
 - alternative multi-class annotation mode: button for each class, click for present (green)/not (grey), or to be most general, click through yes/no/uncertain/unlabeled on each class
 - the latter suggests an extension of binary annotation mode where you add a multi-select for each class; settings panel choose column(s) for annotation
 
+Filter (min,max) and sort by continuous score column in Review mode. 
+
 ### Allowing multiple active clips in grid mode:
 Selection:
 - if user holds shift and clicks clip other than active clip, all clips between them inclusive become active (in displayed order)
@@ -69,9 +81,22 @@ when multiple clips are active, changes made to the annotations of any single cl
 Binary mode: annotating A/S/D/F or clicking yes/no/uncertain/unlabeled applies this label to all active clips
 Multiclass mode: adding or removing a class adds/removes the class from all active clips; changes to annotation status segmented control are applied to all active clips
 
-## known bugs
+### minimum features for shallow training:
+load class list from file or type in manually
+save and load classifier
+compute and save embeddings
+apply classifier to pre-computed embeddings
 
-in server mode, new file dialogue to save the csv of annotations opens three dialogues on top of eachother, such that once use speifies file once there are still two open windows. SHould only show one window. 
+additional features: bandpass range; clip duration; audio stretch factor;
+
+save best model predictions and labels for validation set in output dir
+save publication-ready metrics summary and visualization as html in output dir
+
+## known bugs
+BRG: aiohttp_cors missing as dependency for server mode (not sure why, its listed in requirements so should be installed during install-server.sh)
+BRG: "when I try to selected a dir for my annotation file I run into 
+Error loading directory: Unexpected token '<', "<!DOCTYPE "... is not valid JSON 
+and it doesn't display any screech directories"
 
 "explore" failing to display audio clips (in server mode at least)
 (Error: Failed to load clip: Cannot read properties of undefined (reading 'toString'))
@@ -84,24 +109,31 @@ After clicking 'restart' task from task manager, two issues with tracking info i
 - error messages from previous task are still shown
 - time is incorrect negative value
 
-Training is failing 
-
 Windows shortcuts: ctrl+shift+K doesn't work for next unannotated clip, and ctrl+s doesn't work for save (applies the No label instead, which should be used fors the S shortcut but not ctrl/cmd + S)
 
 current numeric form input fields are very bad, hard to type into and hard to use buttons to change values; sometimes typing a new value doesn't correctly replace the old value. Use the Material UI Spinner element for numeric configuration fields, or something equivalently simple and easy to interact with that doesn't add complexity to the codebase.  
 
-Extraction by subfolder: keep entire relative path of subfolder rather than just `Path(audio_file).parent.name`. That way, folder structures like project/recorder1/wavs/a.wav, project/recorder2/wavs/a.wav are maintained as distinct folders rather than looking like the same folder ("wavs")
+Extraction and inference by subfolder: keep entire relative path of subfolder rather than just `Path(audio_file).parent.name`. That way, folder structures like project/recorder1/wavs/a.wav, project/recorder2/wavs/a.wav are maintained as distinct folders rather than looking like the same folder ("wavs")
 
 Automatic port selection updates for server and local modes:
 Manual server mode port specification turned out to be a hassle. The frontend and backend ports should instead be automatically selected to be on an unused port, and clearly reported once running so that the user can see which ports are being used. This avoids accidental conflicts with overlapping ports. 
-Similarly, I don't want local mode to default to using port 8000. Currently, it checks if 8000 is a dipper server, if so uses it, if not finds an open port to run Dipper backend. Instead, should always launch the dipper backend on an open port. The reason the current behavior is a problem: user could be forwarding remote Dipper backend to port 8000, and also trying to run a separate instance of Dipper in local mode. The local mode should create its own local dipper backend on a unique port rather than using the 8000 port which happens to be a different Dipper instance. Despite this behavior, dev mode (npm run tauri:dev) should look for the backend running on the default 8000 port. 
 
-(BUT!! this makes me wonder: should we allow the set up of user launching local dipper, connecting to remote backend dipper port (eg 8001), then use server-mode file selection and essentially be running local app that runs tasks on the remote?)
+Similarly, I don't want local mode to default to using port 8000. Currently, it checks if 8000 is a dipper server, if so uses it, if not finds an open port to run Dipper backend. Instead, should always launch the dipper backend on an open port. The reason the current behavior is a problem: user could be forwarding remote Dipper backend to port 8000, and also trying to run a separate instance of Dipper in local mode. The local mode should create its own local dipper backend on a unique port rather than using the 8000 port which happens to be a different Dipper instance. Despite this behavior, dev mode (npm run tauri:dev) _should_ look for the backend running on the default 8000 port because this allows rapid dev iteration. 
 
 ### server mode installation
 - should skip `npm install -g serve` if serve is already installed, this will avoid unnecessary permissions error for non-sudo user
 - lightweight_server is not included when cloning the repo; should we download it from github builds/other source? build it locally? (building locally requires creating conda env with relevant packages) can't just provide built executable because won't work across platforms 
 - to launch server in dev mode, the user needs a python env with relevant packages
+
+## Training mode in progress updates
+HopLite: update to v1.0 api, OpenSoundscape v0.13.0 API, and corresponding BMZ, before working on the hoplite integration further. 
+ 
+can we simplify and make the training configuration workflow (save, load, submit task) more robust by avoiding the need to hard code every argument? 
+
+in progress: 
+In @backend/scripts/train_model.py I implemented two different training modes, train_on_audio and train_on_embeddings. Training configuration panel should allow user to pick between these two modes as an additional option. If train_on_embeddings is selected, there is an additional checkbox for "Use existing Hoplite Embedding Database" and when checked, there is a folder selection button "Select existing HopLite DB (folder) to set the config variable "hoplite_db_path". This variable is used within the train_model.py script to load an existing embedding database. If not checked, a different button is shown for "New HopLite DB Folder", this looks like a file save dialogue but the returned value is still set as "hoplite_db_path" in the config and no new files are created yet. The train_model.py script will create a hoplite database folder at the specified folder. 
+- UI is implemented, need similar for inference tab; but need to update backend scripts for HopLite 1.0 and OPSO 0.13.0, and haven't quite finished merging these changes into opso dev/main yet! 
+
 
 ## Intuitive workflows from task manager pane
 Completed tasks in task manager should have a button for the next step in the workflow:

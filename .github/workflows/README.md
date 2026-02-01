@@ -29,7 +29,6 @@ This directory contains automated build workflows for Dipper across multiple pla
 
 **What it builds:**
 1. **PyInstaller Backend** (all platforms)
-   - macOS Intel (x64)
    - macOS Apple Silicon (arm64)
    - Windows (x64)
    - Linux (x64)
@@ -215,11 +214,9 @@ You can manually trigger builds from the GitHub Actions tab:
 ### Review-Only Build
 ```
 artifacts/
-├── lightweight_server-macos-x64/
 ├── lightweight_server-macos-arm64/
 ├── lightweight_server-windows-x64/
 ├── lightweight_server-linux-x64/
-├── dipper-review-macos-x64-dmg/
 ├── dipper-review-macos-arm64-dmg/
 ├── dipper-review-windows-x64-installer/
 └── dipper-review-linux-x64-appimage/
@@ -228,7 +225,6 @@ artifacts/
 ### Full App Build
 ```
 artifacts/
-├── lightweight_server-macos-x64/
 ├── lightweight_server-macos-arm64/
 ├── lightweight_server-windows-x64/
 ├── lightweight_server-linux-x64/
@@ -239,9 +235,6 @@ artifacts/
 ├── conda-env-macos-arm64/
 ├── conda-env-windows-x64/
 ├── conda-env-linux-x64/
-├── dipper-full-macos-x64/
-│   ├── *.dmg
-│   └── dipper_pytorch_env.tar.gz
 ├── dipper-full-macos-arm64/
 ├── dipper-full-windows-x64/
 └── dipper-full-linux-x64/

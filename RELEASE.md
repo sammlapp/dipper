@@ -38,7 +38,6 @@ git push origin v0.0.6
 
 | Platform | Architecture | Output Format |
 |----------|-------------|---------------|
-| macOS | Intel (x64) | DMG |
 | macOS | Apple Silicon (arm64) | DMG |
 | Windows | x64 | NSIS Installer (EXE) |
 | Linux | x64 | AppImage |
@@ -105,7 +104,6 @@ git push origin v0.0.6
 
 ### Review-Only Release Files
 ```
-Dipper-Review-0.0.6-x64.dmg              # macOS Intel
 Dipper-Review-0.0.6-arm64.dmg            # macOS ARM
 Dipper-Review-0.0.6-x64-setup.exe        # Windows
 Dipper-Review-0.0.6-x64.AppImage         # Linux
@@ -113,11 +111,9 @@ Dipper-Review-0.0.6-x64.AppImage         # Linux
 
 ### Full App Release Files
 ```
-Dipper-0.0.6-x64.dmg                     # macOS Intel
 Dipper-0.0.6-arm64.dmg                   # macOS ARM
 Dipper-0.0.6-x64-setup.exe               # Windows
 Dipper-0.0.6-x64.AppImage                # Linux
-dipper_pytorch_env-macos-x64.tar.gz      # ML env macOS Intel
 dipper_pytorch_env-macos-arm64.tar.gz    # ML env macOS ARM
 dipper_pytorch_env-windows-x64.tar.gz    # ML env Windows
 dipper_pytorch_env-linux-x64.tar.gz      # ML env Linux

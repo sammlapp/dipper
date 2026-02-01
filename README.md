@@ -1,4 +1,4 @@
-# Bioacoustics Training GUI
+# Dipper - Bioacoustics ML Application
 
 A cross-platform desktop application for bioacoustics machine learning with active learning capabilities. Built with Tauri and React for the frontend, and Python for the ML backend.
 
@@ -6,187 +6,96 @@ A cross-platform desktop application for bioacoustics machine learning with acti
 
 - **Species Detection Inference**: Run pre-trained models from the bioacoustics model zoo
 - **Model Training**: Train custom models with your own data
+- **Clip Extraction**: Create annotation tasks from detection results
 - **Data Exploration**: Visualize and explore detection results
+- **Review & Annotation**: Annotate audio clips with binary or multi-class labels
 - **Active Learning**: Iteratively improve models with human feedback
-- **Cross-Platform**: Works on Mac, Windows, and Linux
+- **Cross-Platform**: Works on macOS (ARM), Windows, and Linux
 
 ## Project Structure
 
 ```
-training_gui/
-├── frontend/              # Electron + React desktop app
+dipper/
+├── frontend/              # Tauri + React desktop app
 │   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── electron/      # Electron main process
-│   │   └── App.js         # Main React app
-│   ├── public/            # Static assets
-│   └── package.json       # Frontend dependencies
+│   │   ├── components/    # React components (tabs, UI elements)
+│   │   └── utils/         # TaskManager, utilities
+│   ├── src-tauri/         # Tauri Rust backend
+│   ├── python-dist/       # PyInstaller backend executable
+│   └── package.json
 ├── backend/               # Python ML processing
-│   ├── scripts/           # Python scripts for ML operations
-│   └── requirements.txt   # Python dependencies
-├── configs/               # Configuration files
-├── models/                # Model storage
-├── environments/          # Bundled Python environments
-└── build/                 # Build outputs
+│   ├── lightweight_server.py  # HTTP server (aiohttp)
+│   ├── scripts/           # ML task scripts (inference, training, etc.)
+│   ├── build_pyinstaller.py   # Build standalone server
+│   └── requirements-lightweight.txt
+└── .github/workflows/     # CI/CD for releases
 ```
 
-## Development Setup
+## Quick Start
 
 ### Prerequisites
 
-- Node.js (v16+)
-- Python (3.8+)
-- Git
+- **Node.js** (v18+)
+- **Python** (3.9+)
+- **Rust** (required for Tauri) - see [Developer Setup](#developer-setup)
 
-### Frontend Setup
+### Running in Development
 
-1. Navigate to the frontend directory:
 ```bash
+# Install frontend dependencies
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
+
+# Run full dev mode (recommended)
+npm run tauri:dev:full
 ```
 
-3. Start the development server:
-```bash
-npm run dev
-```
+This starts the Python backend, React dev server with hot reload, and launches the Tauri desktop app.
 
-### Backend Setup
+### Building for Production
 
-1. Navigate to the backend directory:
-```bash
-cd backend
-```
-
-2. Create a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-### Running the Application
-
-#### Local Mode (Default)
-
-Start the desktop application:
 ```bash
 cd frontend
-npm run dev
+npm run tauri:build:all
 ```
 
-The application will open in a new desktop window with full functionality.
+Output: Platform-specific installers in `frontend/src-tauri/target/release/bundle/`
 
-#### Server Mode
+## Developer Setup
 
-Run on a remote machine and access via web browser. Perfect for:
+See [CLAUDE.md](CLAUDE.md) for comprehensive developer setup instructions including:
+- Platform-specific prerequisites (Windows, macOS, Linux)
+- Rust/Cargo installation
+- Backend Python environment setup
+- Development modes and commands
+- Troubleshooting common issues
+
+## Server Mode
+
+Run Dipper on a remote server and access via web browser. Useful for:
 - Running ML tasks on a remote GPU server
 - Accessing large datasets stored on remote machines
-- Working with audio files located on a server
-- Single-user remote access (no multi-user support)
+- Single-user remote access
 
-**Quick Start:**
-
-1. **Install (one-time setup):**
-   ```bash
-   git clone <repository-url>
-   cd training_gui
-   ./scripts/install-server.sh
-   ```
-
-2. **Configure:**
-   ```bash
-   # Edit server_config.yml to add your audio data directories
-   nano server_config.yml
-   ```
-
-3. **Launch:**
-   ```bash
-   # Starts both Python backend and React server
-   ./scripts/launch-server.sh
-   ```
-
-4. **Access from your laptop:**
-   ```bash
-   # Create SSH tunnel
-   ssh -L 3000:localhost:3000 -L 8000:localhost:8000 user@remote-server
-
-   # Open browser
-   open http://localhost:3000
-   ```
-
-**What's happening:**
-- Python backend (port 8000) - ML tasks and API
-- Static file server (port 3000) - React app
-- Single command manages both processes
-
-**Manual control (advanced):**
 ```bash
-# Terminal 1: Python backend
-cd backend
-source venv/bin/activate
-python lightweight_server.py --host 0.0.0.0 --port 8000
+# Quick start
+./scripts/launch-server.sh [config_file]
 
-# Terminal 2: Static server
-cd frontend
-npx serve -s build -p 3000
+# Access via SSH tunnel
+ssh -L 3000:localhost:3000 -L 8000:localhost:8000 user@remote-server
+open http://localhost:3000
 ```
 
-**Note:** Each Dipper instance supports one user at a time. For multiple users, run separate instances on different ports.
+See [QUICKSTART_SERVER.md](QUICKSTART_SERVER.md) for detailed server mode instructions.
 
-## Building for Production
+## Documentation
 
-### Frontend
-```bash
-cd frontend
-npm run build
-```
-
-### Backend
-The Python environment will be bundled with the application during the build process.
-
-## Usage
-
-### Running Inference
-
-1. Open the "Inference" tab
-2. Select a model from the bioacoustics model zoo
-3. Choose audio files or folders to process
-4. Configure inference settings
-5. Run the model and view results
-
-### Training Models
-
-1. Open the "Training" tab
-2. Prepare your training data in the expected folder structure
-3. Configure training parameters
-4. Start training and monitor progress
-5. Save and use your trained model
-
-### Exploring Data
-
-1. Open the "Explore Data" tab
-2. Load inference results (CSV files)
-3. Filter detections by score range
-4. Visualize species distributions
-5. Listen to audio samples
-
-## Configuration
-
-Settings are stored in JSON configuration files that can be saved and loaded. The application supports:
-
-- Inference settings (batch size, overlap, etc.)
-- Training parameters (learning rate, epochs, etc.)
-- Data augmentation settings
-- Model-specific configurations
+| Document | Description |
+|----------|-------------|
+| [CLAUDE.md](CLAUDE.md) | Primary developer reference - architecture, commands, patterns |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Detailed system architecture and API documentation |
+| [RELEASE.md](RELEASE.md) | Release process and versioning guide |
+| [QUICKSTART_SERVER.md](QUICKSTART_SERVER.md) | Server mode quick start guide |
 
 ## Models
 
@@ -199,25 +108,21 @@ The application integrates with the [bioacoustics model zoo](https://github.com/
 
 ## Dependencies
 
-### Frontend
-- Electron: Desktop app framework
-- React: UI framework
-- Material-UI: Component library
-- Plotly.js: Data visualization
+**Frontend:**
+- React 18, Material-UI 5, Tauri 2.x
 
-### Backend
-- PyTorch: Machine learning framework
-- OpenSoundscape: Bioacoustics processing
-- Bioacoustics Model Zoo: Pre-trained models
-- NumPy, Pandas: Data processing
+**Backend:**
+- Python 3.11, aiohttp, PyTorch, OpenSoundscape, librosa, pandas
+
+**Build:**
+- Tauri CLI, PyInstaller, conda-pack
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+4. Submit a pull request
 
 ## License
 

@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Note:** When making significant changes to the project (new features, architecture changes, setup requirements), also update [README.md](README.md) to keep the public-facing documentation current.
+
 ## Project Overview
 
 Dipper is a bioacoustics machine learning desktop application built with:
@@ -9,6 +11,53 @@ Dipper is a bioacoustics machine learning desktop application built with:
 - **Backend**: Python HTTP server (aiohttp) on port 8000
 - **Communication**: HTTP REST API (frontend → backend)
 - **ML Processing**: Separate Python subprocesses for inference, training, and extraction
+
+## Developer Setup
+
+### Prerequisites
+
+**All platforms:**
+- Git
+- Node.js (v18+)
+- Python (3.9+)
+- Rust and Cargo (required for Tauri)
+
+**Windows-specific:**
+1. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with "Desktop development with C++" workload
+2. Install [Rust](https://www.rust-lang.org/tools/install) via rustup-init.exe
+3. Restart terminal after installation
+
+**macOS-specific:**
+1. Install Xcode Command Line Tools: `xcode-select --install`
+2. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+
+**Linux-specific:**
+1. Install system dependencies:
+   ```bash
+   sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget libssl-dev libayatana-appindicator3-dev librsvg2-dev
+   ```
+2. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+
+### Initial Setup
+
+```bash
+# Clone and enter repository
+git clone <repository-url>
+cd dipper
+
+# Install frontend dependencies
+cd frontend
+npm install
+
+# Verify Rust/Cargo is available
+cargo --version
+
+# (Optional) Backend Python setup for running backend from source
+cd ../backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements-lightweight.txt
+```
 
 ## Quick Start Commands
 
@@ -276,6 +325,9 @@ The script automatically updates all files and shows next steps:
 See `scripts/README.md` for more details.
 
 ## Troubleshooting
+
+**Issue**: `npm run tauri:dev` fails with "cargo metadata" or "program not found"
+**Fix**: Rust/Cargo is not installed. See "Developer Setup > Prerequisites" above. On Windows, install Visual Studio Build Tools and Rust via rustup-init.exe, then restart your terminal.
 
 **Issue**: Tauri dev mode shows blank screen
 **Fix**: Ensure backend is running on port 8000. Try `npm run tauri:dev:full`
