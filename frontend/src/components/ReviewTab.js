@@ -751,7 +751,10 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         await loadAndProcessCSV(files[0], false); // false = not wide format
       }
     } catch (err) {
-      setError('Failed to select file: ' + err.message);
+      // Ignore cancel/no selection errors (undefined message or user cancelled)
+      if (err.message) {
+        setError('Failed to select file: ' + err.message);
+      }
     }
   };
 
@@ -763,7 +766,10 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         await loadAndProcessCSV(files[0], true); // true = wide format
       }
     } catch (err) {
-      setError('Failed to select file: ' + err.message);
+      // Ignore cancel/no selection errors (undefined message or user cancelled)
+      if (err.message) {
+        setError('Failed to select file: ' + err.message);
+      }
     }
   };
 
@@ -985,7 +991,12 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         console.error('Could not write to error log:', logErr);
       }
 
-      setError('Failed to load annotation task: ' + err.message);
+      // Check if this is a network error (backend not running)
+      if (err.message && err.message.includes('Failed to fetch')) {
+        setError('The backend Python server is not available. This may mean it is still booting (try again in a couple of minutes) or that there is a configuration error and Dipper is not launching correctly on your computer.');
+      } else {
+        setError('Failed to load annotation task: ' + err.message);
+      }
     } finally {
       setLoading(false);
     }

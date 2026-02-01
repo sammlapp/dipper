@@ -26,7 +26,7 @@ Output: `../dist/`
 
 #### Build for Specific Platforms
 
-**macOS (both Intel and ARM):**
+**macOS (ARM):**
 ```bash
 npm run dist:mac
 ```
@@ -34,11 +34,6 @@ npm run dist:mac
 **macOS (ARM/M1/M2 only):**
 ```bash
 npm run dist:mac-arm64
-```
-
-**macOS (Intel only):**
-```bash
-npm run dist:mac-x64
 ```
 
 **Windows:**
@@ -69,15 +64,11 @@ Output: `../dist-review/`
 npm run dist:review-mac
 ```
 
-**macOS (ARM/M1/M2 only):**
+**macOS (ARM only):**
 ```bash
 npm run dist:review-mac-arm64
 ```
 
-**macOS (Intel only):**
-```bash
-npm run dist:review-mac-x64
-```
 
 **Windows:**
 ```bash
@@ -122,7 +113,7 @@ Each build script performs the following steps:
 
 ### macOS
 - **ARM64** (Apple Silicon: M1, M2, M3)
-- **x64** (Intel processors)
+- (Intel processors x64 not supported)
 
 ### Windows
 - **x64** (64-bit Intel/AMD processors)

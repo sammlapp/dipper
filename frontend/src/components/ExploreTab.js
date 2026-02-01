@@ -153,7 +153,10 @@ function ExploreTab() {
         }
       }
     } catch (err) {
-      setError('Failed to select file: ' + err.message);
+      // Ignore cancel/no selection errors (undefined message or user cancelled)
+      if (err.message) {
+        setError('Failed to select file: ' + err.message);
+      }
     }
   };
 
