@@ -1468,7 +1468,7 @@ class LightweightServer:
             # Fill missing values
             df["id"] = list(range(len(df)))
             if "comments" in df.columns:
-                df["comments"].fillna("", inplace=True)
+                df["comments"]=df["comments"].fillna("")
             else:
                 df["comments"] = ""
 
@@ -1477,7 +1477,7 @@ class LightweightServer:
             # Priority: annotation column > labels column > wide format
             if "annotation" in df.columns:
                 # Binary classification format
-                df["annotation"].fillna("", inplace=True)
+                df["annotation"]=df["annotation"].fillna("")
                 df["annotation"] = df["annotation"].str.strip().str.lower()
 
                 # Validate annotation values
@@ -1507,7 +1507,7 @@ class LightweightServer:
             elif "labels" in df.columns:
                 # Multi-class with labels column
                 classes = set()
-                df["labels"].fillna("", inplace=True)
+                df["labels"]= df["labels"].fillna("")
 
                 # Parse labels
                 def parse_labels(x):
@@ -1540,7 +1540,7 @@ class LightweightServer:
                 if "annotation_status" not in df.columns:
                     df["annotation_status"] = "unreviewed"
                 else:
-                    df["annotation_status"].fillna("unreviewed", inplace=True)
+                    df["annotation_status"]=df["annotation_status"].fillna("unreviewed")
 
                 # Validate annotation_status
                 valid_statuses = ["complete", "unreviewed", "uncertain"]
