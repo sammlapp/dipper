@@ -28,6 +28,7 @@ class TaskManager {
     this.queue = [];
     this.runningTasks = new Set();
     this.listeners = new Set();
+    this.tempDir = null; // Cache for system temp directory
     this.loadSettings();
     this.loadTasks();
 
@@ -35,6 +36,35 @@ class TaskManager {
       this.loadSettings();
       this.processQueue();
     });
+  }
+
+  /**
+   * Get the system temporary directory from the backend
+   * Caches the result for subsequent calls
+   */
+  async getTempDir() {
+    if (this.tempDir) {
+      return this.tempDir;
+    }
+
+    try {
+      const backendUrl = await getBackendUrl();
+      const response = await fetch(`${backendUrl}/system/tempdir`);
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        this.tempDir = result.temp_dir;
+        return this.tempDir;
+      } else {
+        console.error('Failed to get temp directory:', result.error);
+        // Fallback to a reasonable default
+        return '/tmp';
+      }
+    } catch (error) {
+      console.error('Error fetching temp directory:', error);
+      // Fallback to a reasonable default
+      return '/tmp';
+    }
   }
 
   loadSettings() {
@@ -288,8 +318,9 @@ class TaskManager {
       const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
       const logFilePath = jobFolder ? `${jobFolder}/inference_log.txt` : '';
 
-      // Create temporary config file
-      const tempConfigPath = `/tmp/inference_config_${processId}.json`;
+      // Create temporary config file using system temp directory
+      const tempDir = await this.getTempDir();
+      const tempConfigPath = `${tempDir}/inference_config_${processId}.json`;
       const configData = {
         task_name: task.name,
         model_source: config.model_source || 'bmz',
@@ -505,10 +536,24 @@ class TaskManager {
       const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
       const logFilePath = jobFolder ? `${jobFolder}/train_log.txt` : '';
 
-      // Create temporary config file
-      const tempConfigPath = `/tmp/training_config_${processId}.json`;
+      // Create temporary config file using system temp directory
+      const tempDir = await this.getTempDir();
+      const tempConfigPath = `${tempDir}/training_config_${processId}.json`;
+
+      // Construct full hoplite_db_path for new databases
+      const fullHopliteDbPath = config.mode === 'train_on_embeddings' && config.hoplite_db_path
+        ? (config.use_existing_hoplite_db
+            ? config.hoplite_db_path
+            : `${config.hoplite_db_path}/${config.hoplite_db_name || 'hoplite_embeddings'}`)
+        : '';
+
       const configData = {
-        model: config.model || 'BirdNET',
+        mode: config.mode || 'train_on_audio',
+        model_source: config.model_source || 'bmz',
+        model: config.model_source === 'custom' ? 'Custom Architecture' : config.model,
+        cnn_architecture: config.cnn_architecture,
+        preprocessing: config.preprocessing,
+        hoplite_db_path: fullHopliteDbPath,
         class_list: config.class_list || [],
         fully_annotated_files: config.fully_annotated_files || [],
         single_class_annotations: config.single_class_annotations || [],
@@ -525,7 +570,11 @@ class TaskManager {
           batch_size: config.batch_size || 32,
           num_workers: config.num_workers || 4,
           freeze_feature_extractor: config.freeze_feature_extractor !== false,
-          classifier_hidden_layer_sizes: config.training_settings?.classifier_hidden_layer_sizes || null
+          classifier_hidden_layer_sizes: config.training_settings?.classifier_hidden_layer_sizes || null,
+          // All parameters (backend will use conditionally based on freeze setting)
+          n_augmentation_variants: config.n_augmentation_variants,
+          feature_extractor_lr: config.feature_extractor_lr,
+          classifier_lr: config.classifier_lr
         }
       };
 
@@ -707,8 +756,9 @@ class TaskManager {
       const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
       const logFilePath = jobFolder ? `${jobFolder}/annotation_log.txt` : '';
 
-      // Create temporary config file
-      const tempConfigPath = `/tmp/annotation_config_${processId}.json`;
+      // Create temporary config file using system temp directory
+      const tempDir = await this.getTempDir();
+      const tempConfigPath = `${tempDir}/annotation_config_${processId}.json`;
       const configData = {
         predictions_folder: config.predictions_folder,
         class_list: config.class_list || [],

@@ -1285,6 +1285,9 @@ class LightweightServer:
         self.app.router.add_post("/clips/batch", self.clips_batch)
         self.app.router.add_delete("/cache", self.clear_cache)
 
+        # System info routes
+        self.app.router.add_get("/system/tempdir", self.get_temp_dir)
+
         # New config and process management routes
         self.app.router.add_post("/config/save", self.save_config)
         self.app.router.add_post("/config/load", self.load_config)
@@ -1348,6 +1351,18 @@ class LightweightServer:
                 ],
             }
         )
+
+    async def get_temp_dir(self, request):
+        """Return the system temporary directory path"""
+        try:
+            temp_dir = tempfile.gettempdir()
+            return web.json_response({
+                "status": "success",
+                "temp_dir": temp_dir
+            })
+        except Exception as e:
+            logger.error(f"Error getting temp directory: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def scan_folder(self, request):
         """Scan folder for audio files"""
