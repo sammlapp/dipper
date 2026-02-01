@@ -17,8 +17,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15-intel  # Intel
-            artifact_name: lightweight_server-macos-x64
           - os: macos-latest  # ARM (macos-15)
             artifact_name: lightweight_server-macos-arm64
           - os: windows-latest
@@ -70,10 +68,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-x64
-            os: macos-15-intel  # Intel
-            rust_target: x86_64-apple-darwin
-            pyinstaller_artifact: lightweight_server-macos-x64
           - platform: macos-arm64
             os: macos-latest  # ARM (macos-15)
             rust_target: aarch64-apple-darwin
