@@ -2886,17 +2886,11 @@ def main():
     logger.info(f"Server will start on {host}:{port}")
 
     if args.test:
-        print("✅ Lightweight server test successful!")
+        print("[OK] Lightweight server test successful!")
         print(f"Python version: {sys.version}")
         print(
-            f"PyInstaller bundling: {'✅ SUCCESS' if getattr(sys, 'frozen', False) else '❌ Not bundled'}"
+            f"PyInstaller bundling: {'[OK] SUCCESS' if getattr(sys, 'frozen', False) else '[ERROR] Not bundled'}"
         )
-        print("Available libraries:")
-        print("  - pandas ✅")
-        print("  - numpy ✅")
-        print("  - librosa ✅")
-        print("  - PIL ✅")
-        print("  - aiohttp ✅")
         return 0
 
     async def run_server():

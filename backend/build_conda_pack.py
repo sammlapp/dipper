@@ -21,7 +21,7 @@ OUTPUT_DIR = PROJECT_ROOT / "environments"
 def run_command(command, description=None, ignore_errors=False):
     """Run a command and handle errors"""
     if description:
-        print(f"📋 {description}")
+        print(f"[INFO] {description}")
 
     print(f"Running: {command}")
     try:
@@ -31,10 +31,10 @@ def run_command(command, description=None, ignore_errors=False):
         return result
     except subprocess.CalledProcessError as e:
         if ignore_errors:
-            print(f"⚠️  Command failed (ignored): {command}")
+            print(f"[WARNING] Command failed (ignored): {command}")
             return None
         else:
-            print(f"❌ Command failed: {command}")
+            print(f"[ERROR] Command failed: {command}")
             print(f"Error: {e}")
             if e.stdout:
                 print(f"Stdout: {e.stdout}")
@@ -49,16 +49,16 @@ def check_conda():
         result = run_command(
             "conda --version", description="Checking conda availability"
         )
-        print(f"✅ Conda found: {result.stdout.strip()}")
+        print(f"[OK] Conda found: {result.stdout.strip()}")
         return True
     except:
-        print("❌ Conda not found. Please install Miniconda or Anaconda.")
+        print("[ERROR] Conda not found. Please install Miniconda or Anaconda.")
         return False
 
 
 def create_conda_environment():
     """Create conda environment from yml file"""
-    print(f"🐍 Creating conda environment: {ENV_NAME}")
+    print(f"[INFO] Creating conda environment: {ENV_NAME}")
 
     # Remove existing environment if it exists
     print("Checking for existing environment...")
@@ -67,19 +67,19 @@ def create_conda_environment():
     # Create environment from yml file
     yml_path = BACKEND_DIR / "dipper_pytorch_env.yml"
     if not yml_path.exists():
-        print(f"❌ Environment file not found: {yml_path}")
+        print(f"[ERROR] Environment file not found: {yml_path}")
         sys.exit(1)
 
     run_command(
         f'conda env create -f "{yml_path}"',
         description=f"Creating environment from {yml_path}",
     )
-    print("✅ Conda environment created successfully!")
+    print("[OK] Conda environment created successfully!")
 
 
 def install_conda_pack():
     """Install conda-pack if not available"""
-    print("📦 Ensuring conda-pack is available...")
+    print("[INFO] Ensuring conda-pack is available...")
 
     # Try to install conda-pack in base environment
     try:
@@ -88,13 +88,13 @@ def install_conda_pack():
             description="Installing conda-pack via conda",
         )
     except:
-        print("⚠️  Failed to install conda-pack via conda, trying pip...")
+        print("[WARNING] Failed to install conda-pack via conda, trying pip...")
         try:
             run_command(
                 "python -m pip install conda-pack", description="Installing conda-pack via pip"
             )
         except:
-            print("❌ Failed to install conda-pack. Please install it manually:")
+            print("[ERROR] Failed to install conda-pack. Please install it manually:")
             print("   conda install conda-pack -c conda-forge")
             print("   OR")
             print("   python -m pip install conda-pack")
@@ -103,7 +103,7 @@ def install_conda_pack():
 
 def pack_environment():
     """Pack the conda environment"""
-    print("📦 Packing environment with conda-pack...")
+    print("[INFO] Packing environment with conda-pack...")
 
     # Create output directory
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -121,13 +121,13 @@ def pack_environment():
         description="Packing environment",
     )
 
-    print(f"✅ Environment packed successfully: {output_file}")
+    print(f"[OK] Environment packed successfully: {output_file}")
     return output_file
 
 
 def create_extraction_script(output_file):
     """Create bash script to extract and test the environment"""
-    print("📝 Creating extraction script...")
+    print("[INFO] Creating extraction script...")
 
     script_content = f"""#!/bin/bash
 # Extract and test conda-pack environment
@@ -169,9 +169,9 @@ echo "Testing Python environment..."
 
 echo "Testing key imports..."
 "$EXTRACT_DIR/bin/python" -c "import torch; print(f'PyTorch version: {{torch.__version__}}')"
-"$EXTRACT_DIR/bin/python" -c "import bioacoustics_model_zoo as bmz; print('Bioacoustics model zoo loaded successfully')" || echo "⚠️  Bioacoustics model zoo not available (normal if not installed)"
+"$EXTRACT_DIR/bin/python" -c "import bioacoustics_model_zoo as bmz; print('Bioacoustics model zoo loaded successfully')" || echo "[WARNING] Bioacoustics model zoo not available (normal if not installed)"
 
-echo "✅ Environment is ready for use!"
+echo "[OK] Environment is ready for use!"
 echo "To use: $EXTRACT_DIR/bin/python your_script.py"
 """
 
@@ -182,13 +182,13 @@ echo "To use: $EXTRACT_DIR/bin/python your_script.py"
     # Make executable
     os.chmod(script_path, 0o755)
 
-    print(f"✅ Extraction script created: {script_path}")
+    print(f"[OK] Extraction script created: {script_path}")
     return script_path
 
 
 def create_test_script():
     """Create Python test script for the packed environment"""
-    print("🧪 Creating test script...")
+    print("[INFO] Creating test script...")
 
     test_content = '''#!/usr/bin/env python3
 """
@@ -205,63 +205,63 @@ def test_imports():
     
     try:
         import torch
-        print(f"✅ PyTorch {torch.__version__}")
+        print(f"[OK] PyTorch {torch.__version__}")
     except ImportError as e:
-        print(f"❌ PyTorch: {e}")
+        print(f"[ERROR] PyTorch: {e}")
         return False
     
     try:
         import numpy as np
-        print(f"✅ NumPy {np.__version__}")
+        print(f"[OK] NumPy {np.__version__}")
     except ImportError as e:
-        print(f"❌ NumPy: {e}")
+        print(f"[ERROR] NumPy: {e}")
         return False
     
     try:
         import pandas as pd
-        print(f"✅ Pandas {pd.__version__}")
+        print(f"[OK] Pandas {pd.__version__}")
     except ImportError as e:
-        print(f"❌ Pandas: {e}")
+        print(f"[ERROR] Pandas: {e}")
         return False
     
     try:
         import librosa
-        print(f"✅ Librosa {librosa.__version__}")
+        print(f"[OK] Librosa {librosa.__version__}")
     except ImportError as e:
-        print(f"❌ Librosa: {e}")
+        print(f"[ERROR] Librosa: {e}")
         return False
     
     try:
         import bioacoustics_model_zoo as bmz
-        print("✅ Bioacoustics model zoo")
-        
+        print("[OK] Bioacoustics model zoo")
+
         # Test loading a model
         try:
             model = bmz.HawkEars()
-            print("✅ HawkEars model loaded successfully")
+            print("[OK] HawkEars model loaded successfully")
         except Exception as model_error:
-            print(f"⚠️  HawkEars model test failed: {model_error}")
+            print(f"[WARNING] HawkEars model test failed: {model_error}")
             # This is not critical for the environment test
         
     except ImportError as e:
-        print(f"❌ Bioacoustics model zoo: {e}")
+        print(f"[ERROR] Bioacoustics model zoo: {e}")
         return False
     except Exception as e:
-        print(f"⚠️  Bioacoustics model zoo loaded but initialization failed: {e}")
+        print(f"[WARNING] Bioacoustics model zoo loaded but initialization failed: {e}")
         # This is not critical for the environment test
     
     return True
 
 def main():
-    print("🐍 Testing conda-pack environment")
+    print("[INFO] Testing conda-pack environment")
     print(f"Python version: {sys.version}")
     print(f"Python executable: {sys.executable}")
     
     if test_imports():
-        print("\\n✅ All tests passed! Environment is working correctly.")
+        print("\\n[OK] All tests passed! Environment is working correctly.")
         return 0
     else:
-        print("\\n❌ Some tests failed. Environment may not be complete.")
+        print("\\n[ERROR] Some tests failed. Environment may not be complete.")
         return 1
 
 if __name__ == "__main__":
@@ -272,14 +272,14 @@ if __name__ == "__main__":
     with open(test_script_path, "w") as f:
         f.write(test_content)
 
-    print(f"✅ Test script created: {test_script_path}")
+    print(f"[OK] Test script created: {test_script_path}")
     return test_script_path
 
 
 def main():
     """Main build function"""
     try:
-        print("🚀 Starting conda-pack environment build...")
+        print("[INFO] Starting conda-pack environment build...")
         print(f"Project root: {PROJECT_ROOT}")
         print(f"Backend directory: {BACKEND_DIR}")
         print(f"Output directory: {OUTPUT_DIR}")
@@ -301,23 +301,23 @@ def main():
         extract_script = create_extraction_script(output_file)
         test_script = create_test_script()
 
-        print("\n✅ Conda-pack environment built successfully!")
-        print(f"📦 Environment archive: {output_file}")
-        print(f"🔧 Extraction script: {extract_script}")
-        print(f"🧪 Test script: {test_script}")
+        print("\n[OK] Conda-pack environment built successfully!")
+        print(f"Environment archive: {output_file}")
+        print(f"Extraction script: {extract_script}")
+        print(f"Test script: {test_script}")
 
         # Show file sizes
         if output_file.exists():
             size_bytes = output_file.stat().st_size
             size_mb = size_bytes / (1024 * 1024)
-            print(f"📊 Archive size: {size_mb:.1f} MB")
+            print(f"Archive size: {size_mb:.1f} MB")
 
-        print("\n📋 Usage:")
+        print("\nUsage:")
         print(f"   Extract: {extract_script} {output_file} ./runtime_envs/{ENV_NAME}")
         print(f"   Test: ./runtime_envs/{ENV_NAME}/bin/python {test_script}")
 
     except Exception as error:
-        print(f"❌ Build failed: {error}")
+        print(f"[ERROR] Build failed: {error}")
         sys.exit(1)
 
 
