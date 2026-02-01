@@ -1,0 +1,12 @@
+name: test
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.12
+  - pip
+
+  - pip:
+    - ai-edge-litert>=2.1.1
