@@ -369,18 +369,23 @@ function ExploreTab() {
   // Calculate dynamic score range from all valid scores
   const getScoreRange = () => {
     if (!scoreData || !scoreData.scores) return { min: -10, max: 15 };
-    
-    const allValidScores = Object.values(scoreData.scores)
-      .filter(scores => Array.isArray(scores))
-      .flat()
-      .filter(score => score != null && !isNaN(score));
-    
-    if (allValidScores.length === 0) return { min: -10, max: 15 };
-    
-    return {
-      min: Math.min(...allValidScores),
-      max: Math.max(...allValidScores)
-    };
+
+    let min = Infinity;
+    let max = -Infinity;
+
+    for (const scores of Object.values(scoreData.scores)) {
+      if (!Array.isArray(scores)) continue;
+      for (const score of scores) {
+        if (score != null && !isNaN(score)) {
+          if (score < min) min = score;
+          if (score > max) max = score;
+        }
+      }
+    }
+
+    if (min === Infinity || max === -Infinity) return { min: -10, max: 15 };
+
+    return { min, max };
   };
 
   // Memoized filtered species list based on selection
@@ -440,8 +445,7 @@ function ExploreTab() {
         totalClips: scores.length,
         validClips: validScores.length,
         detections: detections.length,
-        detectionRate: (validScores.length / scores.length * 100).toFixed(1),
-        thresholdDetectionRate: (detections.length / scores.length * 100).toFixed(1),
+        detectionRate: (detections.length / scores.length * 100).toFixed(1),
         scores: scores
       };
     });
