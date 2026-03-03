@@ -5,17 +5,21 @@ take a close look at this codebase, especially documentation markdowns such as r
 
 # Build and release
 - lightweight python executable for GUI back-end is built with pyinstaller
-- heavy python environment is built with conda-pack (inference, train scripts)
+- heavy dipper ML environment is built with conda-pack (inference, train scripts); app downloads via google drive into a system-specific cache dir and extracts .tar.gz to conda env folder
 - inference, train, extraction scripts run in separate processes and are tracked by task manager
-- these run with the built-in heavier conda env (downloaded on demand to application cache dir) unless the user specifies a custom python env to use
-- an annotation-only version of the app can be 
+- these run with the dipper ML conda env (downloaded on demand to application cache dir) unless the user specifies a custom python env to use
+- an annotation-only version of the app is built for each platform (Mac ARM, Win 64, Linux 64)
 - server mode: user clones github repo, runs install script, edits config file, launches server that can be accessed on web browser via port forwarding
 
 # Incomplete items / TODO /feature request
 
+- select subset of classes to save inference results for
+
 WandB integration: need to allow user to provide API key and configure group name and project name for a run. Run name should match the dipper run name. 
 
 - need to resolve issues with building conda-pack env for Windows
+- made a working env on Windows: needed to make edits to the windows env yml, then uninstall soundfile and force-reinstall with pip
+- used dipper env to run conda-pack, creating dipper_pytorch_env.tar.gz file
 
 test downloading/using default conda-pack env on linux! (updated conda pack env; need to rerun github runner and re-upload to onedrive)
 
@@ -30,6 +34,9 @@ Colors match coloring of tasks in task pane for running (started)/queued/cancele
 - [task name] canceled (task type) (yellow)
 
 Task manager status updates for training tasks: similar to inference tasks, status updates during training should be posted to .status file in the job output folder and read by the task manager to show the user a useful message about the current status/progress of training. Currently always just says training task is still running
+
+Regional/date bird species list filtering using ebird meta-model. 
+
 
 ### User feature requests
 
@@ -93,15 +100,15 @@ save best model predictions and labels for validation set in output dir
 save publication-ready metrics summary and visualization as html in output dir
 
 ## known bugs
-BRG: aiohttp_cors missing as dependency for server mode (not sure why, its listed in requirements so should be installed during install-server.sh)
+
+BRG: aiohttp_cors missing as dependency for server mode after install (not sure why, its listed in requirements so should be installed during install-server.sh)
+
 BRG: "when I try to selected a dir for my annotation file I run into 
 Error loading directory: Unexpected token '<', "<!DOCTYPE "... is not valid JSON 
 and it doesn't display any screech directories"
 
-"explore" failing to display audio clips (in server mode at least)
+"explore" failing to display audio clips: now works but breaks when settings are changed; need to update settings and reception of settings to match Review settings options and format
 (Error: Failed to load clip: Cannot read properties of undefined (reading 'toString'))
-
-Clip extraction: add "annotation" (if single-target) or "labels","annotation_status" (if multi-target) columns to the created csv so that the csv can be opened in the review tab. I tried to fix this but it is still not actually exporting csvs with these columns. 
 
 When app reloads, tasks are re-started; background tasks should continue and the app should simply check on their status when reopening. This implies that the task manager should have a cached on-disk record of active tasks.
 
@@ -117,8 +124,6 @@ Extraction and inference by subfolder: keep entire relative path of subfolder ra
 
 Automatic port selection updates for server and local modes:
 Manual server mode port specification turned out to be a hassle. The frontend and backend ports should instead be automatically selected to be on an unused port, and clearly reported once running so that the user can see which ports are being used. This avoids accidental conflicts with overlapping ports. 
-
-Similarly, I don't want local mode to default to using port 8000. Currently, it checks if 8000 is a dipper server, if so uses it, if not finds an open port to run Dipper backend. Instead, should always launch the dipper backend on an open port. The reason the current behavior is a problem: user could be forwarding remote Dipper backend to port 8000, and also trying to run a separate instance of Dipper in local mode. The local mode should create its own local dipper backend on a unique port rather than using the 8000 port which happens to be a different Dipper instance. Despite this behavior, dev mode (npm run tauri:dev) _should_ look for the backend running on the default 8000 port because this allows rapid dev iteration. 
 
 ### server mode installation
 - should skip `npm install -g serve` if serve is already installed, this will avoid unnecessary permissions error for non-sudo user

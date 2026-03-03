@@ -171,7 +171,7 @@ export const showJSONFilePicker = (multiple = false) => {
 export const showModelFilePicker = (multiple = false) => {
   return showFilePicker({
     multiple,
-    filters: [],  // No filter - allow any file
+    filters: ['.pth', '.pt', '.pickle', '.pkl', '.model'],
     title: 'Select Model Files'
   });
 };

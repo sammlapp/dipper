@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { basename } from 'pathe';
 import { FormControl, Select, MenuItem } from '@mui/material';
 import HelpIcon from './HelpIcon';
-import { selectCSVFiles, selectFolder, saveFile, selectJSONFiles } from '../utils/fileOperations';
+import { selectCSVFiles, selectFolder, saveFile, selectJSONFiles, selectModelFiles } from '../utils/fileOperations';
 import { getBackendUrl } from '../utils/backendConfig';
 
 // Default values for training form
@@ -11,7 +11,18 @@ const DEFAULT_VALUES = {
   singleClassAnnotations: [],
   config: {
     model: 'HawkEars_Embedding',
+    model_source: 'bmz',
+    mode: 'train_on_audio',
     class_list: '',
+    // Custom model settings
+    cnn_architecture: 'resnet18',
+    preprocessing: {
+      clip_duration: 5.0,
+      sample_rate: 32000,
+      spec_window_samples: 512,
+      low_freq: 0,
+      high_freq: 12000,
+    },
     fully_annotated_files: [],
     single_class_annotations: [],
     background_samples_file: '',
@@ -24,10 +35,14 @@ const DEFAULT_VALUES = {
     use_multi_layer_classifier: false,
     classifier_hidden_layer_sizes_input: '100',
     // Frozen feature extractor parameters
-    n_augmentation_variants: 5,
+    n_augmentation_variants: 0,
     // Unfrozen feature extractor parameters
     feature_extractor_lr: 0.00001,
     classifier_lr: 0.001,
+    // Hoplite embedding database settings
+    use_existing_hoplite_db: false,
+    hoplite_db_path: '',
+    hoplite_db_name: 'hoplite_embeddings',
     // Python environment settings
     use_custom_python_env: false,
     custom_python_env_path: '',
@@ -133,6 +148,17 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
     }
   };
 
+  const handleModelFileSelection = async () => {
+    try {
+      const files = await selectModelFiles();
+      if (files && files.length > 0) {
+        setConfig(prev => ({ ...prev, model: files[0] }));
+      }
+    } catch (error) {
+      console.error('Failed to select model file:', error);
+    }
+  };
+
   const updateSingleClassAnnotationClass = (index, selectedClass) => {
     setSingleClassAnnotations(prev => {
       const updated = [...prev];
@@ -213,6 +239,26 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
       }
     } catch (error) {
       console.error('Failed to select Python environment folder:', error);
+    }
+  };
+
+  const handleHopliteDbSelection = async () => {
+    try {
+      if (config.use_existing_hoplite_db) {
+        // Select existing database folder
+        const folder = await selectFolder();
+        if (folder) {
+          setConfig(prev => ({ ...prev, hoplite_db_path: folder }));
+        }
+      } else {
+        // Select parent folder for new database
+        const parentFolder = await selectFolder();
+        if (parentFolder) {
+          setConfig(prev => ({ ...prev, hoplite_db_path: parentFolder }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to select Hoplite database folder:', error);
     }
   };
 
@@ -302,9 +348,21 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           }).filter(size => size !== null && size > 0);
         };
 
+        // Construct full hoplite_db_path for new databases
+        const fullHopliteDbPath = config.mode === 'train_on_embeddings' && config.hoplite_db_path
+          ? (config.use_existing_hoplite_db
+              ? config.hoplite_db_path
+              : `${config.hoplite_db_path}/${config.hoplite_db_name}`)
+          : '';
+
         const configData = {
           task_name: taskName,
-          model: config.model,
+          model: config.model_source === 'custom' ? 'Custom Architecture' : config.model,
+          model_source: config.model_source,
+          cnn_architecture: config.cnn_architecture,
+          preprocessing: config.preprocessing,
+          mode: config.mode,
+          hoplite_db_path: fullHopliteDbPath,
           class_list: config.class_list,
           fully_annotated_files: config.fully_annotated_files,
           single_class_annotations: singleClassAnnotations,
@@ -316,14 +374,13 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             batch_size: config.batch_size,
             num_workers: config.num_workers,
             freeze_feature_extractor: config.freeze_feature_extractor,
+            use_multi_layer_classifier: config.use_multi_layer_classifier,
+            classifier_hidden_layer_sizes_input: config.classifier_hidden_layer_sizes_input,
             classifier_hidden_layer_sizes: config.use_multi_layer_classifier ? parseHiddenLayerSizes(config.classifier_hidden_layer_sizes_input) : null,
-            // Conditional parameters based on freeze setting
-            ...(config.freeze_feature_extractor ? {
-              n_augmentation_variants: config.n_augmentation_variants
-            } : {
-              feature_extractor_lr: config.feature_extractor_lr,
-              classifier_lr: config.classifier_lr
-            })
+            // Save all parameters regardless of freeze setting so they can be restored
+            n_augmentation_variants: config.n_augmentation_variants,
+            feature_extractor_lr: config.feature_extractor_lr,
+            classifier_lr: config.classifier_lr
           },
           python_environment: {
             use_custom: config.use_custom_python_env,
@@ -380,9 +437,24 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           setTaskName(configData.task_name || '');
           setSingleClassAnnotations(configData.single_class_annotations || []);
 
+          // For loading, just store the full path - we can't determine if it was existing or new
+          // so we'll default to "existing" mode if a path is present
           setConfig(prev => ({
             ...prev,
-            model: configData.model || 'BirdNET',
+            model_source: configData.model_source || 'bmz',
+            model: configData.model,
+            mode: configData.mode || 'train_on_audio',
+            cnn_architecture: configData.cnn_architecture || 'resnet18',
+            preprocessing: configData.preprocessing || {
+              clip_duration: 5.0,
+              sample_rate: 22050,
+              spec_window_samples: 512,
+              low_freq: 0,
+              high_freq: 11025
+            },
+            hoplite_db_path: configData.hoplite_db_path || '',
+            use_existing_hoplite_db: !!(configData.hoplite_db_path), // If path exists, assume existing DB
+            hoplite_db_name: 'hoplite_embeddings', // Reset to default
             class_list: Array.isArray(configData.class_list) ? configData.class_list.join(', ') : (configData.class_list || ''),
             fully_annotated_files: configData.fully_annotated_files || [],
             background_samples_file: configData.background_samples_file || '',
@@ -392,12 +464,10 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             batch_size: configData.training_settings?.batch_size || 32,
             num_workers: configData.training_settings?.num_workers || 4,
             freeze_feature_extractor: configData.training_settings?.freeze_feature_extractor !== false,
-            use_multi_layer_classifier: Boolean(configData.training_settings?.classifier_hidden_layer_sizes),
-            classifier_hidden_layer_sizes_input: Array.isArray(configData.training_settings?.classifier_hidden_layer_sizes)
-              ? configData.training_settings.classifier_hidden_layer_sizes.join(', ')
-              : '100',
-            // Conditional parameters
-            n_augmentation_variants: configData.training_settings?.n_augmentation_variants || 5,
+            use_multi_layer_classifier: configData.training_settings?.use_multi_layer_classifier || false,
+            classifier_hidden_layer_sizes_input: configData.training_settings?.classifier_hidden_layer_sizes_input || '100',
+            // All parameters (will be used conditionally based on freeze setting)
+            n_augmentation_variants: configData.training_settings?.n_augmentation_variants || 0,
             feature_extractor_lr: configData.training_settings?.feature_extractor_lr || 0.00001,
             classifier_lr: configData.training_settings?.classifier_lr || 0.001,
             // Python environment settings
@@ -434,24 +504,308 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           />
         </div>
 
-        {/* Model Selection */}
-        <div className="form-group">
-          <label>Base Model <HelpIcon section="training-model-selection" /></label>
-          <FormControl size="small" fullWidth sx={{ mt: 0.5 }}>
-            <Select
-              value={config.model}
-              onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
+        {/* Training Mode Selection */}
+        <div className="form-group full-width">
+          <label>Training Mode <HelpIcon section="training-mode" /></label>
+          <div className="segmented-control not-too-big">
+            <button
+              type="button"
+              className={`segment ${config.mode === 'train_on_audio' ? 'active' : ''}`}
+              onClick={() => {
+                setConfig(prev => ({
+                  ...prev,
+                  mode: 'train_on_audio'
+                }));
+              }}
             >
-              <MenuItem value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</MenuItem>
-              {/* don't allow ensembled HawkEars <MenuItem value="HawkEars">HawkEars</MenuItem> */}
-              <MenuItem value="BirdNET">BirdNET Global bird species classifier</MenuItem>
-              {/* don't allow training low-band hawkears, weird architecture */}
-              <MenuItem value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</MenuItem>
-              {/* <MenuItem value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</MenuItem> */}
-              {/* <MenuItem value="Perch">Perch Global bird species classifier </MenuItem> */}
-            </Select>
-          </FormControl>
+              Train on Audio
+            </button>
+            <button
+              type="button"
+              className={`segment ${config.mode === 'train_on_embeddings' ? 'active' : ''}`}
+              onClick={() => {
+                setConfig(prev => ({
+                  ...prev,
+                  mode: 'train_on_embeddings'
+                }));
+              }}
+            >
+              Train on Embeddings
+            </button>
+          </div>
+          <div className="help-text">
+            Train on Audio: Standard training approach. Train on Embeddings: Uses Hoplite database for faster training (feature extractor must be frozen)
+          </div>
         </div>
+
+        {/* Hoplite Database Configuration (only for train_on_embeddings mode) */}
+        {config.mode === 'train_on_embeddings' && (
+          <div className="form-group full-width" style={{ marginLeft: '20px', paddingLeft: '16px', borderLeft: '2px solid var(--border)' }}>
+            <label>
+              <input
+                type="checkbox"
+                checked={config.use_existing_hoplite_db}
+                onChange={(e) => setConfig(prev => ({
+                  ...prev,
+                  use_existing_hoplite_db: e.target.checked,
+                  hoplite_db_path: '' // Clear path when toggling
+                }))}
+                style={{ marginRight: '8px' }}
+              />
+              Use Existing Hoplite Embedding Database
+            </label>
+            <div className="help-text">
+              Load embeddings from an existing database or create a new one
+            </div>
+
+            {config.use_existing_hoplite_db ? (
+              // Existing database: just select folder
+              <div className="file-selection" style={{ marginTop: '8px' }}>
+                <div className="file-selection-buttons">
+                  <button onClick={handleHopliteDbSelection}>
+                    Select Existing Hoplite DB Folder
+                  </button>
+                  {config.hoplite_db_path && (
+                    <button
+                      onClick={() => setConfig(prev => ({ ...prev, hoplite_db_path: '' }))}
+                      className="button-clear"
+                      title="Clear selected Hoplite database folder"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {config.hoplite_db_path && (
+                  <span className="selected-path" style={{ marginTop: '4px', display: 'block' }}>
+                    {config.hoplite_db_path}
+                  </span>
+                )}
+                <div className="help-text" style={{ marginTop: '4px' }}>
+                  Select folder containing existing Hoplite database
+                </div>
+              </div>
+            ) : (
+              // New database: select parent folder + specify name
+              <div style={{ marginTop: '8px' }}>
+                <div className="form-group">
+                  <label>Database Name</label>
+                  <input
+                    type="text"
+                    value={config.hoplite_db_name}
+                    onChange={(e) => setConfig(prev => ({ ...prev, hoplite_db_name: e.target.value }))}
+                    placeholder="hoplite_embeddings"
+                    style={{ width: '300px' }}
+                  />
+                  <div className="help-text">
+                    Name of the new database folder to create
+                  </div>
+                </div>
+
+                <div className="file-selection">
+                  <div className="file-selection-buttons">
+                    <button onClick={handleHopliteDbSelection}>
+                      Select Parent Folder
+                    </button>
+                    {config.hoplite_db_path && (
+                      <button
+                        onClick={() => setConfig(prev => ({ ...prev, hoplite_db_path: '' }))}
+                        className="button-clear"
+                        title="Clear selected parent folder"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {config.hoplite_db_path && (
+                    <div style={{ marginTop: '4px' }}>
+                      <div className="help-text" style={{ marginBottom: '4px' }}>
+                        Database will be created at:
+                      </div>
+                      <span className="selected-path" style={{ display: 'block' }}>
+                        {config.hoplite_db_path}/{config.hoplite_db_name}
+                      </span>
+                    </div>
+                  )}
+                  <div className="help-text" style={{ marginTop: '4px' }}>
+                    Select folder where new Hoplite database will be created
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Model Source Selection */}
+        <div className="form-group full-width">
+          <label>Model Source <HelpIcon section="training-model-source" /></label>
+          <div className="segmented-control not-too-big">
+            <button
+              type="button"
+              className={`segment ${config.model_source === 'bmz' ? 'active' : ''}`}
+              onClick={() => {
+                setConfig(prev => ({
+                  ...prev,
+                  model_source: 'bmz',
+                  model: 'HawkEars_Embedding' // Reset to default BMZ model
+                }));
+              }}
+            >
+              Bioacoustics Model Zoo
+            </button>
+            <button
+              type="button"
+              className={`segment ${config.model_source === 'local_file' ? 'active' : ''}`}
+              onClick={() => {
+                setConfig(prev => ({
+                  ...prev,
+                  model_source: 'local_file',
+                  model: '' // Clear model path
+                }));
+              }}
+            >
+              Local Model File
+            </button>
+            <button
+              type="button"
+              className={`segment ${config.model_source === 'custom' ? 'active' : ''}`}
+              onClick={() => {
+                setConfig(prev => ({
+                  ...prev,
+                  model_source: 'custom',
+                  model: 'Custom Architecture'
+                }));
+              }}
+            >
+              Custom Architecture
+            </button>
+          </div>
+        </div>
+
+        {/* Conditional Model Selection */}
+        {config.model_source === 'bmz' ? (
+          <div className="form-group">
+            <label>Base Model <HelpIcon section="training-model-selection" /></label>
+            <FormControl size="small" fullWidth sx={{ mt: 0.5 }}>
+              <Select
+                value={config.model}
+                onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
+              >
+                <MenuItem value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</MenuItem>
+                {/* don't allow ensembled HawkEars <MenuItem value="HawkEars">HawkEars</MenuItem> */}
+                <MenuItem value="BirdNET">BirdNET Global bird species classifier</MenuItem>
+                {/* don't allow training low-band hawkears, weird architecture */}
+                <MenuItem value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</MenuItem>
+                {/* <MenuItem value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</MenuItem> */}
+                <MenuItem value="Perch">Perch Global bird species classifier </MenuItem>
+              </Select>
+            </FormControl>
+          </div>
+        ) : config.model_source === 'local_file' ? (
+          <div className="form-group full-width">
+            <label>Local Model File <HelpIcon section="training-local-model" /></label>
+            <div className="file-selection">
+              <div className="file-selection-buttons">
+                <button onClick={handleModelFileSelection}>
+                  Select Model File
+                </button>
+                {config.model && (
+                  <button
+                    onClick={() => setConfig(prev => ({ ...prev, model: '' }))}
+                    className="button-clear"
+                    title="Clear selected model file"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {config.model && (
+                <span className="selected-path">
+                  {basename(config.model)}
+                </span>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Custom architecture configuration */
+          <>
+            <div className="form-group">
+              <label>CNN Architecture <HelpIcon section="training-cnn-architecture" /></label>
+              <FormControl size="small" fullWidth sx={{ mt: 0.5 }}>
+                <Select
+                  value={config.cnn_architecture}
+                  onChange={(e) => setConfig(prev => ({ ...prev, cnn_architecture: e.target.value }))}
+                >
+                  <MenuItem value="resnet18">ResNet-18</MenuItem>
+                  <MenuItem value="resnet34">ResNet-34</MenuItem>
+                  <MenuItem value="resnet50">ResNet-50</MenuItem>
+                  <MenuItem value="efficientnet_b0">EfficientNet-B0</MenuItem>
+                  <MenuItem value="efficientnet_b1">EfficientNet-B1</MenuItem>
+                </Select>
+              </FormControl>
+            </div>
+
+            <div className="form-group">
+              <label>Clip Duration (sec) <HelpIcon section="training-clip-duration" /></label>
+              <input
+                type="number"
+                step="0.1"
+                value={config.preprocessing.clip_duration}
+                onChange={(e) => setConfig(prev => ({
+                  ...prev,
+                  preprocessing: { ...prev.preprocessing, clip_duration: parseFloat(e.target.value) }
+                }))}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Sample Rate (Hz) <HelpIcon section="training-sample-rate" /></label>
+              <input
+                type="number"
+                value={config.preprocessing.sample_rate}
+                onChange={(e) => setConfig(prev => ({
+                  ...prev,
+                  preprocessing: { ...prev.preprocessing, sample_rate: parseInt(e.target.value) }
+                }))}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Spectrogram Window (samples) <HelpIcon section="training-spec-window" /></label>
+              <input
+                type="number"
+                value={config.preprocessing.spec_window_samples}
+                onChange={(e) => setConfig(prev => ({
+                  ...prev,
+                  preprocessing: { ...prev.preprocessing, spec_window_samples: parseInt(e.target.value) }
+                }))}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Low Frequency (Hz) <HelpIcon section="training-low-freq" /></label>
+              <input
+                type="number"
+                value={config.preprocessing.low_freq}
+                onChange={(e) => setConfig(prev => ({
+                  ...prev,
+                  preprocessing: { ...prev.preprocessing, low_freq: parseInt(e.target.value) }
+                }))}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>High Frequency (Hz) <HelpIcon section="training-high-freq" /></label>
+              <input
+                type="number"
+                value={config.preprocessing.high_freq}
+                onChange={(e) => setConfig(prev => ({
+                  ...prev,
+                  preprocessing: { ...prev.preprocessing, high_freq: parseInt(e.target.value) }
+                }))}
+              />
+            </div>
+          </>
+        )}
 
         {/* Fully Annotated Files */}
         <div className="form-group full-width">

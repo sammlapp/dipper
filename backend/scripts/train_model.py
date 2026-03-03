@@ -59,6 +59,8 @@ def train_on_audio(model, train_labels, eval_labels, config):
 
     # initialize multi-layer classifier if needed:
     hidden_layer_sizes = train_cfg.get("classifier_hidden_layer_sizes")
+    if not hidden_layer_sizes:
+        hidden_layer_sizes = []
 
     if hidden_layer_sizes and len(hidden_layer_sizes) > 0:
         assert all(
@@ -73,12 +75,14 @@ def train_on_audio(model, train_labels, eval_labels, config):
         set_layer_from_name(model.network, clf_layer_name, new_classifier)
 
     # Set audio root if provided
-    audio_root = config.get("root_audio_folder", None)
+    audio_root = config.get("root_audio_folder")
+    if audio_root == "":
+        audio_root = None
 
     # training strategy depends on whether the feature extractor is frozen
     # if it is frozen, we can quickly train the classifier head on embeddings
     # if it is not frozen, we need to train the entire model
-    if config.get("freeze_feature_extractor", True):
+    if train_cfg.get("freeze_feature_extractor"):
         logger.info("Freezing feature extractor")
         model.freeze_feature_extractor()
 
@@ -94,7 +98,7 @@ def train_on_audio(model, train_labels, eval_labels, config):
         # after fitting, this function loads the weights of the best step
         _, _, _, _, metrics = fit_classifier_on_embeddings(
             embedding_model=model,
-            classifier_model=model.network.classifier,
+            classifier_model=model.classifier,
             train_df=train_labels,
             validation_df=eval_labels,
             n_augmentation_variants=train_cfg.get("n_augmentation_variants"),
@@ -131,8 +135,8 @@ def train_on_audio(model, train_labels, eval_labels, config):
             # use AdamW optimizer with custom parameters
             model.optimizer_params = {
                 "class": torch.optim.AdamW,
-                "kwargs": {"lr": train_cfg.get("feature_extractor_lr", 0.001)},
-                "classifier_lr": train_cfg.get("classifier_lr", 0.01),
+                "kwargs": {"lr": train_cfg.get("feature_extractor_lr")},
+                "classifier_lr": train_cfg.get("classifier_lr"),
             }
         except:
             logger.warning(
@@ -162,20 +166,18 @@ def train_on_audio(model, train_labels, eval_labels, config):
             batch_size=train_cfg["batch_size"],
             num_workers=train_cfg["num_workers"],
             save_path=out_dir,
-            save_interval=-1,  # Only save best epoch (saves best.pkl)
+            save_interval=9999,  # Only save best epoch (saves best.pkl)
             audio_root=audio_root,
         )
         metrics = model.valid_metrics[model.best_epoch]
 
 
-def train_hoplite(train_labels, eval_labels, config):
+def train_hoplite(model, train_labels, eval_labels, config):
+    # TODO: could avoid model load if all samples are already embedded?
     # local hoplite imports as needed
     from hoplite_utils import load_or_create_db
 
     train_cfg = config["training_settings"]
-
-    # TODO: could avoid model load if all samples are already embedded
-    model = load_model(config)
 
     # create db for training or connect to existing one
     train_db = load_or_create_db(
@@ -214,20 +216,22 @@ def train_hoplite(train_labels, eval_labels, config):
             model.embed_to_hoplite_db(
                 train_labels,
                 db=train_db,
-                dataset_name=config["training_datset_name"],
+                dataset_name=config["training_dataset_name"],
                 audio_root=config["root_audio_folder"],
                 batch_size=train_cfg["batch_size"],
                 num_workers=train_cfg["num_workers"],
-                embedding_exists_mode="add",
+                embedding_exists_mode="add",  # allow augmented variants of same sample
                 bypass_augmentations=False,
             )
+    logger.info("Embedding complete.")
 
     # second, retrieve train and eval features from db
+    logger.info("Retrieving embeddings from database for training...")
     index_values = []
     train_embeddings = []
     for f, s, e in train_labels.index:
         ids = train_db.get_embeddings_by_source(
-            dataset_name=config["training_datset_name"],
+            dataset_name=config["training_dataset_name"],
             source_id=f,
             offsets=np.array([s], dtype=np.float16),
         )
@@ -243,7 +247,7 @@ def train_hoplite(train_labels, eval_labels, config):
     eval_embeddings = []
     for f, s, e in eval_labels.index:
         ids = train_db.get_embeddings_by_source(
-            dataset_name=config["eval_datset_name"],
+            dataset_name=config["eval_dataset_name"],
             source_id=f,
             offsets=np.array([s], dtype=np.float16),
         )
@@ -253,14 +257,15 @@ def train_hoplite(train_labels, eval_labels, config):
     eval_embeddings = np.vstack(eval_embeddings)
 
     # third, train classifier
+    logger.info("Training classifier on embeddings...")
     import opensoundscape as opso
     import torch
 
     # initialize an MLP with random weights and desired shape
     classes = list(train_labels.columns)
-    hidden_layers = config.get("training_settings", {}).get(
-        "classifier_hidden_layer_sizes"
-    )
+    hidden_layers = config.get("training_settings").get("classifier_hidden_layer_sizes")
+    if not hidden_layers:
+        hidden_layers = []
     mlp = opso.ml.shallow_classifier.MLPClassifier(
         input_size=train_db.embedding_dim,
         output_size=len(classes),
@@ -279,7 +284,7 @@ def train_hoplite(train_labels, eval_labels, config):
         optimizer=torch.optim.Adam(mlp.parameters(), lr=0.001),
         # criterion=opso.ml.loss.BCELossWeakNegatives(), #TODO: weak negatives loss!
     )
-
+    logger.info("Classifier training complete.")
     mlp.save(config["model_save_path"])
 
     logger.info(f"Trained classifier saved to {config['model_save_path']}")
@@ -391,9 +396,19 @@ def run_training(config):
             )  # TODO this will fail for models that take audio as input! need to implement audio-space mixup
 
         if config["mode"] == "train_on_embeddings":
-            metrics = train_hoplite(model, train_df, evaluation_df, config)
+            metrics = train_hoplite(
+                model=model,
+                train_labels=train_df,
+                eval_labels=evaluation_df,
+                config=config,
+            )
         elif config["mode"] == "train_on_audio":
-            metrics = train_on_audio(model, train_df, evaluation_df, config)
+            metrics = train_on_audio(
+                model=model,
+                train_labels=train_df,
+                eval_labels=evaluation_df,
+                config=config,
+            )
         else:
             raise ValueError(f"Unsupported mode: {config['mode']}")
 

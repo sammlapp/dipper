@@ -81,9 +81,7 @@ def run_inference(files, model, config_data):
             # run shallow classifier on features retrieved from hoplite db
             predictions = classify_from_hoplite_embeddings(files, model, config_data)
         else:  # run full forward pass of model
-            predictions = model.predict(
-                files, **config_data["inference_settings"]
-            )
+            predictions = model.predict(files, **config_data["inference_settings"])
 
         logger.info(f"Progress: 100% ({total_files}/{total_files})")
         logger.info(f"Predictions generated with shape: {predictions.shape}")
@@ -365,7 +363,7 @@ def run_classification(model, files, config_data):
 def embed_hoplite(model, files, config_data):
     from hoplite_utils import load_or_create_db
 
-    # initialize new database or connect to existing database at path config_data["db_path"]
+    # initialize new database or connect to existing database at path config_data["hoplite_db_path"]
     db = load_or_create_db(
         config_data, embedding_dim=model.classifier.in_features, logger=logger
     )
@@ -504,6 +502,9 @@ def main():
             assert (
                 config_data.get("model_source") == "mlp_classifier"
             ), "When classifying from Hoplite embeddings, you must select a shallow classifier as the model (model_source = 'mlp_classifier')"
+            raise NotImplementedError(
+                "Classifying from Hoplite embeddings is not yet implemented in this script"
+            )
         else:
             raise ValueError(
                 f"Unknown mode: {mode}. Supported modes are 'classification', 'embed_to_hoplite', and 'classify_from_hoplite'"

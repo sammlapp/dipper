@@ -10,7 +10,7 @@ def load_bmz_model(model_name, logger=None):
         if logger:
             logger.info(f"Loading model: {model_name}")
 
-        # Load model using the same approach as streamlit_inference.py
+        # Load model by initializing class from bmz
         model = getattr(bmz, model_name)()
         if logger:
             logger.info(f"Model loaded successfully: {type(model).__name__}")
@@ -33,7 +33,28 @@ def load_bmz_model(model_name, logger=None):
 
 def load_model(config_data, logger=None):
     model_source = config_data.get("model_source")
-    if model_source == "bmz":
+    if model_source == "custom":
+        preprocessing_config = config_data.get("preprocessing")
+        # option: ['resnet18','resnet34','resnet50','efficientnet_b0','efficientnet_b1']
+        architecture = config_data.get("cnn_architecture")
+        model = opensoundscape.CNN(
+            architecture,
+            classes=config_data.get("class_list"),
+            sample_duration=preprocessing_config.get("clip_duration"),
+        )
+        # configure preprocessing
+        model.preprocessor.pipeline.load_audio.set(
+            sample_rate=preprocessing_config.get("sample_rate")
+        )
+
+        model.preprocessor.pipeline.to_spec.set(
+            window_samples=preprocessing_config.get("spec_window_samples")
+        )
+        model.preprocessor.pipeline.bandpass.set(
+            min_f=preprocessing_config.get("low_freq"),
+            max_f=preprocessing_config.get("high_freq"),
+        )
+    elif model_source == "bmz":
         model_name = config_data.get("model")
         if not model_name:
             raise ValueError("Model name for BMZ model not specified in config")

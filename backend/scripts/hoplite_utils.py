@@ -12,7 +12,7 @@ def load_or_create_db(config_data, embedding_dim=None, logger=None):
     ## set up model and databse
     # specify a folder to contain the db files
     # can specify an existing folder to connect to an existing db
-    db_path = Path(config_data["db_path"])
+    db_path = Path(config_data["hoplite_db_path"])
 
     # create db:
     if db_path.exists():

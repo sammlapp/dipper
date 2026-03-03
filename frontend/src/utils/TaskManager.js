@@ -47,23 +47,20 @@ class TaskManager {
       return this.tempDir;
     }
 
-    try {
-      const backendUrl = await getBackendUrl();
-      const response = await fetch(`${backendUrl}/system/tempdir`);
-      const result = await response.json();
+    const backendUrl = await getBackendUrl();
+    const response = await fetch(`${backendUrl}/system/tempdir`);
 
-      if (result.status === 'success') {
-        this.tempDir = result.temp_dir;
-        return this.tempDir;
-      } else {
-        console.error('Failed to get temp directory:', result.error);
-        // Fallback to a reasonable default
-        return '/tmp';
-      }
-    } catch (error) {
-      console.error('Error fetching temp directory:', error);
-      // Fallback to a reasonable default
-      return '/tmp';
+    if (!response.ok) {
+      throw new Error(`Failed to get temp directory: HTTP ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.status === 'success') {
+      this.tempDir = result.temp_dir;
+      return this.tempDir;
+    } else {
+      throw new Error(`Failed to get temp directory: ${result.error || 'Unknown error'}`);
     }
   }
 

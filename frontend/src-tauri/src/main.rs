@@ -124,6 +124,7 @@ async fn select_model_files(app: tauri::AppHandle) -> Result<Vec<String>, String
 
     app.dialog()
         .file()
+        .add_filter("Model Files", &["pth", "pt", "pickle", "pkl", "model"])
         .add_filter("All Files", &["*"])
         .pick_files(move |files| {
             tx.send(files).ok();
