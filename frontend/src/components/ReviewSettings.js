@@ -77,6 +77,8 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     // Focus mode settings
     focus_mode_autoplay: true,
     focus_size: 'medium', // 'small', 'medium', 'large'
+    audio_padding_seconds: 2, // Padding before/after clip for context
+    enable_bbox_drawing: false, // Enable bounding box annotation mode
 
     // Keyboard shortcuts
     keyboard_shortcuts_enabled: true,
@@ -199,6 +201,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
       key === 'dB_range' ||
       key === 'use_bandpass' ||
       key === 'bandpass_range' ||
+      key === 'audio_padding_seconds' ||
       key === 'show_reference_frequency' ||
       key === 'reference_frequency' ||
       key === 'resize_images' ||
@@ -244,6 +247,8 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
       image_height: 200,
       focus_mode_autoplay: true,
       focus_size: 'medium',
+      audio_padding_seconds: 2,
+      enable_bbox_drawing: false,
       keyboard_shortcuts_enabled: true,
       review_mode: 'binary',
       manual_classes: '',
@@ -535,6 +540,38 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
               </Select>
             </FormControl>
           </label>
+        </div>
+
+        <div className="spectrogram-settings" style={{ marginTop: '12px' }}>
+          <label>
+            Audio Padding (seconds):
+            <input
+              type="number"
+              value={settings.audio_padding_seconds || 0}
+              onChange={(e) => handleSettingChange('audio_padding_seconds', parseFloat(e.target.value) || 0)}
+              min="0"
+              max="10"
+              step="0.5"
+              style={{ width: '80px', marginLeft: '8px' }}
+            />
+          </label>
+          <small className="help-text" style={{ display: 'block', marginTop: '4px', color: '#666' }}>
+            Adds context audio/spectrogram before and after the target clip region.
+          </small>
+        </div>
+
+        <div className="display-toggles" style={{ marginTop: '12px' }}>
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={settings.enable_bbox_drawing || false}
+              onChange={(e) => handleSettingChange('enable_bbox_drawing', e.target.checked)}
+            />
+            <span>Enable Bounding Box Drawing</span>
+          </label>
+          <small className="help-text" style={{ display: 'block', marginTop: '4px', color: '#666' }}>
+            Draw time-frequency boxes on spectrograms. Saved to bbox_start_t, bbox_end_t, bbox_low_f, bbox_high_f columns.
+          </small>
         </div>
       </div>
 
