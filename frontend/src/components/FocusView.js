@@ -185,6 +185,63 @@ function FocusView({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
+  const formatAxisTime = useCallback((seconds) => {
+    if (seconds == null || Number.isNaN(seconds)) return '0:00.00';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds - mins * 60;
+    return `${mins}:${secs.toFixed(2).padStart(5, '0')}`;
+  }, []);
+
+  const axisTickCount = 5;
+  const displayTimeRange = (
+    Number.isFinite(start_time) &&
+    Number.isFinite(end_time) &&
+    end_time > start_time
+  )
+    ? [start_time, end_time]
+    : time_range;
+
+  const timeTicks = (displayTimeRange && axisTickCount > 1)
+    ? Array.from({ length: axisTickCount }, (_, i) => {
+      const t = displayTimeRange[0] + (i / (axisTickCount - 1)) * (displayTimeRange[1] - displayTimeRange[0]);
+      return { value: t, label: formatAxisTime(t), pct: (i / (axisTickCount - 1)) * 100 };
+    })
+    : [];
+  const freqTicks = (frequency_range && axisTickCount > 1)
+    ? Array.from({ length: axisTickCount }, (_, i) => {
+      const f = frequency_range[0] + (i / (axisTickCount - 1)) * (frequency_range[1] - frequency_range[0]);
+      return {
+        value: f,
+        label: `${(f / 1000).toFixed(1)} kHz`,
+        // Higher frequencies should be visually toward top.
+        pctFromTop: 100 - ((i / (axisTickCount - 1)) * 100)
+      };
+    })
+    : [];
+
+  const handleDownloadCurrentClip = useCallback(() => {
+    if (!audio_base64) {
+      console.error('FocusView download failed: no clip audio data available');
+      return;
+    }
+
+    try {
+      const link = document.createElement('a');
+      link.href = `data:audio/wav;base64,${audio_base64}`;
+
+      const start = Number.isFinite(start_time) ? start_time.toFixed(2) : 'start';
+      const end = Number.isFinite(end_time) ? end_time.toFixed(2) : 'end';
+      const stem = file ? basename(file).replace(/\.[^/.]+$/, '') : 'clip';
+      link.download = `${stem}_${start}s_${end}s.wav`;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('FocusView download failed:', err);
+    }
+  }, [audio_base64, file, start_time, end_time]);
+
   // Handle annotation changes with auto-advance
   const handleAnnotationChangeWithAdvance = useCallback((newAnnotation, newAnnotationStatus) => {
     if (onAnnotationChange) {
@@ -468,6 +525,13 @@ function FocusView({
                   title="Restart"
                 >
                   <span className="material-symbols-outlined">restart_alt</span>
+                </button>
+<button
+                  onClick={handleDownloadCurrentClip}
+                  className="audio-btn"
+                  title="Download current clip audio"
+                >
+                  <span className="material-symbols-outlined">download</span>
                 </button>
               </div>
               <div className="audio-timeline-compact">
