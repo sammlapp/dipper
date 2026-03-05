@@ -2252,7 +2252,7 @@ button:disabled {
 /* Active clip styling - thicker border */
 .annotation-card.active-clip {
   /* border: 4px solid var(--primary-color); */
-  box-shadow: 0 0 15px 5px rgb(11, 114, 198, .7);
+  box-shadow: 0 0 15px 5px rgba(9, 98, 171, 1);
 }
 
 .annotation-spectrogram-container {
