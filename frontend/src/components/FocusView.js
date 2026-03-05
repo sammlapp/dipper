@@ -117,8 +117,17 @@ function FocusView({
 
   const handleAudioLoadedMetadata = useCallback(() => {
     if (audioRef.current) {
-      setDuration(audioRef.current.duration);
+      setDuration(audioRef.current.duration || 0);
+      setCurrentTime(audioRef.current.currentTime || 0);
     }
+  }, []);
+
+  const handleAudioPlay = useCallback(() => {
+    setIsPlaying(true);
+  }, []);
+
+  const handleAudioPause = useCallback(() => {
+    setIsPlaying(false);
   }, []);
 
   const handleAudioEnded = useCallback(() => {
@@ -128,7 +137,7 @@ function FocusView({
 
   // Play/pause functions
   const playAudio = useCallback(async () => {
-    if (audioRef.current && audioRef.current.readyState >= 2) { // HAVE_CURRENT_DATA
+    if (audioRef.current) {
       try {
         // Reset position if at end
         if (audioRef.current.currentTime >= audioRef.current.duration) {
@@ -150,12 +159,12 @@ function FocusView({
   }, [isPlaying]);
 
   const togglePlayPause = useCallback(() => {
-    if (isPlaying) {
+    if (audioRef.current && !audioRef.current.paused) {
       pauseAudio();
     } else {
       playAudio();
     }
-  }, [isPlaying, playAudio, pauseAudio]);
+  }, [playAudio, pauseAudio]);
 
   // Audio seek function
   const handleSeek = useCallback((event) => {
@@ -409,6 +418,8 @@ function FocusView({
             src={audioUrl}
             onTimeUpdate={handleAudioTimeUpdate}
             onLoadedMetadata={handleAudioLoadedMetadata}
+            onPlay={handleAudioPlay}
+            onPause={handleAudioPause}
             onEnded={handleAudioEnded}
             preload="metadata"
           />
@@ -416,49 +427,77 @@ function FocusView({
 
         {/* Large spectrogram display */}
         <div className={`focus-spectrogram-container ${settings?.focus_size ? `size-${settings.focus_size}` : 'size-medium'}`}>
-          <div
-            className="focus-spectrogram"
-            onClick={handleSpectrogramClick}
-            title={audioUrl ? (isPlaying ? 'Click to pause audio' : 'Click to play audio') : 'Audio not available'}
-            style={{ position: 'relative' }}
-          >
-            {spectrogram_base64 ? (
-              <img
-                src={`data:image/png;base64,${spectrogram_base64}`}
-                alt="Spectrogram"
-                className="focus-spectrogram-image"
-              />
-            ) : (
-              <div className="focus-spectrogram-placeholder">
-                <img src="/icon.svg" alt="Loading" className="placeholder-icon app-icon" />
-                <div className="placeholder-text">Loading spectrogram...</div>
-              </div>
-            )}
-
-            {/* Bounding box overlay for drawing annotations */}
-            {onBoundingBoxChange && time_range && frequency_range && (
-              <BoundingBoxOverlay
-                boundingBox={
-                  bbox_start_time != null && bbox_end_time != null &&
-                  bbox_low_freq != null && bbox_high_freq != null
-                    ? { start_time: bbox_start_time, end_time: bbox_end_time, low_freq: bbox_low_freq, high_freq: bbox_high_freq }
-                    : null
-                }
-                onBoundingBoxChange={onBoundingBoxChange}
-                timeRange={time_range}
-                frequencyRange={frequency_range}
-              />
-            )}
-
-            {/* Progress bar overlay */}
-            {duration > 0 && (
-              <div className="focus-progress-bar">
+          <div className="focus-spectrogram-grid">
+            <div className="focus-axis-y-outside">
+              {spectrogram_base64 && freqTicks.map((tick, idx) => (
                 <div
-                  className="focus-progress-fill"
-                  style={{ width: `${(currentTime / duration) * 100}%` }}
+                  key={`freq-outside-${idx}`}
+                  className="focus-axis-outside-tick-wrap focus-axis-outside-tick-wrap-y"
+                  style={{ top: `${tick.pctFromTop}%` }}
+                >
+                  <div className="focus-axis-outside-label focus-axis-outside-label-y">{tick.label}</div>
+                  <div className="focus-axis-outside-tick focus-axis-outside-tick-y" />
+                </div>
+              ))}
+            </div>
+
+            <div
+              className="focus-spectrogram"
+              onClick={handleSpectrogramClick}
+              title={audioUrl ? (isPlaying ? 'Click to pause audio' : 'Click to play audio') : 'Audio not available'}
+              style={{ position: 'relative' }}
+            >
+              {spectrogram_base64 ? (
+                <img
+                  src={`data:image/png;base64,${spectrogram_base64}`}
+                  alt="Spectrogram"
+                  className="focus-spectrogram-image"
                 />
-              </div>
-            )}
+              ) : (
+                <div className="focus-spectrogram-placeholder">
+                  <img src="/icon.svg" alt="Loading" className="placeholder-icon app-icon" />
+                  <div className="placeholder-text">Loading spectrogram...</div>
+                </div>
+              )}
+
+              {/* Bounding box overlay for drawing annotations */}
+              {onBoundingBoxChange && time_range && frequency_range && (
+                <BoundingBoxOverlay
+                  boundingBox={
+                    bbox_start_time != null && bbox_end_time != null &&
+                    bbox_low_freq != null && bbox_high_freq != null
+                      ? { start_time: bbox_start_time, end_time: bbox_end_time, low_freq: bbox_low_freq, high_freq: bbox_high_freq }
+                      : null
+                  }
+                  onBoundingBoxChange={onBoundingBoxChange}
+                  timeRange={time_range}
+                  frequencyRange={frequency_range}
+                />
+              )}
+
+              {/* Progress bar overlay */}
+              {duration > 0 && (
+                <div className="focus-progress-bar">
+                  <div
+                    className="focus-progress-fill"
+                    style={{ width: `${(currentTime / duration) * 100}%` }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="focus-axis-x-outside">
+              {spectrogram_base64 && timeTicks.map((tick, idx) => (
+                <div
+                  key={`time-outside-${idx}`}
+                  className="focus-axis-outside-tick-wrap focus-axis-outside-tick-wrap-x"
+                  style={{ left: `${tick.pct}%` }}
+                >
+                  <div className="focus-axis-outside-tick focus-axis-outside-tick-x" />
+                  <div className="focus-axis-outside-label focus-axis-outside-label-x">{tick.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -526,7 +565,7 @@ function FocusView({
                 >
                   <span className="material-symbols-outlined">restart_alt</span>
                 </button>
-<button
+                <button
                   onClick={handleDownloadCurrentClip}
                   className="audio-btn"
                   title="Download current clip audio"
