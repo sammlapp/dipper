@@ -1097,21 +1097,11 @@ def process_single_clip(clip_data, settings):
         start_time = clip_data["start_time"]
         end_time = clip_data["end_time"]
 
-        # Audio padding for focus mode context
-        audio_padding = float(settings.get("audio_padding_seconds", 0))
-        padded_start = max(0, start_time - audio_padding)
-        padded_end = end_time + audio_padding
-
-        # Load audio with padding
-        padded_duration = padded_end - padded_start
+        # Load audio
+        duration = end_time - start_time
         samples, sr = librosa.load(
-            file_path, sr=None, offset=padded_start, duration=padded_duration
+            file_path, sr=None, offset=start_time, duration=duration
         )
-
-        # calculate actual start and end times of the loaded audio (may be shorter than requested if near start or end of file)
-        # actual_start_time = padded_start
-        actual_end_time = padded_start + len(samples) / sr
-        actual_duration = len(samples) / sr
 
         # Normalize audio if requested
         if settings.get("normalize_audio", True):
@@ -1142,7 +1132,6 @@ def process_single_clip(clip_data, settings):
             frequencies = frequencies[lowest_index : highest_index + 1]
 
         # Show reference frequency line if requested (after bandpass filtering)
-        # TODO: move this from spec creation to the UI
         if settings.get("show_reference_frequency", False):
             ref_freq = settings.get("reference_frequency", 1000)
             # Only add reference line if frequency is within the current range
@@ -1201,14 +1190,10 @@ def process_single_clip(clip_data, settings):
             "status": "success",
             "audio_base64": audio_base64,
             "spectrogram_base64": spectrogram_base64,
-            "duration": actual_duration,
+            "duration": duration,
             "sample_rate": int(sr),
             "frequency_range": [float(frequencies.min()), float(frequencies.max())],
-            "time_range": [float(padded_start), float(actual_end_time)],
-            "original_time_range": [float(start_time), float(end_time)],
-            "audio_padding": audio_padding,
-            "spectrogram_width": img_array.shape[1],
-            "spectrogram_height": img_array.shape[0],
+            "time_range": [float(start_time), float(end_time)],
         }
 
     except Exception as e:
@@ -1371,7 +1356,10 @@ class LightweightServer:
         """Return the system temporary directory path"""
         try:
             temp_dir = tempfile.gettempdir()
-            return web.json_response({"status": "success", "temp_dir": temp_dir})
+            return web.json_response({
+                "status": "success",
+                "temp_dir": temp_dir
+            })
         except Exception as e:
             logger.error(f"Error getting temp directory: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
@@ -1495,7 +1483,7 @@ class LightweightServer:
             # Fill missing values
             df["id"] = list(range(len(df)))
             if "comments" in df.columns:
-                df["comments"] = df["comments"].fillna("")
+                df["comments"]=df["comments"].fillna("")
             else:
                 df["comments"] = ""
 
@@ -1504,7 +1492,7 @@ class LightweightServer:
             # Priority: annotation column > labels column > wide format
             if "annotation" in df.columns:
                 # Binary classification format
-                df["annotation"] = df["annotation"].fillna("")
+                df["annotation"]=df["annotation"].fillna("")
                 df["annotation"] = df["annotation"].str.strip().str.lower()
 
                 # Validate annotation values
@@ -1534,7 +1522,7 @@ class LightweightServer:
             elif "labels" in df.columns:
                 # Multi-class with labels column
                 classes = set()
-                df["labels"] = df["labels"].fillna("")
+                df["labels"]= df["labels"].fillna("")
 
                 # Parse labels
                 def parse_labels(x):
@@ -1567,9 +1555,7 @@ class LightweightServer:
                 if "annotation_status" not in df.columns:
                     df["annotation_status"] = "unreviewed"
                 else:
-                    df["annotation_status"] = df["annotation_status"].fillna(
-                        "unreviewed"
-                    )
+                    df["annotation_status"]=df["annotation_status"].fillna("unreviewed")
 
                 # Validate annotation_status
                 valid_statuses = ["complete", "unreviewed", "uncertain"]

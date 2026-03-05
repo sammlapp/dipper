@@ -155,7 +155,6 @@ export const useHttpAudioLoader = (serverUrl) => {
         image_width: 224,
         image_height: 224,
         normalize_audio: true,
-        audio_padding_seconds: 0,
         max_workers: 4,
         ...settings
       };

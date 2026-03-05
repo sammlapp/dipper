@@ -4,9 +4,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Note:** When making significant changes to the project (new features, architecture changes, setup requirements), also update [README.md](README.md) to keep the public-facing documentation current.
 
-Agent instructions:
-Do not waste too many credits on thinking and planning. Start by reading as much as necessary, then make a succinct plan, then direclty execute it. Recently you've been wasting time and credits on too many planning iterations. 
-
 ## Project Overview
 
 Dipper is a bioacoustics machine learning desktop application built with:

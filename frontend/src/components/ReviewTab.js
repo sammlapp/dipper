@@ -409,7 +409,6 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
             resize_images: true, // Always resize for focus mode
             image_width: focusDimensions.width,
             image_height: focusDimensions.height,
-            audio_padding_seconds: settings.audio_padding_seconds || 0, // Add padding for context
           };
         }
 
@@ -1274,28 +1273,6 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     }
   }, [focusClipIndex, filteredAnnotationData, handleCommentChange]);
 
-  // Focus mode bbox change
-  const handleFocusBboxChange = useCallback((bboxData) => {
-    // bboxData = { bbox_start_t, bbox_end_t, bbox_low_f, bbox_high_f }
-    const currentClip = filteredAnnotationData[focusClipIndex];
-    if (currentClip) {
-      setAnnotationData(prev => {
-        const idx = prev.findIndex(c => c.id === currentClip.id);
-        if (idx === -1) return prev;
-        const arr = [...prev];
-        arr[idx] = {
-          ...prev[idx],
-          bbox_start_t: bboxData.bbox_start_t,
-          bbox_end_t: bboxData.bbox_end_t,
-          bbox_low_f: bboxData.bbox_low_f,
-          bbox_high_f: bboxData.bbox_high_f
-        };
-        return arr;
-      });
-      setHasUnsavedChanges(true);
-    }
-  }, [focusClipIndex, filteredAnnotationData]);
-
   // Reset focus index when data changes
   useEffect(() => {
     if (filteredAnnotationData.length > 0 && focusClipIndex >= filteredAnnotationData.length) {
@@ -1768,6 +1745,19 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     };
   }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange, handleActiveClipAnnotation, handleActiveClipNavigation, handleJumpToNextIncompleteBin, classifierGuidedMode.enabled, stratifiedBins.length, currentBinIndex]);
 
+  // Load current focus clip spectrogram when in focus mode
+  useEffect(() => {
+    if (isFocusMode && annotationData.length > 0) {
+      const currentClip = annotationData[focusClipIndex];
+      const hasLoadedData = loadedPageData.find(loaded => loaded.clip_id === currentClip?.id);
+
+      if (currentClip && !hasLoadedData) {
+        // Load the current clip if it's not already loaded
+        loadFocusClipSpectrogram(currentClip);
+      }
+    }
+  }, [isFocusMode, focusClipIndex, annotationData, loadedPageData]);
+
   // Function to load spectrogram for a specific clip in focus mode
   const loadFocusClipSpectrogram = useCallback(async (clip) => {
     try {
@@ -1819,7 +1809,6 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         resize_images: true, // Always resize for focus mode
         image_width: focusDimensions.width,
         image_height: focusDimensions.height,
-        audio_padding_seconds: settings.audio_padding_seconds || 0, // Add padding for context
       };
 
       const loadedClip = await httpLoader.loadClipsBatch([clipToLoad], visualizationSettings);
@@ -1839,20 +1828,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       // Don't set transitioning state - no overlay shown
       // setIsPageTransitioning(false);
     }
-  }, [rootAudioPath, httpLoader, settings.focus_size, settings.audio_padding_seconds]);
-
-  // Load current focus clip spectrogram when in focus mode
-  useEffect(() => {
-    if (isFocusMode && filteredAnnotationData.length > 0) {
-      const currentClip = filteredAnnotationData[focusClipIndex];
-      const hasLoadedData = loadedPageData.find(loaded => loaded.clip_id === currentClip?.id);
-
-      if (currentClip && !hasLoadedData) {
-        // Load the current clip if it's not already loaded
-        loadFocusClipSpectrogram(currentClip);
-      }
-    }
-  }, [isFocusMode, focusClipIndex, filteredAnnotationData, loadedPageData, loadFocusClipSpectrogram]);
+  }, [rootAudioPath, httpLoader]);
 
   const handleSelectRootAudioPath = async () => {
     try {
@@ -1961,17 +1937,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       : ['annotation', 'comments'];
     const excludedCols = new Set([...standardCols, ...annotationCols, 'id', 'spectrogram_base64', 'audio_base64', 'clip_id']);
 
-    // Get extra columns from all rows (not just first row) so late-added fields
-    // like bbox_* are always exported even if first row doesn't have them.
-    const allColumns = new Set();
-    dataToUse.forEach(clip => {
-      Object.keys(clip || {}).forEach(col => allColumns.add(col));
-    });
-
-    // Ensure bbox columns are present when feature is used, even if sparse across rows
-    ['bbox_start_t', 'bbox_end_t', 'bbox_low_f', 'bbox_high_f'].forEach(col => allColumns.add(col));
-
-    const extraCols = Array.from(allColumns).filter(col => !excludedCols.has(col));
+    // Get extra columns (metadata like card, date, grid, scores, etc.)
+    const extraCols = Object.keys(dataToUse[0]).filter(col => !excludedCols.has(col));
 
     // Final column order: standard, annotation, then extra metadata
     const headers = [...standardCols, ...annotationCols, ...extraCols];
@@ -3116,7 +3083,6 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                   // Show old clip if we've navigated but new clip hasn't loaded yet
                   const clipIndexToShow = (isOnNewClip && !hasLoadedNewClip) ? lastRenderedFocusClipIndex : focusClipIndex;
                   const clipToShow = filteredAnnotationData[clipIndexToShow];
-                  const loadedFocusClip = loadedPageData.find(loaded => loaded.clip_id === clipToShow?.id);
 
                   // Calculate which bin the current focus clip belongs to (for CGL mode)
                   let focusBinIndex = currentBinIndex;
@@ -3194,18 +3160,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                       <FocusView
                         clipData={{
                           ...clipToShow,
-                          // Merge only rendering/media fields from loaded data so clip annotation
-                          // fields (including bbox_* columns) are never overwritten.
-                          spectrogram_base64: loadedFocusClip?.spectrogram_base64,
-                          audio_base64: loadedFocusClip?.audio_base64,
-                          frequency_range: loadedFocusClip?.frequency_range,
-                          time_range: loadedFocusClip?.time_range,
-                          original_time_range: loadedFocusClip?.original_time_range,
-                          audio_padding: loadedFocusClip?.audio_padding,
+                          // Find loaded spectrogram data for the clip we're showing
+                          ...loadedPageData.find(loaded => loaded.clip_id === clipToShow?.id) || {}
                         }}
                         onAnnotationChange={handleFocusAnnotationChange}
                         onCommentChange={handleFocusCommentChange}
-                        onBboxChange={handleFocusBboxChange}
                         onNavigate={handleFocusNavigation}
                         settings={settings}
                         reviewMode={settings.review_mode}

@@ -2252,7 +2252,7 @@ button:disabled {
 /* Active clip styling - thicker border */
 .annotation-card.active-clip {
   /* border: 4px solid var(--primary-color); */
-  box-shadow: 0 0 15px 5px rgba(9, 98, 171, 1);
+  box-shadow: 0 0 15px 5px rgb(11, 114, 198, .7);
 }
 
 .annotation-spectrogram-container {
@@ -2956,14 +2956,14 @@ button:disabled {
   justify-content: center;
   align-items: flex-start;
   width: 100%;
-  padding: 0.5rem 0.25rem;
+  padding: 1rem;
 }
 
 .focus-view-inner {
   display: flex;
   flex-direction: column;
   gap: 0;
-  max-width: none;
+  max-width: 1200px;
   width: 100%;
 }
 
@@ -2972,24 +2972,14 @@ button:disabled {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: transparent;
-  border-radius: 0;
-  box-shadow: none;
-  overflow: visible;
-  border: none;
+  background-color: var(--white);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  border: 2px solid var(--border);
   width: 100%;
   height: 400px;
   /* Default height */
-}
-
-.focus-spectrogram-grid {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) 34px;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  padding: 8px 8px 6px 0;
 }
 
 /* Size variants for the container */
@@ -3000,9 +2990,9 @@ button:disabled {
 }
 
 .focus-spectrogram-container.size-medium {
-  max-width: none;
+  max-width: 900px;
   height: 400px;
-  margin: 0;
+  margin: 0 auto;
 }
 
 .focus-spectrogram-container.size-large {
@@ -3017,18 +3007,16 @@ button:disabled {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 0;
+  min-height: 400px;
   width: 100%;
-  height: 100%;
-  grid-column: 2;
-  grid-row: 1;
 }
 
 .focus-spectrogram-image {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: fill;
+  object-fit: contain;
+  /* Ensure the image fits the container properly */
 }
 
 .focus-spectrogram-placeholder {
@@ -3036,8 +3024,7 @@ button:disabled {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 0;
-  height: 100%;
+  min-height: 400px;
   color: var(--medium-gray);
 }
 
@@ -3065,110 +3052,6 @@ button:disabled {
   height: 100%;
   background-color: var(--dark-accent);
   transition: width 0.1s ease;
-}
-
-/* Padding overlay for audio context in focus mode */
-.focus-padding-overlay {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.1);
-  pointer-events: none;
-  z-index: 5;
-}
-
-.focus-padding-left {
-  left: 0;
-  border-right: 2px dashed rgba(255, 255, 255, 0.5);
-}
-
-.focus-padding-right {
-  right: 0;
-  border-left: 2px dashed rgba(255, 255, 255, 0.5);
-}
-
-/* Bounding box canvas overlay */
-.focus-bbox-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 10;
-}
-
-/* Focus view outside axes */
-.focus-axis-y-outside {
-  grid-column: 1;
-  grid-row: 1;
-  position: relative;
-}
-
-.focus-axis-x-outside {
-  grid-column: 2;
-  grid-row: 2;
-  position: relative;
-}
-
-.focus-axis-outside-tick-wrap {
-  position: absolute;
-  pointer-events: none;
-  color: #000;
-}
-
-.focus-axis-outside-tick-wrap-x {
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  top: 0;
-}
-
-.focus-axis-outside-tick-wrap-y {
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  right: 0;
-}
-
-.focus-axis-outside-tick {
-  background-color: #000;
-}
-
-.focus-axis-outside-tick-x {
-  width: 1px;
-  height: 6px;
-}
-
-.focus-axis-outside-tick-y {
-  width: 6px;
-  height: 1px;
-}
-
-.focus-axis-outside-label {
-  font-size: 10px;
-  line-height: 1;
-  color: #000;
-  white-space: nowrap;
-}
-
-.focus-axis-outside-label-x {
-  margin-top: 2px;
-}
-
-.focus-axis-outside-label-y {
-  margin-right: 4px;
-}
-
-/* Cursor styles when bbox drawing is enabled */
-.focus-spectrogram.bbox-mode {
-  cursor: crosshair;
-}
-
-.focus-spectrogram.bbox-mode:active {
-  cursor: crosshair;
 }
 
 .focus-play-overlay {
