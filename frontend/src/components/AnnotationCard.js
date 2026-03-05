@@ -551,7 +551,6 @@ const AnnotationCard = memo(function AnnotationCard({
             onBoundingBoxChange={onBoundingBoxChange}
             timeRange={time_range}
             frequencyRange={frequency_range}
-            disabled={isPlaying}
           />
         )}
 

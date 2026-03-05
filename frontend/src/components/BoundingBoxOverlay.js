@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, memo } from 'react';
+import { useState, useCallback, useRef, memo, useEffect } from 'react';
 
 /**
  * BoundingBoxOverlay - A simple overlay for drawing bounding boxes on spectrograms.
@@ -11,7 +11,6 @@ const BoundingBoxOverlay = memo(function BoundingBoxOverlay({
   onBoundingBoxChange,   // Callback when box changes
   timeRange,             // [start_time, end_time] in seconds
   frequencyRange,        // [low_freq, high_freq] in Hz
-  disabled = false       // Disable drawing (e.g., during playback)
 }) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState(null);
@@ -45,7 +44,7 @@ const BoundingBoxOverlay = memo(function BoundingBoxOverlay({
   }, [timeRange, frequencyRange]);
 
   const handleMouseDown = useCallback((e) => {
-    if (disabled || !onBoundingBoxChange) return;
+    if (!onBoundingBoxChange) return;
 
     // Only handle left mouse button
     if (e.button !== 0) return;
@@ -65,72 +64,7 @@ const BoundingBoxOverlay = memo(function BoundingBoxOverlay({
       low_freq: coords.freq,
       high_freq: coords.freq
     });
-  }, [disabled, onBoundingBoxChange, pixelToCoords]);
-
-  const handleMouseMove = useCallback((e) => {
-    if (!isDrawing || !drawStart) return;
-
-    const rect = overlayRef.current.getBoundingClientRect();
-    const pixelX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-    const pixelY = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
-
-    const coords = pixelToCoords(pixelX, pixelY, rect);
-
-    // Mark that we've moved (dragged)
-    didDragRef.current = true;
-
-    // Calculate box with proper min/max for both axes
-    setCurrentBox({
-      start_time: Math.min(drawStart.time, coords.time),
-      end_time: Math.max(drawStart.time, coords.time),
-      low_freq: Math.min(drawStart.freq, coords.freq),
-      high_freq: Math.max(drawStart.freq, coords.freq)
-    });
-  }, [isDrawing, drawStart, pixelToCoords]);
-
-  const handleMouseUp = useCallback((e) => {
-    if (!isDrawing) {
-      return;
-    }
-
-    // If we didn't drag, let the click pass through to parent for audio playback
-    if (!didDragRef.current) {
-      setIsDrawing(false);
-      setDrawStart(null);
-      setCurrentBox(null);
-      return;
-    }
-
-    if (!currentBox) {
-      setIsDrawing(false);
-      setDrawStart(null);
-      return;
-    }
-
-    // Only save if box has meaningful size (more than 2% of each dimension)
-    const [timeStart, timeEnd] = timeRange;
-    const [freqLow, freqHigh] = frequencyRange;
-    const timeSpan = timeEnd - timeStart;
-    const freqSpan = freqHigh - freqLow;
-
-    const boxTimeSpan = currentBox.end_time - currentBox.start_time;
-    const boxFreqSpan = currentBox.high_freq - currentBox.low_freq;
-
-    if (boxTimeSpan > timeSpan * 0.02 && boxFreqSpan > freqSpan * 0.02) {
-      // Round to reasonable precision
-      const roundedBox = {
-        start_time: Math.round(currentBox.start_time * 1000) / 1000,
-        end_time: Math.round(currentBox.end_time * 1000) / 1000,
-        low_freq: Math.round(currentBox.low_freq),
-        high_freq: Math.round(currentBox.high_freq)
-      };
-      onBoundingBoxChange(roundedBox);
-    }
-
-    setIsDrawing(false);
-    setDrawStart(null);
-    setCurrentBox(null);
-  }, [isDrawing, currentBox, timeRange, frequencyRange, onBoundingBoxChange]);
+  }, [onBoundingBoxChange, pixelToCoords]);
 
   // Handle click - stop propagation if we just finished dragging
   const handleClick = useCallback((e) => {
@@ -140,24 +74,80 @@ const BoundingBoxOverlay = memo(function BoundingBoxOverlay({
     }
   }, []);
 
-  const handleMouseLeave = useCallback(() => {
-    if (isDrawing) {
-      // Cancel drawing if mouse leaves overlay
+  // When drawing starts, attach document-level listeners to track mouse outside overlay
+  useEffect(() => {
+    if (!isDrawing) return;
+
+    const handleDocumentMouseMove = (e) => {
+      if (!drawStart || !overlayRef.current) return;
+
+      const rect = overlayRef.current.getBoundingClientRect();
+      // Clamp pixel coordinates to overlay bounds
+      const pixelX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      const pixelY = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+
+      const coords = pixelToCoords(pixelX, pixelY, rect);
+
+      didDragRef.current = true;
+
+      setCurrentBox({
+        start_time: Math.min(drawStart.time, coords.time),
+        end_time: Math.max(drawStart.time, coords.time),
+        low_freq: Math.min(drawStart.freq, coords.freq),
+        high_freq: Math.max(drawStart.freq, coords.freq)
+      });
+    };
+
+    const handleDocumentMouseUp = (e) => {
+      if (!didDragRef.current) {
+        setIsDrawing(false);
+        setDrawStart(null);
+        setCurrentBox(null);
+        return;
+      }
+
+      if (currentBox) {
+        const [timeStart, timeEnd] = timeRange;
+        const [freqLow, freqHigh] = frequencyRange;
+        const timeSpan = timeEnd - timeStart;
+        const freqSpan = freqHigh - freqLow;
+
+        const boxTimeSpan = currentBox.end_time - currentBox.start_time;
+        const boxFreqSpan = currentBox.high_freq - currentBox.low_freq;
+
+        if (boxTimeSpan > timeSpan * 0.02 && boxFreqSpan > freqSpan * 0.02) {
+          const roundedBox = {
+            start_time: Math.round(currentBox.start_time * 1000) / 1000,
+            end_time: Math.round(currentBox.end_time * 1000) / 1000,
+            low_freq: Math.round(currentBox.low_freq),
+            high_freq: Math.round(currentBox.high_freq)
+          };
+          onBoundingBoxChange(roundedBox);
+        }
+      }
+
       setIsDrawing(false);
       setDrawStart(null);
       setCurrentBox(null);
-      didDragRef.current = false;
-    }
-  }, [isDrawing]);
+    };
+
+    document.addEventListener('mousemove', handleDocumentMouseMove);
+    document.addEventListener('mouseup', handleDocumentMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleDocumentMouseMove);
+      document.removeEventListener('mouseup', handleDocumentMouseUp);
+    };
+  }, [isDrawing, drawStart, currentBox, timeRange, frequencyRange, pixelToCoords, onBoundingBoxChange]);
 
   // Clear box on double-click
   const handleDoubleClick = useCallback((e) => {
-    if (disabled || !onBoundingBoxChange) return;
+    if (!onBoundingBoxChange) return;
 
     e.preventDefault();
     e.stopPropagation();
     onBoundingBoxChange(null);
-  }, [disabled, onBoundingBoxChange]);
+  }, [onBoundingBoxChange]);
 
   // Calculate display box (either saved box or current drawing)
   const displayBox = currentBox || boundingBox;
@@ -187,9 +177,6 @@ const BoundingBoxOverlay = memo(function BoundingBoxOverlay({
       ref={overlayRef}
       className="bounding-box-overlay"
       onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       style={{
@@ -198,7 +185,7 @@ const BoundingBoxOverlay = memo(function BoundingBoxOverlay({
         left: 0,
         right: 0,
         bottom: 0,
-        cursor: disabled ? 'default' : 'crosshair',
+        cursor: 'crosshair',
         zIndex: 10
       }}
     >
