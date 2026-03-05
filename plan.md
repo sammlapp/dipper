@@ -56,7 +56,6 @@ should not create annotation_status column when using binary annotation
 (currently creates it if you flip the UI to multi-class annotation, even if you don't add any annotations)
 
 Davis Hines:
-- clip download from focus view (esp in remote mode)
 when you annotate, it continues playing the old clip even after youve selected a label with asdf-keys, which plays overtop of the other clip, which detracted from the softwares intended function of fast review
 - I actually like this feature, but we could make it configurable
 
@@ -66,19 +65,13 @@ would be nice to have arrow key functionality to navigate active clip (j/k navig
 would be nice to have multi selection feature (shift-click) to annotate a string of clips with the same label
 
 Santiago:
-frequency axis kHz ticks and tick labels on spectrograms
-- configurable to show/hide
-configurable color for referecne frequency line
+configurable color for reference frequency line
 
 Louis/Lauren/lab:
 - alternative multi-class annotation mode: button for each class, click for present (green)/not (grey), or to be most general, click through yes/no/uncertain/unlabeled on each class
 - the latter suggests an extension of binary annotation mode where you add a multi-select for each class; settings panel choose column(s) for annotation
 
 Filter (min,max) and sort by continuous score column in Review mode. 
-
-Fixes and features applied but reverted:
-- frequency and time axes on spectrogram in focus mode
-- download current clip in Focus mode
 
 ### Allowing multiple active clips in grid mode:
 Selection:

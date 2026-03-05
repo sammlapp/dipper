@@ -91,6 +91,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     labels: { enabled: false, values: [] },
     annotation_status: { enabled: false, values: [] }
   });
+  // Snapshot of visible clip IDs - clips stay visible until Apply Filters is clicked again
+  const [visibleClipIds, setVisibleClipIds] = useState(null); // null means show all (no filter snapshot)
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [currentSavePath, setCurrentSavePath] = useState(null); // Session save path
   const [serverInitializing, setServerInitializing] = useState(false);
@@ -256,49 +258,16 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     }
   };
 
-  // Apply filters to annotation data (using appliedFilters, not filters)
+  // Apply filters to annotation data using snapshot of visible clip IDs
+  // Clips stay visible until Apply Filters is clicked again, even if their labels change
   const filteredAnnotationData = useMemo(() => {
-    return annotationData.filter(clip => {
-      // Filter by annotation (binary mode)
-      if (appliedFilters.annotation.enabled && appliedFilters.annotation.values.length > 0) {
-        const clipAnnotation = clip.annotation || 'unlabeled';
-        if (!appliedFilters.annotation.values.includes(clipAnnotation)) {
-          return false;
-        }
-      }
-
-      // Filter by labels (multi-class mode)
-      if (appliedFilters.labels.enabled && appliedFilters.labels.values.length > 0) {
-        const clipLabels = clip.labels || '';
-        if (!clipLabels) return false;
-
-        try {
-          let labels = [];
-          if (clipLabels.startsWith('[') && clipLabels.endsWith(']')) {
-            labels = JSON.parse(clipLabels.replace(/'/g, '"'));
-          } else {
-            labels = clipLabels.split(',').map(s => s.trim()).filter(s => s);
-          }
-
-          // Check if any of the clip's labels match the filter
-          const hasMatchingLabel = labels.some(label => appliedFilters.labels.values.includes(label));
-          if (!hasMatchingLabel) return false;
-        } catch (e) {
-          return false;
-        }
-      }
-
-      // Filter by annotation status (multi-class mode)
-      if (appliedFilters.annotation_status.enabled && appliedFilters.annotation_status.values.length > 0) {
-        const clipStatus = clip.annotation_status || 'unreviewed';
-        if (!appliedFilters.annotation_status.values.includes(clipStatus)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [annotationData, appliedFilters]);
+    // If we have a snapshot of visible clip IDs, use that instead of re-evaluating filters
+    if (visibleClipIds !== null) {
+      return annotationData.filter(clip => visibleClipIds.has(clip.id));
+    }
+    // No active filters - show all clips
+    return annotationData;
+  }, [annotationData, visibleClipIds]);
 
   // Calculate items per page based on grid settings
   const itemsPerPage = settings.grid_rows * settings.grid_columns;
@@ -1363,14 +1332,66 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     }));
   }, []);
 
-  // Apply filters function
+  // Helper to check if any filters are active
+  const hasActiveFilters = useCallback((filterState) => {
+    return (filterState.annotation.enabled && filterState.annotation.values.length > 0) ||
+           (filterState.labels.enabled && filterState.labels.values.length > 0) ||
+           (filterState.annotation_status.enabled && filterState.annotation_status.values.length > 0);
+  }, []);
+
+  // Apply filters function - captures snapshot of matching clip IDs
   const applyFilters = useCallback(() => {
     setAppliedFilters(filters);
+
+    // Compute which clips match the filters and capture their IDs as a snapshot
+    if (hasActiveFilters(filters)) {
+      const matchingIds = new Set(
+        annotationData.filter(clip => {
+          // Filter by annotation (binary mode)
+          if (filters.annotation.enabled && filters.annotation.values.length > 0) {
+            const clipAnnotation = clip.annotation || 'unlabeled';
+            if (!filters.annotation.values.includes(clipAnnotation)) {
+              return false;
+            }
+          }
+          // Filter by labels (multi-class mode)
+          if (filters.labels.enabled && filters.labels.values.length > 0) {
+            const clipLabels = clip.labels || '';
+            if (!clipLabels) return false;
+            try {
+              let labels = [];
+              if (clipLabels.startsWith('[') && clipLabels.endsWith(']')) {
+                labels = JSON.parse(clipLabels.replace(/'/g, '"'));
+              } else {
+                labels = clipLabels.split(',').map(s => s.trim()).filter(s => s);
+              }
+              const hasMatchingLabel = labels.some(label => filters.labels.values.includes(label));
+              if (!hasMatchingLabel) return false;
+            } catch (e) {
+              return false;
+            }
+          }
+          // Filter by annotation status
+          if (filters.annotation_status.enabled && filters.annotation_status.values.length > 0) {
+            const clipStatus = clip.annotation_status || 'unreviewed';
+            if (!filters.annotation_status.values.includes(clipStatus)) {
+              return false;
+            }
+          }
+          return true;
+        }).map(clip => clip.id)
+      );
+      setVisibleClipIds(matchingIds);
+    } else {
+      // No active filters, clear the snapshot
+      setVisibleClipIds(null);
+    }
+
     setCurrentPage(0); // Reset to first page when filters are applied
     setLastRenderedPage(0); // Reset rendered page tracker
     setFocusClipIndex(0);
     setLastRenderedFocusClipIndex(0); // Reset focus clip index
-  }, [filters]);
+  }, [filters, annotationData, hasActiveFilters]);
 
   // Clear filters function
   const clearFilters = useCallback(() => {
@@ -1381,6 +1402,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
+    setVisibleClipIds(null); // Clear the snapshot
     setCurrentPage(0);
     setLastRenderedPage(0); // Reset rendered page tracker
     setFocusClipIndex(0);
@@ -2716,9 +2738,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 <button
                   onClick={applyFilters}
                   className="apply-filters-button"
-                  disabled={!hasUnappliedFilterChanges}
+                  disabled={!hasUnappliedFilterChanges && !hasActiveFilters(filters)}
                 >
-                  Apply Filters
+                  {visibleClipIds !== null && !hasUnappliedFilterChanges ? 'Refresh Filters' : 'Apply Filters'}
                 </button>
                 <button
                   onClick={clearFilters}
