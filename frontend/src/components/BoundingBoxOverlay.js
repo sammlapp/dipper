@@ -28,8 +28,19 @@ const BoundingBoxOverlay = memo(function BoundingBoxOverlay({
   const [drawStart, setDrawStart] = useState(null);
   const [currentBox, setCurrentBox] = useState(null);
   const [hoverHandle, setHoverHandle] = useState(null); // For cursor feedback
+  const [overlayReady, setOverlayReady] = useState(false); // Track when overlay has rendered
   const overlayRef = useRef(null);
   const didDragRef = useRef(false);
+
+  // Trigger re-render after mount to ensure getBoundingClientRect returns valid dimensions
+  useEffect(() => {
+    if (overlayRef.current) {
+      // Use requestAnimationFrame to wait for layout to complete
+      requestAnimationFrame(() => {
+        setOverlayReady(true);
+      });
+    }
+  }, []);
 
   // Convert pixel position to time/frequency coordinates
   const pixelToCoords = useCallback((pixelX, pixelY, rect) => {
@@ -341,8 +352,9 @@ const BoundingBoxOverlay = memo(function BoundingBoxOverlay({
   const displayBox = currentBox || boundingBox;
 
   // Calculate pixel coordinates for display
+  // Include overlayReady in deps to recalculate after mount when dimensions are available
   const getBoxStyle = useCallback(() => {
-    if (!displayBox || !overlayRef.current) return null;
+    if (!displayBox || !overlayRef.current || !overlayReady) return null;
 
     const rect = overlayRef.current.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return null;
@@ -356,7 +368,7 @@ const BoundingBoxOverlay = memo(function BoundingBoxOverlay({
       width: bottomRight.x - topLeft.x,
       height: bottomRight.y - topLeft.y
     };
-  }, [displayBox, coordsToPixel]);
+  }, [displayBox, coordsToPixel, overlayReady]);
 
   const boxStyle = getBoxStyle();
 
