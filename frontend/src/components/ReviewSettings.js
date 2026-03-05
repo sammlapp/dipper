@@ -68,6 +68,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     show_comments: false,
     show_file_name: false,
     show_binary_controls: true, // Show yes/no/uncertain controls in grid mode
+    enable_bounding_boxes: false, // Enable click-drag bounding box selection
 
     // Image resize settings
     resize_images: true,
@@ -239,6 +240,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
       show_comments: false,
       show_file_name: true,
       show_binary_controls: true,
+      enable_bounding_boxes: false,
       resize_images: true,
       image_width: 400,
       image_height: 200,
@@ -494,6 +496,15 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
               onChange={(e) => handleSettingChange('show_binary_controls', e.target.checked)}
             />
             <span>Show Binary Controls (Grid Mode)</span>
+          </label>
+
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={settings.enable_bounding_boxes}
+              onChange={(e) => handleSettingChange('enable_bounding_boxes', e.target.checked)}
+            />
+            <span>Enable Bounding Box Selection</span>
           </label>
         </div>
       </div>

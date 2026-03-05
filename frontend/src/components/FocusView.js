@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { basename } from 'pathe';
 import Select from 'react-select';
+import BoundingBoxOverlay from './BoundingBoxOverlay';
 
 function FocusView({
   clipData,
   onAnnotationChange,
   onCommentChange,
+  onBoundingBoxChange,
   onNavigate,
   settings,
   reviewMode = 'binary',
@@ -29,7 +31,13 @@ function FocusView({
     annotation_status = 'unreviewed',
     comments = '',
     audio_base64 = null,
-    spectrogram_base64 = null
+    spectrogram_base64 = null,
+    frequency_range = null,
+    time_range = null,
+    bbox_start_time = null,
+    bbox_end_time = null,
+    bbox_low_freq = null,
+    bbox_high_freq = null
   } = clipData || {};
 
   // Local state for comment to prevent re-renders on every keystroke
@@ -355,6 +363,7 @@ function FocusView({
             className="focus-spectrogram"
             onClick={handleSpectrogramClick}
             title={audioUrl ? (isPlaying ? 'Click to pause audio' : 'Click to play audio') : 'Audio not available'}
+            style={{ position: 'relative' }}
           >
             {spectrogram_base64 ? (
               <img
@@ -369,6 +378,21 @@ function FocusView({
               </div>
             )}
 
+            {/* Bounding box overlay for drawing annotations */}
+            {onBoundingBoxChange && time_range && frequency_range && (
+              <BoundingBoxOverlay
+                boundingBox={
+                  bbox_start_time != null && bbox_end_time != null &&
+                  bbox_low_freq != null && bbox_high_freq != null
+                    ? { start_time: bbox_start_time, end_time: bbox_end_time, low_freq: bbox_low_freq, high_freq: bbox_high_freq }
+                    : null
+                }
+                onBoundingBoxChange={onBoundingBoxChange}
+                timeRange={time_range}
+                frequencyRange={frequency_range}
+              />
+            )}
+
             {/* Progress bar overlay */}
             {duration > 0 && (
               <div className="focus-progress-bar">
@@ -378,15 +402,6 @@ function FocusView({
                 />
               </div>
             )}
-
-            {/* Play/pause overlay */}
-            {/* <div className="focus-play-overlay">
-              <div className={`focus-play-button ${isPlaying ? 'playing' : 'paused'}`}>
-                <span className="material-symbols-outlined">
-                  {isPlaying ? 'pause' : 'play_arrow'}
-                </span>
-              </div>
-            </div> */}
           </div>
         </div>
 

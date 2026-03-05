@@ -32,6 +32,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     show_comments: false,
     show_file_name: false,
     show_binary_controls: true,
+    enable_bounding_boxes: false,
     resize_images: true,
     image_width: 400,
     image_height: 200,
@@ -2151,7 +2152,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                   isActive={isActive}
                   onAnnotationChange={(annotation, annotationStatus) => handleAnnotationChange(clip.id, annotation, annotationStatus)}
                   onCommentChange={(comment) => handleCommentChange(clip.id, comment)}
-                  onBoundingBoxChange={(boundingBox) => handleBoundingBoxChange(clip.id, boundingBox)}
+                  onBoundingBoxChange={settings.enable_bounding_boxes ? (boundingBox) => handleBoundingBoxChange(clip.id, boundingBox) : undefined}
                   onCardClick={() => setActiveClipIndexOnPage(indexOnPage)}
                   onPlayPause={isActive ? (audioControls) => {
                     // Store previous clip's controls before updating to new clip
@@ -3208,6 +3209,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                         }}
                         onAnnotationChange={handleFocusAnnotationChange}
                         onCommentChange={handleFocusCommentChange}
+                        onBoundingBoxChange={settings.enable_bounding_boxes ? (boundingBox) => handleBoundingBoxChange(clipToShow?.id, boundingBox) : undefined}
                         onNavigate={handleFocusNavigation}
                         settings={settings}
                         reviewMode={settings.review_mode}
