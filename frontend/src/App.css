@@ -3013,10 +3013,30 @@ button:disabled {
   position: relative;
 }
 
+.focus-axis-y-outside::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 100%;
+  background: #111;
+}
+
 .focus-axis-x-outside {
   grid-column: 2;
   grid-row: 2;
   position: relative;
+}
+
+.focus-axis-x-outside::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: #111;
 }
 
 .focus-axis-outside-tick-wrap {
