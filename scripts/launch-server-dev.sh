@@ -90,17 +90,8 @@ if [ ! -f "$PROJECT_ROOT/backend/lightweight_server.py" ]; then
     exit 1
 fi
 
-# Check for venv created by install-server.sh
-VENV_PATH="$PROJECT_ROOT/backend/venv"
-if [ -d "$VENV_PATH" ] && [ -f "$VENV_PATH/bin/python" ]; then
-    PYTHON_CMD="$VENV_PATH/bin/python"
-    echo -e "${GREEN}✓ Using venv: $VENV_PATH${NC}"
-else
-    # Fall back to system Python
-    PYTHON_CMD=$(command -v python3 || command -v python)
-    echo -e "${YELLOW}⚠ No venv found at $VENV_PATH, using system Python${NC}"
-    echo -e "${YELLOW}  Run ./scripts/install-server.sh to create venv with dependencies${NC}"
-fi
+# Find Python command
+PYTHON_CMD=$(command -v python3 || command -v python)
 
 echo -e "${BLUE}Starting development servers...${NC}"
 echo ""
