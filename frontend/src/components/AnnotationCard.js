@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { basename } from 'pathe';
 import Select from 'react-select';
+import BoundingBoxOverlay from './BoundingBoxOverlay';
 
 const AnnotationCard = memo(function AnnotationCard({
   clipData,
@@ -12,6 +13,7 @@ const AnnotationCard = memo(function AnnotationCard({
   isActive = false, // New prop to indicate active clip
   onAnnotationChange,
   onCommentChange,
+  onBoundingBoxChange, // Callback for bounding box changes
   onCardClick, // New prop for click handler
   onPlayPause, // New prop to trigger play/pause from outside
   className = "",
@@ -40,7 +42,13 @@ const AnnotationCard = memo(function AnnotationCard({
     annotation_status = 'unreviewed',
     comments = '',
     spectrogram_base64 = null,
-    audio_base64 = null
+    audio_base64 = null,
+    frequency_range = null,
+    time_range = null,
+    bbox_start_time = null,
+    bbox_end_time = null,
+    bbox_low_freq = null,
+    bbox_high_freq = null
   } = clipData || {};
 
   // Create audio URL from base64 data
@@ -527,8 +535,25 @@ const AnnotationCard = memo(function AnnotationCard({
         className={`annotation-spectrogram-container ${audioUrl ? 'clickable' : ''}`}
         onClick={handleSpectrogramClick}
         title={audioUrl ? (isPlaying ? 'Click to pause audio' : 'Click to play audio') : 'Audio not available'}
+        style={{ position: 'relative' }}
       >
         {renderSpectrogram}
+
+        {/* Bounding box overlay for drawing annotations */}
+        {onBoundingBoxChange && time_range && frequency_range && (
+          <BoundingBoxOverlay
+            boundingBox={
+              bbox_start_time != null && bbox_end_time != null &&
+              bbox_low_freq != null && bbox_high_freq != null
+                ? { start_time: bbox_start_time, end_time: bbox_end_time, low_freq: bbox_low_freq, high_freq: bbox_high_freq }
+                : null
+            }
+            onBoundingBoxChange={onBoundingBoxChange}
+            timeRange={time_range}
+            frequencyRange={frequency_range}
+            disabled={isPlaying}
+          />
+        )}
 
         {/* Progress bar overlay */}
         {duration > 0 && (

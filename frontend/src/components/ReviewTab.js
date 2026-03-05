@@ -1248,6 +1248,40 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     setHasUnsavedChanges(true);
   }, []);
 
+  // Bounding box change handler
+  const handleBoundingBoxChange = useCallback((clipId, boundingBox) => {
+    setAnnotationData(prev => {
+      const clipIndex = prev.findIndex(clip => clip.id === clipId);
+      if (clipIndex === -1) return prev;
+
+      const currentClip = prev[clipIndex];
+
+      // Update bounding box fields (null to clear)
+      const updates = boundingBox
+        ? {
+            bbox_start_time: boundingBox.start_time,
+            bbox_end_time: boundingBox.end_time,
+            bbox_low_freq: boundingBox.low_freq,
+            bbox_high_freq: boundingBox.high_freq
+          }
+        : {
+            bbox_start_time: null,
+            bbox_end_time: null,
+            bbox_low_freq: null,
+            bbox_high_freq: null
+          };
+
+      // Check if anything actually changed
+      const hasChanges = Object.keys(updates).some(key => currentClip[key] !== updates[key]);
+      if (!hasChanges) return prev;
+
+      const newArray = [...prev];
+      newArray[clipIndex] = { ...currentClip, ...updates };
+      return newArray;
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
   // Focus mode navigation
   const handleFocusNavigation = useCallback((direction) => {
     if (direction === 'next') {
@@ -1930,18 +1964,24 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     }
 
     // Get all column names from the first clip, preserving order
-    // Standard columns first, then annotation columns, then extra metadata columns
+    // Standard columns first, then annotation columns, bounding box columns, then extra metadata columns
     const standardCols = ['file', 'start_time', 'end_time'];
     const annotationCols = settingsToUse.review_mode === 'multiclass'
       ? ['labels', 'annotation_status', 'comments']
       : ['annotation', 'comments'];
-    const excludedCols = new Set([...standardCols, ...annotationCols, 'id', 'spectrogram_base64', 'audio_base64', 'clip_id']);
+    const bboxCols = ['bbox_start_time', 'bbox_end_time', 'bbox_low_freq', 'bbox_high_freq'];
+    // Exclude transient/internal columns from export
+    const excludedCols = new Set([
+      ...standardCols, ...annotationCols, ...bboxCols,
+      'id', 'spectrogram_base64', 'audio_base64', 'clip_id',
+      'frequency_range', 'time_range', 'sample_rate', 'duration', 'status', 'originalData'
+    ]);
 
     // Get extra columns (metadata like card, date, grid, scores, etc.)
     const extraCols = Object.keys(dataToUse[0]).filter(col => !excludedCols.has(col));
 
-    // Final column order: standard, annotation, then extra metadata
-    const headers = [...standardCols, ...annotationCols, ...extraCols];
+    // Final column order: standard, annotation, bounding box, then extra metadata
+    const headers = [...standardCols, ...annotationCols, ...bboxCols, ...extraCols];
 
     const rows = dataToUse.map(clip => {
       return headers.map(header => {
@@ -2099,7 +2139,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                   clipData={{
                     ...clip,
                     spectrogram_base64: loadedClip.spectrogram_base64,
-                    audio_base64: loadedClip.audio_base64
+                    audio_base64: loadedClip.audio_base64,
+                    frequency_range: loadedClip.frequency_range,
+                    time_range: loadedClip.time_range
                   }}
                   reviewMode={settings.review_mode}
                   availableClasses={availableClasses}
@@ -2109,6 +2151,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                   isActive={isActive}
                   onAnnotationChange={(annotation, annotationStatus) => handleAnnotationChange(clip.id, annotation, annotationStatus)}
                   onCommentChange={(comment) => handleCommentChange(clip.id, comment)}
+                  onBoundingBoxChange={(boundingBox) => handleBoundingBoxChange(clip.id, boundingBox)}
                   onCardClick={() => setActiveClipIndexOnPage(indexOnPage)}
                   onPlayPause={isActive ? (audioControls) => {
                     // Store previous clip's controls before updating to new clip
@@ -2127,7 +2170,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         </div>
       </>
     );
-  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridDimensions, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, settings.show_binary_controls, handleAnnotationChange, handleCommentChange, classifierGuidedMode, stratifiedBins]);
+  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridDimensions, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, settings.show_binary_controls, handleAnnotationChange, handleCommentChange, handleBoundingBoxChange, classifierGuidedMode, stratifiedBins]);
 
   return (
     <div className="review-tab-layout">

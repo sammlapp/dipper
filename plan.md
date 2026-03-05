@@ -76,6 +76,11 @@ Louis/Lauren/lab:
 
 Filter (min,max) and sort by continuous score column in Review mode. 
 
+Fixes and features applied but reverted:
+- frequency and time axes on spectrogram in focus mode
+- darker, more opaque highlighting of active clip
+- download current clip in Focus mode
+
 ### Allowing multiple active clips in grid mode:
 Selection:
 - if user holds shift and clicks clip other than active clip, all clips between them inclusive become active (in displayed order)
