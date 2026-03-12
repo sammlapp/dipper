@@ -70,13 +70,15 @@ Davis Hines:
 when you annotate, it continues playing the old clip even after youve selected a label with asdf-keys, which plays overtop of the other clip, which detracted from the softwares intended function of fast review
 - I actually like this feature, but we could make it configurable
 
-would be nice to have a audacity esq bar that tranverses the entire spectrogram to visualize what part of clip is playing (vertical scroll bar shows playback position; this exists in focus mode already)
+would be nice to have a audacity esq bar that tranverses the entire spectrogram to visualize what part of clip is playing (vertical scroll bar shows playback position)
+- I tried to implement this and it was a huge pain, kept doing ugly jupy thing
 would be nice to have arrow key functionality to navigate active clip (j/k navigate next/previous, but arrows navigate up/down/left/right for active clip in grid mode)
 
 would be nice to have multi selection feature (shift-click) to annotate a string of clips with the same label
 
 Santiago:
 configurable color for reference frequency line
+- should not be painted onto the spectrogram! should be displayed by the ui over the spectrogram
 
 Louis/Lauren/lab:
 - alternative multi-class annotation mode: button for each class, click for present (green)/not (grey), or to be most general, click through yes/no/uncertain/unlabeled on each class
@@ -90,6 +92,8 @@ Selection:
 - if user holds ctrl/cmd while clicking a clip, the clicked clip is added to the set of currently active clips
 - if a user clicks a clip without cmd/ctrl or shift held, that clip becomes the only active clip
 Display:
+(when holding down shift or ctrl/cmd key, curson icon changes to indicate multi-select mode)
+
 - when multiple clips are active, active clip border-glow changes color and playback is disabled; all selected clips show the border-glow to indicate they are selected
 Annotation:
 when multiple clips are active, changes made to the annotations of any single clip are applied to all active clips
@@ -108,8 +112,6 @@ save best model predictions and labels for validation set in output dir
 save publication-ready metrics summary and visualization as html in output dir
 
 ## known bugs
-
-bounding-box times are incorrect (when clip occurs at beginning or end of audio file?)
 
 LMC: when random order is enabled in CGL, clip order shuffles every time user adds an annotation or comment
 

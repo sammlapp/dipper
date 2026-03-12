@@ -4,6 +4,7 @@ import Select from 'react-select';
 function ClassifierGuidedPanel({
   config,
   onConfigChange,
+  onApplyOrder,
   availableColumns,
   numericColumns,
   availableClasses,
@@ -84,17 +85,18 @@ function ClassifierGuidedPanel({
           <span>Enable Mode</span>
         </label>
         <p className="help-text">
-          Organize clips into stratification bins based on metadata columns.
-          Display one bin per page with auto-advance when completion criteria are met.
+          Sort or stratify clips for guided listening. Stratification groups clips into bins
+          by column values; without stratification, normal pagination is used with the selected sort order.
         </p>
       </div>
 
       {config.enabled && (
         <>
           <div className="panel-section">
-            <h4>Stratification Columns</h4>
+            <h4>Stratification Columns <span style={{ fontWeight: 400, fontSize: '0.85em', color: '#888' }}>(optional)</span></h4>
             <p className="help-text">
               Select columns to create unique bins. Each unique combination will be one bin/page.
+              Leave empty to use normal pagination with the sort order below.
             </p>
             <Select
               isMulti
@@ -105,9 +107,6 @@ function ClassifierGuidedPanel({
               className="react-select-container"
               classNamePrefix="react-select"
             />
-            {config.stratificationColumns.length === 0 && (
-              <p className="warning-text">⚠️ Please select at least one column</p>
-            )}
           </div>
 
           <div className="panel-section">
@@ -248,16 +247,43 @@ function ClassifierGuidedPanel({
             )}
           </div>
 
+          {config.stratificationColumns.length > 0 && (
+            <div className="panel-section">
+              <h4>Max Clips Per Bin</h4>
+              <input
+                type="number"
+                value={config.maxClipsPerBin}
+                onChange={(e) => handleMaxClipsChange(e.target.value)}
+                min="1"
+                className="number-input"
+              />
+              <p className="help-text">Maximum number of clips to display per bin (default: 20)</p>
+            </div>
+          )}
+
           <div className="panel-section">
-            <h4>Max Clips Per Bin</h4>
-            <input
-              type="number"
-              value={config.maxClipsPerBin}
-              onChange={(e) => handleMaxClipsChange(e.target.value)}
-              min="1"
-              className="number-input"
-            />
-            <p className="help-text">Maximum number of clips to display per bin (default: 20)</p>
+            <button
+              onClick={onApplyOrder}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: 'var(--dark-accent)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontFamily: 'Rokkitt, sans-serif',
+                fontWeight: 500
+              }}
+            >
+              {config.stratificationColumns.length > 0 ? 'Apply Stratification & Order' : 'Apply Order'}
+            </button>
+            <p className="help-text">
+              {config.stratificationColumns.length > 0
+                ? 'Build bins and set clip order. Re-click to reshuffle random order.'
+                : 'Sort clips into the selected order. Re-click to reshuffle random order.'}
+            </p>
           </div>
 
         </>

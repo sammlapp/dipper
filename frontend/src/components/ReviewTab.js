@@ -10,6 +10,7 @@ import ScoreHistogram from './ScoreHistogram';
 import { useHttpAudioLoader, HttpServerStatus } from './HttpAudioLoader';
 import {
   createStratifiedBins,
+  sortClipsInBin,
   isBinComplete,
   getAvailableColumns,
   getNumericColumns
@@ -81,6 +82,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   });
   const [stratifiedBins, setStratifiedBins] = useState([]);
   const [currentBinIndex, setCurrentBinIndex] = useState(0);
+  // Stable sorted clip order for CGL - only updated on explicit user action (Apply Order button)
+  const [cglSortedData, setCglSortedData] = useState(null); // null means use filteredAnnotationData as-is
   const [filters, setFilters] = useState({
     annotation: { enabled: false, values: [] },
     labels: { enabled: false, values: [] },
@@ -277,49 +280,52 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
 
   // Calculate items per page based on grid settings
   const itemsPerPage = settings.grid_rows * settings.grid_columns;
-  const totalPages = Math.ceil(filteredAnnotationData.length / itemsPerPage);
 
   // Get current page data - memoized to prevent unnecessary re-renders
+  // The active data source for pagination: cglSortedData (when CGL sort applied, no stratification),
+  // filteredAnnotationData otherwise
+  const paginationSource = useMemo(() => {
+    if (classifierGuidedMode.enabled && cglSortedData !== null) return cglSortedData;
+    return filteredAnnotationData;
+  }, [classifierGuidedMode.enabled, cglSortedData, filteredAnnotationData]);
+
+  const totalPages = Math.ceil(paginationSource.length / itemsPerPage);
+
   const getCurrentPageData = useCallback(() => {
-    // If classifier-guided mode is enabled, use bin data instead
+    // Stratification mode: use bin data
     if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
       const currentBin = stratifiedBins[currentBinIndex];
       return currentBin ? currentBin.clips : [];
     }
-
-    // Normal pagination mode
+    // Normal pagination (uses sorted source if CGL sort applied)
     const start = currentPage * itemsPerPage;
     const end = start + itemsPerPage;
-    return filteredAnnotationData.slice(start, end);
-  }, [currentPage, itemsPerPage, filteredAnnotationData, classifierGuidedMode.enabled, stratifiedBins, currentBinIndex]);
+    return paginationSource.slice(start, end);
+  }, [currentPage, itemsPerPage, paginationSource, classifierGuidedMode.enabled, stratifiedBins, currentBinIndex]);
 
   // Memoize current page data separately to reduce dependencies
   const currentPageData = useMemo(() => {
-    // If classifier-guided mode is enabled, use bin data instead
+    // Stratification mode: use bin data
     if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
       const currentBin = stratifiedBins[currentBinIndex];
       return currentBin ? currentBin.clips : [];
     }
-
-    // Normal pagination mode
+    // Normal pagination (uses sorted source if CGL sort applied)
     const start = currentPage * itemsPerPage;
     const end = start + itemsPerPage;
-    return filteredAnnotationData.slice(start, end);
-  }, [currentPage, itemsPerPage, filteredAnnotationData, classifierGuidedMode.enabled, stratifiedBins, currentBinIndex]);
+    return paginationSource.slice(start, end);
+  }, [currentPage, itemsPerPage, paginationSource, classifierGuidedMode.enabled, stratifiedBins, currentBinIndex]);
 
   // Get data for the last rendered page/bin (to show old content while new one loads)
   const lastRenderedPageData = useMemo(() => {
-    // If classifier-guided mode was enabled for last render, use last bin data
     if (classifierGuidedMode.enabled && stratifiedBins.length > 0 && lastRenderedBinIndex < stratifiedBins.length) {
       const lastBin = stratifiedBins[lastRenderedBinIndex];
       return lastBin ? lastBin.clips : [];
     }
-
-    // Normal pagination mode
     const start = lastRenderedPage * itemsPerPage;
     const end = start + itemsPerPage;
-    return filteredAnnotationData.slice(start, end);
-  }, [lastRenderedPage, lastRenderedBinIndex, itemsPerPage, filteredAnnotationData, classifierGuidedMode.enabled, stratifiedBins]);
+    return paginationSource.slice(start, end);
+  }, [lastRenderedPage, lastRenderedBinIndex, itemsPerPage, paginationSource, classifierGuidedMode.enabled, stratifiedBins]);
 
   // Load spectrograms for current page
   const loadCurrentPageSpectrograms = useCallback(async () => {
@@ -496,7 +502,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     if (annotationData.length > 0) {
       loadCurrentPageSpectrograms();
     }
-  }, [currentPage, currentBinIndex, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled, stratifiedBins.length, isFocusMode]);
+  }, [currentPage, currentBinIndex, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled, stratifiedBins.length, cglSortedData, isFocusMode]);
 
   // Reset active clip to first clip when page or bin changes (unless it's a layout change)
   useEffect(() => {
@@ -653,9 +659,20 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     maxClipsPerBin: 20
   });
 
-  // Generate stratified bins when classifier-guided mode config changes
-  useEffect(() => {
-    if (classifierGuidedMode.enabled && filteredAnnotationData.length > 0) {
+  // Apply CGL ordering - called explicitly by user via button, not automatically on annotation changes.
+  // This computes sorted order and (if stratification columns set) builds bins.
+  const applyCglOrder = useCallback(() => {
+    if (!classifierGuidedMode.enabled || filteredAnnotationData.length === 0) {
+      setCglSortedData(null);
+      setStratifiedBins([]);
+      setCurrentBinIndex(0);
+      return;
+    }
+
+    const hasStratification = classifierGuidedMode.stratificationColumns.length > 0;
+
+    if (hasStratification) {
+      // Stratification mode: build bins (sorting happens inside createStratifiedBins)
       const bins = createStratifiedBins(filteredAnnotationData, {
         stratificationColumns: classifierGuidedMode.stratificationColumns,
         sortStrategy: classifierGuidedMode.sortStrategy,
@@ -663,38 +680,34 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         maxClipsPerBin: classifierGuidedMode.maxClipsPerBin
       });
       setStratifiedBins(bins);
-
-      // Only reset to first bin if configuration changed (not just data updated)
-      const configChanged =
-        prevConfigRef.current.enabled !== classifierGuidedMode.enabled ||
-        JSON.stringify(prevConfigRef.current.stratificationColumns) !== JSON.stringify(classifierGuidedMode.stratificationColumns) ||
-        prevConfigRef.current.sortStrategy !== classifierGuidedMode.sortStrategy ||
-        prevConfigRef.current.scoreColumn !== classifierGuidedMode.scoreColumn ||
-        prevConfigRef.current.maxClipsPerBin !== classifierGuidedMode.maxClipsPerBin;
-
-      if (configChanged) {
-        setCurrentBinIndex(0); // Reset to first bin only when config changes
-        prevConfigRef.current = {
-          enabled: classifierGuidedMode.enabled,
-          stratificationColumns: [...classifierGuidedMode.stratificationColumns],
-          sortStrategy: classifierGuidedMode.sortStrategy,
-          scoreColumn: classifierGuidedMode.scoreColumn,
-          maxClipsPerBin: classifierGuidedMode.maxClipsPerBin
-        };
-      }
-      // Otherwise keep current bin index - just update bin contents with new annotation data
+      setCglSortedData(null);
+      setCurrentBinIndex(0);
     } else {
+      // No stratification: just sort the clips, keep normal pagination
+      const sorted = sortClipsInBin(filteredAnnotationData, classifierGuidedMode.sortStrategy, classifierGuidedMode.scoreColumn);
+      setCglSortedData(sorted);
+      setStratifiedBins([]);
+      setCurrentPage(0);
+      setLastRenderedPage(0);
+    }
+
+    prevConfigRef.current = {
+      enabled: classifierGuidedMode.enabled,
+      stratificationColumns: [...classifierGuidedMode.stratificationColumns],
+      sortStrategy: classifierGuidedMode.sortStrategy,
+      scoreColumn: classifierGuidedMode.scoreColumn,
+      maxClipsPerBin: classifierGuidedMode.maxClipsPerBin
+    };
+  }, [classifierGuidedMode, filteredAnnotationData]);
+
+  // Clear CGL state when CGL is disabled
+  useEffect(() => {
+    if (!classifierGuidedMode.enabled) {
+      setCglSortedData(null);
       setStratifiedBins([]);
       setCurrentBinIndex(0);
     }
-  }, [
-    classifierGuidedMode.enabled,
-    classifierGuidedMode.stratificationColumns,
-    classifierGuidedMode.sortStrategy,
-    classifierGuidedMode.scoreColumn,
-    classifierGuidedMode.maxClipsPerBin,
-    filteredAnnotationData
-  ]);
+  }, [classifierGuidedMode.enabled]);
 
   // Note: Manual classes are now applied via explicit button clicks in ReviewSettings
   // No automatic updates when manual_classes changes
@@ -786,6 +799,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     });
     setStratifiedBins([]);
     setCurrentBinIndex(0);
+    setCglSortedData(null);
     setFilters({
       annotation: { enabled: false, values: [] },
       labels: { enabled: false, values: [] },
@@ -2128,20 +2142,20 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   };
 
   const getGridDimensions = useCallback(() => {
-    // In classifier-guided mode, use dynamic rows based on clips in bin
-    if (classifierGuidedMode.enabled && currentPageData.length > 0) {
+    // In stratification mode only, use dynamic rows based on clips in bin
+    if (classifierGuidedMode.enabled && stratifiedBins.length > 0 && currentPageData.length > 0) {
       const rows = Math.ceil(currentPageData.length / settings.grid_columns);
       return { rows, columns: settings.grid_columns };
     }
     return { rows: settings.grid_rows, columns: settings.grid_columns };
-  }, [settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled, currentPageData.length]);
+  }, [settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled, stratifiedBins.length, currentPageData.length]);
 
 
 
   const renderAnnotationGrid = useMemo(() => {
     // Determine which page/bin data to show
     // If we've moved to a new page/bin but spectrograms haven't loaded, show the old content
-    const isOnNewPageOrBin = classifierGuidedMode.enabled
+    const isOnNewPageOrBin = (classifierGuidedMode.enabled && stratifiedBins.length > 0)
       ? (currentBinIndex !== lastRenderedBinIndex)
       : (currentPage !== lastRenderedPage);
     const hasLoadedNewContent = loadedPageData.length > 0 &&
@@ -3052,6 +3066,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
             <ClassifierGuidedPanel
               config={classifierGuidedMode}
               onConfigChange={setClassifierGuidedMode}
+              onApplyOrder={applyCglOrder}
               availableColumns={getAvailableColumns(annotationData)}
               numericColumns={getNumericColumns(annotationData)}
               availableClasses={availableClasses}
