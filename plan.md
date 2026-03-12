@@ -12,6 +12,11 @@ take a close look at this codebase, especially documentation markdowns such as r
 - server mode: user clones github repo, runs install script, edits config file, launches server that can be accessed on web browser via port forwarding
 
 # Incomplete items / TODO /feature request
+- in binary annotation mode, settings pannel allows user to select which column to use as the annotation column (could be a class name like 'American Robin', could be the default column name 'annotation'). This column will be the one used to display current annotation status and to save annotations to. Status bar notes which column is being annotated. Eg instead of Annotated: 99/100, "[column name]: 99/100 annotated"
+
+- support  stereo audio
+
+- when pasting a path to navigate to in server mode file browser: if its a file path instead of a folder, navigate to the folder and select the file as the 'active' file
 
 - select subset of classes to save inference results for
 
@@ -40,11 +45,13 @@ Regional/date bird species list filtering using ebird meta-model.
 
 ### User feature requests
 
-- support  stereo audio
+- sort entire annotation table by score
 
 - search/filter for clip by name
 
-** Download clip (in server mode)  **
+- right click menu on a spectrogram: download audio, download spectrogram, copy audio file path
+
+- dark mode
 
 Jeff Larkin: 
 - ecological inference, basics like map, modelled occupancy in two treatment groups 

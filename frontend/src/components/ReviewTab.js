@@ -84,12 +84,18 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const [filters, setFilters] = useState({
     annotation: { enabled: false, values: [] },
     labels: { enabled: false, values: [] },
-    annotation_status: { enabled: false, values: [] }
+    annotation_status: { enabled: false, values: [] },
+    bounding_box: { enabled: false, value: 'has' }, // value: 'has' | 'does_not_have'
+    numeric_range: { enabled: false, column: null, min: null, max: null },
+    categorical: { enabled: false, column: null, values: [] }
   });
   const [appliedFilters, setAppliedFilters] = useState({
     annotation: { enabled: false, values: [] },
     labels: { enabled: false, values: [] },
-    annotation_status: { enabled: false, values: [] }
+    annotation_status: { enabled: false, values: [] },
+    bounding_box: { enabled: false, value: 'has' },
+    numeric_range: { enabled: false, column: null, min: null, max: null },
+    categorical: { enabled: false, column: null, values: [] }
   });
   // Snapshot of visible clip IDs - clips stay visible until Apply Filters is clicked again
   const [visibleClipIds, setVisibleClipIds] = useState(null); // null means show all (no filter snapshot)
@@ -1324,6 +1330,54 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     };
   }, [annotationData]);
 
+  // Check if bbox columns exist in the annotation data
+  const hasBboxColumns = useMemo(() => {
+    if (!annotationData || annotationData.length === 0) return false;
+    return 'bbox_start_time' in annotationData[0];
+  }, [annotationData]);
+
+  // Get all columns in the data that aren't internal/system columns
+  const filterableColumns = useMemo(() => {
+    if (!annotationData || annotationData.length === 0) return [];
+    const excluded = new Set([
+      'id', 'spectrogram_base64', 'audio_base64', 'clip_id',
+      'frequency_range', 'time_range'
+    ]);
+    const cols = new Set();
+    annotationData.forEach(clip => {
+      Object.keys(clip).forEach(k => { if (!excluded.has(k)) cols.add(k); });
+    });
+    return Array.from(cols).sort();
+  }, [annotationData]);
+
+  // Numeric columns for range filter
+  const numericFilterColumns = useMemo(() => getNumericColumns(annotationData), [annotationData]);
+
+  // Numeric range bounds for the selected column
+  const numericRangeBounds = useMemo(() => {
+    const col = filters.numeric_range.column;
+    if (!col || !annotationData.length) return { min: 0, max: 1 };
+    let min = Infinity, max = -Infinity;
+    annotationData.forEach(clip => {
+      const v = parseFloat(clip[col]);
+      if (!isNaN(v)) { if (v < min) min = v; if (v > max) max = v; }
+    });
+    if (!isFinite(min)) return { min: 0, max: 1 };
+    return { min, max };
+  }, [filters.numeric_range.column, annotationData]);
+
+  // Unique values for the selected categorical column
+  const categoricalColumnValues = useMemo(() => {
+    const col = filters.categorical.column;
+    if (!col || !annotationData.length) return [];
+    const vals = new Set();
+    annotationData.forEach(clip => {
+      const v = clip[col];
+      if (v !== null && v !== undefined) vals.add(String(v));
+    });
+    return Array.from(vals).sort();
+  }, [filters.categorical.column, annotationData]);
+
   // Handle filter changes (just update the UI state, don't apply yet)
   const handleFilterChange = useCallback((filterType, enabled, values) => {
     setFilters(prev => ({
@@ -1336,7 +1390,10 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const hasActiveFilters = useCallback((filterState) => {
     return (filterState.annotation.enabled && filterState.annotation.values.length > 0) ||
            (filterState.labels.enabled && filterState.labels.values.length > 0) ||
-           (filterState.annotation_status.enabled && filterState.annotation_status.values.length > 0);
+           (filterState.annotation_status.enabled && filterState.annotation_status.values.length > 0) ||
+           filterState.bounding_box.enabled ||
+           (filterState.numeric_range.enabled && filterState.numeric_range.column) ||
+           (filterState.categorical.enabled && filterState.categorical.column && filterState.categorical.values.length > 0);
   }, []);
 
   // Apply filters function - captures snapshot of matching clip IDs
@@ -1378,6 +1435,26 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
               return false;
             }
           }
+          // Filter by bounding box presence
+          if (filters.bounding_box.enabled) {
+            const hasBbox = clip.bbox_start_time !== null && clip.bbox_start_time !== undefined &&
+                            !isNaN(parseFloat(clip.bbox_start_time));
+            if (filters.bounding_box.value === 'has' && !hasBbox) return false;
+            if (filters.bounding_box.value === 'does_not_have' && hasBbox) return false;
+          }
+          // Filter by numeric range
+          if (filters.numeric_range.enabled && filters.numeric_range.column) {
+            const val = parseFloat(clip[filters.numeric_range.column]);
+            if (isNaN(val)) return false;
+            if (filters.numeric_range.min !== null && val < filters.numeric_range.min) return false;
+            if (filters.numeric_range.max !== null && val > filters.numeric_range.max) return false;
+          }
+          // Filter by categorical column values
+          if (filters.categorical.enabled && filters.categorical.column && filters.categorical.values.length > 0) {
+            const clipVal = clip[filters.categorical.column];
+            const strVal = clipVal !== null && clipVal !== undefined ? String(clipVal) : '';
+            if (!filters.categorical.values.includes(strVal)) return false;
+          }
           return true;
         }).map(clip => clip.id)
       );
@@ -1398,7 +1475,10 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     const emptyFilters = {
       annotation: { enabled: false, values: [] },
       labels: { enabled: false, values: [] },
-      annotation_status: { enabled: false, values: [] }
+      annotation_status: { enabled: false, values: [] },
+      bounding_box: { enabled: false, value: 'has' },
+      numeric_range: { enabled: false, column: null, min: null, max: null },
+      categorical: { enabled: false, column: null, values: [] }
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
@@ -2733,6 +2813,180 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 </>
               )}
 
+              {/* Bounding box filter (only shown if bbox columns exist) */}
+              {hasBboxColumns && (
+                <div className="filter-group">
+                  <label className="filter-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={filters.bounding_box.enabled}
+                      onChange={(e) => setFilters(prev => ({
+                        ...prev,
+                        bounding_box: { ...prev.bounding_box, enabled: e.target.checked }
+                      }))}
+                    />
+                    Filter by bounding box
+                  </label>
+                  {filters.bounding_box.enabled && (
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                      <Select
+                        value={filters.bounding_box.value}
+                        onChange={(e) => setFilters(prev => ({
+                          ...prev,
+                          bounding_box: { ...prev.bounding_box, value: e.target.value }
+                        }))}
+                      >
+                        <MenuItem value="has">Has bounding box</MenuItem>
+                        <MenuItem value="does_not_have">No bounding box</MenuItem>
+                      </Select>
+                    </FormControl>
+                  )}
+                </div>
+              )}
+
+              {/* Numeric range filter */}
+              {numericFilterColumns.length > 0 && (
+                <div className="filter-group">
+                  <label className="filter-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={filters.numeric_range.enabled}
+                      onChange={(e) => setFilters(prev => ({
+                        ...prev,
+                        numeric_range: { ...prev.numeric_range, enabled: e.target.checked }
+                      }))}
+                    />
+                    Filter by numeric range
+                  </label>
+                  {filters.numeric_range.enabled && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <Select
+                          value={filters.numeric_range.column || ''}
+                          displayEmpty
+                          onChange={(e) => setFilters(prev => ({
+                            ...prev,
+                            numeric_range: { ...prev.numeric_range, column: e.target.value || null, min: null, max: null }
+                          }))}
+                        >
+                          <MenuItem value=""><em>Select column</em></MenuItem>
+                          {numericFilterColumns.map(col => (
+                            <MenuItem key={col} value={col}>{col}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      {filters.numeric_range.column && (
+                        <>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <input
+                              type="number"
+                              placeholder={`Min (${numericRangeBounds.min.toFixed(3)})`}
+                              value={filters.numeric_range.min ?? ''}
+                              step="any"
+                              style={{ width: '100px', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.85rem' }}
+                              onChange={(e) => setFilters(prev => ({
+                                ...prev,
+                                numeric_range: { ...prev.numeric_range, min: e.target.value === '' ? null : parseFloat(e.target.value) }
+                              }))}
+                            />
+                            <span style={{ color: '#666' }}>–</span>
+                            <input
+                              type="number"
+                              placeholder={`Max (${numericRangeBounds.max.toFixed(3)})`}
+                              value={filters.numeric_range.max ?? ''}
+                              step="any"
+                              style={{ width: '100px', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.85rem' }}
+                              onChange={(e) => setFilters(prev => ({
+                                ...prev,
+                                numeric_range: { ...prev.numeric_range, max: e.target.value === '' ? null : parseFloat(e.target.value) }
+                              }))}
+                            />
+                          </div>
+                          <input
+                            type="range"
+                            min={numericRangeBounds.min}
+                            max={numericRangeBounds.max}
+                            step={(numericRangeBounds.max - numericRangeBounds.min) / 200 || 0.01}
+                            value={filters.numeric_range.min ?? numericRangeBounds.min}
+                            style={{ width: '100%' }}
+                            onChange={(e) => setFilters(prev => ({
+                              ...prev,
+                              numeric_range: { ...prev.numeric_range, min: parseFloat(e.target.value) }
+                            }))}
+                          />
+                          <input
+                            type="range"
+                            min={numericRangeBounds.min}
+                            max={numericRangeBounds.max}
+                            step={(numericRangeBounds.max - numericRangeBounds.min) / 200 || 0.01}
+                            value={filters.numeric_range.max ?? numericRangeBounds.max}
+                            style={{ width: '100%' }}
+                            onChange={(e) => setFilters(prev => ({
+                              ...prev,
+                              numeric_range: { ...prev.numeric_range, max: parseFloat(e.target.value) }
+                            }))}
+                          />
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Categorical column filter */}
+              {filterableColumns.length > 0 && (
+                <div className="filter-group">
+                  <label className="filter-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={filters.categorical.enabled}
+                      onChange={(e) => setFilters(prev => ({
+                        ...prev,
+                        categorical: { ...prev.categorical, enabled: e.target.checked }
+                      }))}
+                    />
+                    Filter by column values
+                  </label>
+                  {filters.categorical.enabled && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <Select
+                          value={filters.categorical.column || ''}
+                          displayEmpty
+                          onChange={(e) => setFilters(prev => ({
+                            ...prev,
+                            categorical: { ...prev.categorical, column: e.target.value || null, values: [] }
+                          }))}
+                        >
+                          <MenuItem value=""><em>Select column</em></MenuItem>
+                          {filterableColumns.map(col => (
+                            <MenuItem key={col} value={col}>{col}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      {filters.categorical.column && categoricalColumnValues.length > 0 && (
+                        <FormControl size="small" sx={{ minWidth: 150 }}>
+                          <Select
+                            multiple
+                            value={filters.categorical.values}
+                            onChange={(e) => setFilters(prev => ({
+                              ...prev,
+                              categorical: { ...prev.categorical, values: e.target.value }
+                            }))}
+                            renderValue={(selected) => selected.join(', ')}
+                            displayEmpty
+                          >
+                            {categoricalColumnValues.map(val => (
+                              <MenuItem key={val} value={val}>{val}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Filter Actions */}
               <div className="filter-actions">
                 <button
@@ -2866,16 +3120,6 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
               <span className="material-symbols-outlined">
                 {autoSaveEnabled ? 'sync' : 'sync_disabled'}
               </span>
-            </button>
-
-            {/* Filter button */}
-            <button
-              onClick={() => setIsFilterPanelOpen(true)}
-              className={`toolbar-btn ${(filters.annotation.enabled || filters.labels.enabled || filters.annotation_status.enabled) ? 'active' : ''}`}
-              title="Filter Clips"
-              disabled={annotationData.length === 0}
-            >
-              <span className="material-symbols-outlined">filter_alt</span>
             </button>
 
             {/* Save Status Indicator */}
@@ -3076,6 +3320,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 title="Score Histogram"
               >
                 <span className="material-symbols-outlined">bar_chart</span>
+              </button>
+            )}
+
+            {/* Filter button */}
+            {annotationData.length > 0 && (
+              <button
+                onClick={() => setIsFilterPanelOpen(true)}
+                className={`toolbar-btn ${(visibleClipIds !== null || hasActiveFilters(filters)) ? 'active' : ''}`}
+                title="Filter Clips"
+              >
+                <span className="material-symbols-outlined">filter_alt</span>
               </button>
             )}
 
