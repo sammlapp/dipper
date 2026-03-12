@@ -40,6 +40,10 @@ Regional/date bird species list filtering using ebird meta-model.
 
 ### User feature requests
 
+- support  stereo audio
+
+- search/filter for clip by name
+
 ** Download clip (in server mode)  **
 
 Jeff Larkin: 
@@ -97,6 +101,10 @@ save best model predictions and labels for validation set in output dir
 save publication-ready metrics summary and visualization as html in output dir
 
 ## known bugs
+
+bounding-box times are incorrect (when clip occurs at beginning or end of audio file?)
+
+LMC: when random order is enabled in CGL, clip order shuffles every time user adds an annotation or comment
 
 BRG: aiohttp_cors missing as dependency for server mode after install (not sure why, its listed in requirements so should be installed during install-server.sh)
 

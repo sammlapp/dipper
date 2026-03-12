@@ -1103,6 +1103,19 @@ def process_single_clip(clip_data, settings):
             file_path, sr=None, offset=start_time, duration=duration
         )
 
+        # if start time was <0 or end time was > audio duration, librosa will return available audio
+        # we want to pad with zeros to ensure consistent length for display
+        expected_length = int(duration * sr)
+        # pad front with zeros if start_time < 0
+        if start_time < 0:
+            pad_length = int(-start_time * sr)
+            samples = np.concatenate((np.zeros(pad_length), samples))
+
+        # pad end with zeros if end_time > audio duration
+        if len(samples) < expected_length:
+            pad_length = expected_length - len(samples)
+            samples = np.concatenate((samples, np.zeros(pad_length)))
+
         # Normalize audio if requested
         if settings.get("normalize_audio", True):
             samples = samples / (np.max(np.abs(samples)) + 1e-8)
@@ -1356,10 +1369,7 @@ class LightweightServer:
         """Return the system temporary directory path"""
         try:
             temp_dir = tempfile.gettempdir()
-            return web.json_response({
-                "status": "success",
-                "temp_dir": temp_dir
-            })
+            return web.json_response({"status": "success", "temp_dir": temp_dir})
         except Exception as e:
             logger.error(f"Error getting temp directory: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
@@ -1483,7 +1493,7 @@ class LightweightServer:
             # Fill missing values
             df["id"] = list(range(len(df)))
             if "comments" in df.columns:
-                df["comments"]=df["comments"].fillna("")
+                df["comments"] = df["comments"].fillna("")
             else:
                 df["comments"] = ""
 
@@ -1492,7 +1502,7 @@ class LightweightServer:
             # Priority: annotation column > labels column > wide format
             if "annotation" in df.columns:
                 # Binary classification format
-                df["annotation"]=df["annotation"].fillna("")
+                df["annotation"] = df["annotation"].fillna("")
                 df["annotation"] = df["annotation"].str.strip().str.lower()
 
                 # Validate annotation values
@@ -1522,7 +1532,7 @@ class LightweightServer:
             elif "labels" in df.columns:
                 # Multi-class with labels column
                 classes = set()
-                df["labels"]= df["labels"].fillna("")
+                df["labels"] = df["labels"].fillna("")
 
                 # Parse labels
                 def parse_labels(x):
@@ -1555,7 +1565,9 @@ class LightweightServer:
                 if "annotation_status" not in df.columns:
                     df["annotation_status"] = "unreviewed"
                 else:
-                    df["annotation_status"]=df["annotation_status"].fillna("unreviewed")
+                    df["annotation_status"] = df["annotation_status"].fillna(
+                        "unreviewed"
+                    )
 
                 # Validate annotation_status
                 valid_statuses = ["complete", "unreviewed", "uncertain"]
