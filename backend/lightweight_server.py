@@ -1444,9 +1444,18 @@ class LightweightServer:
             data = await request.json()
             csv_path = data.get("csv_path")
             threshold = data.get("threshold", 0)
-            wide_format = data.get(
-                "wide_format", False
-            )  # New parameter for multi-hot format
+            wide_format = data.get("wide_format", False)
+            annotation_column = data.get("annotation_column", None)
+            # mode: 'binary', 'multiclass', or 'wide' — sent by frontend dialog
+            mode = data.get("mode", None)
+            # Derive from legacy params if mode not provided
+            if mode is None:
+                if wide_format:
+                    mode = "wide"
+                elif annotation_column:
+                    mode = "binary"
+                else:
+                    mode = "binary"  # safe default
 
             if not csv_path:
                 return web.json_response({"error": "csv_path is required"}, status=400)
@@ -1499,148 +1508,83 @@ class LightweightServer:
 
             classes = None
 
-            # Priority: annotation column > labels column > wide format
-            if "annotation" in df.columns:
-                # Binary classification format
-                df["annotation"] = df["annotation"].fillna("")
-                df["annotation"] = df["annotation"].str.strip().str.lower()
+            def parse_labels(x):
+                if pd.isna(x) or x == "":
+                    return []
+                elif isinstance(x, list):
+                    return x
+                elif isinstance(x, str):
+                    if x.startswith("[") and x.endswith("]"):
+                        try:
+                            return json.loads(x.replace("'", '"'))
+                        except:
+                            return []
+                    else:
+                        return [label.strip() for label in x.split(",") if label.strip()]
+                return []
 
-                # Validate annotation values
-                valid_annotations = ["yes", "no", "uncertain", ""]
-                invalid = df["annotation"][~df["annotation"].isin(valid_annotations)]
-                if not invalid.empty:
-                    return web.json_response(
-                        {
-                            "error": f"annotation column contained invalid values: {invalid.unique()}. Valid values are: {valid_annotations}"
-                        },
-                        status=400,
-                    )
+            if mode == "binary":
+                # Binary mode: use the specified annotation column, create if missing
+                col = annotation_column or "annotation"
+                if col not in df.columns:
+                    df[col] = ""
+                df[col] = df[col].fillna("").astype(str).str.strip().str.lower().replace("nan", "")
 
-                # Reorder columns
                 standard_cols = ["file", "start_time"]
                 if "end_time" in df.columns:
                     standard_cols.append("end_time")
-                standard_cols.extend(["annotation", "comments"])
-
-                extra_cols = [
-                    col
-                    for col in df.columns
-                    if col not in standard_cols and col != "id"
-                ]
+                standard_cols.extend([col, "comments"])
+                extra_cols = [c for c in df.columns if c not in standard_cols and c != "id"]
                 df = df[standard_cols + extra_cols + ["id"]]
 
-            elif "labels" in df.columns:
-                # Multi-class with labels column
-                classes = set()
+            elif mode == "multiclass":
+                # Multi-class mode: use labels column, create if missing
+                if "labels" not in df.columns:
+                    df["labels"] = ""
                 df["labels"] = df["labels"].fillna("")
-
-                # Parse labels
-                def parse_labels(x):
-                    if pd.isna(x) or x == "":
-                        return []
-                    elif isinstance(x, list):
-                        return x
-                    elif isinstance(x, str):
-                        if x.startswith("[") and x.endswith("]"):
-                            try:
-                                return json.loads(x.replace("'", '"'))
-                            except:
-                                return []
-                        else:
-                            return [
-                                label.strip() for label in x.split(",") if label.strip()
-                            ]
-                    else:
-                        return []
-
                 df["labels"] = df["labels"].apply(parse_labels)
 
                 # Extract unique classes
+                classes = set()
                 for labels_list in df["labels"]:
                     if isinstance(labels_list, list):
                         classes.update(labels_list)
                 classes = sorted(list(classes)) if classes else None
 
-                # Handle annotation_status
                 if "annotation_status" not in df.columns:
                     df["annotation_status"] = "unreviewed"
                 else:
-                    df["annotation_status"] = df["annotation_status"].fillna(
-                        "unreviewed"
-                    )
+                    df["annotation_status"] = df["annotation_status"].fillna("unreviewed")
 
-                # Validate annotation_status
-                valid_statuses = ["complete", "unreviewed", "uncertain"]
-                invalid_statuses = df["annotation_status"][
-                    ~df["annotation_status"].isin(valid_statuses)
-                ]
-                if not invalid_statuses.empty:
-                    return web.json_response(
-                        {
-                            "error": f"annotation_status column contained invalid values: {invalid_statuses.unique()}. Valid values are: {valid_statuses}"
-                        },
-                        status=400,
-                    )
-
-                # Reorder columns
                 standard_cols = ["file", "start_time"]
                 if "end_time" in df.columns:
                     standard_cols.append("end_time")
                 standard_cols.extend(["labels", "annotation_status", "comments"])
-
-                extra_cols = [
-                    col
-                    for col in df.columns
-                    if col not in standard_cols and col != "id"
-                ]
+                extra_cols = [c for c in df.columns if c not in standard_cols and c != "id"]
                 df = df[standard_cols + extra_cols + ["id"]]
 
-                # Serialize labels to JSON
                 df["labels"] = df["labels"].apply(
                     lambda x: json.dumps(x) if isinstance(x, list) else "[]"
                 )
 
-            elif wide_format:
-                # Multi-hot format (one column per class) - only used when explicitly requested
-                classes = list(
-                    set(df.columns)
-                    - set(["file", "start_time", "end_time", "comments", "id"])
-                )
+            elif mode == "wide":
+                # Wide-format: convert one-hot/score columns to multiclass labels
+                non_data_cols = {"file", "start_time", "end_time", "comments", "id"}
+                classes = [c for c in df.columns if c not in non_data_cols]
                 df["labels"] = df.apply(
                     self._multihot_to_class_list, axis=1, args=(classes, threshold)
                 )
-
-                # Serialize labels to JSON
                 df["labels"] = df["labels"].apply(
                     lambda x: json.dumps(x) if isinstance(x, list) else "[]"
                 )
-
-                if "comments" not in df.columns:
-                    df["comments"] = ""
-
                 df["annotation_status"] = "unreviewed"
 
-                # Reorder columns
                 standard_cols = ["file", "start_time"]
                 if "end_time" in df.columns:
                     standard_cols.append("end_time")
                 standard_cols.extend(["labels", "annotation_status", "comments"])
-
-                extra_cols = [
-                    col
-                    for col in df.columns
-                    if col not in standard_cols and col not in classes and col != "id"
-                ]
+                extra_cols = [c for c in df.columns if c not in standard_cols and c not in classes and c != "id"]
                 df = df[standard_cols + extra_cols + ["id"]]
-
-            else:
-                # No annotation or labels column, and not wide format - error
-                return web.json_response(
-                    {
-                        "error": "CSV must have either 'annotation' column (for binary review) or 'labels' column (for multiclass review). For wide-format CSV with one-hot encoded columns, use 'Open Wide-format CSV' button."
-                    },
-                    status=400,
-                )
 
             # Convert to JSON
             clips = df.to_dict(orient="records")
