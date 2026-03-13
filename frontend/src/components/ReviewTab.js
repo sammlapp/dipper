@@ -1394,7 +1394,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       // If manual classes are provided, only use those (don't extract from clips)
       // This ensures when user changes manual classes, old values don't persist
       if (manualClasses.length > 0) {
-        setAvailableClasses(Array.from(classSet).sort());
+        setAvailableClasses(Array.from(classSet)); // preserve user-defined order
         return;
       }
     }

@@ -24,6 +24,21 @@
   -webkit-user-select: none;
 }
 
+/* Re-enable text selection for copyable content */
+.file-name,
+.focus-file-name,
+.focus-file-name-new,
+.error-message,
+.error-message span,
+.error-display,
+.annotation-error,
+.task-error,
+.error-details,
+.server-status {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 body {
   margin: 0;
   font-family: 'Rokkitt', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;

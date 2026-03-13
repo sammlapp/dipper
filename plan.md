@@ -77,13 +77,8 @@ Louis/Lauren/lab:
 - alternative multi-class annotation mode: button for each class, click for present (green)/not (grey), or to be most general, click through yes/no/uncertain/unlabeled on each class
 - the latter suggests an extension of binary annotation mode where you add a multi-select for each class; settings panel choose column(s) for annotation
 
-Display:
-when holding down shift or ctrl/cmd key, curson icon changes to indicate multi-select capability
-
-Annotation:
-when in multiple active clip mode, changes made to the annotations of any single clip are applied to all active clips
-Binary mode: annotating A/S/D/F or clicking yes/no/uncertain/unlabeled applies this label to all active clips
-Multiclass mode: when multiple active clip mode is enabled, adding or removing a class from any clip adds/removes the class from all active clips; changes to annotation status segmented control are applied to all active clips
+BRG:
+option to autoskip to next clip in multi-label focus mode when marked complete
 
 ### minimum features for shallow training:
 load class list from file or type in manually
