@@ -469,6 +469,8 @@ const AnnotationCard = memo(function AnnotationCard({
             closeMenuOnSelect={false}
             hideSelectedOptions={false}
             blurInputOnSelect={false}
+            menuPortalTarget={document.body}
+            menuPosition="fixed"
           />
 
           {/* Annotation status control */}
