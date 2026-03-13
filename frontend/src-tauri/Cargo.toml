@@ -1,6 +1,6 @@
 [package]
 name = "dipper"
-version = "0.0.10"
+version = "0.0.11"
 description = "Bioacoustics ML Training and Inference Tool"
 authors = ["Dipper Team"]
 license = "MIT"
