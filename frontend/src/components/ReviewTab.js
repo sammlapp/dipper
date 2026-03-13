@@ -550,6 +550,18 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     return annotationData;
   }, [annotationData, visibleClipIds]);
 
+  // Fast lookup: live clip data by ID (so bin/sorted clips always reflect current annotationData)
+  const annotationDataById = useMemo(() => {
+    const map = new Map();
+    annotationData.forEach(clip => map.set(clip.id, clip));
+    return map;
+  }, [annotationData]);
+
+  // Resolve a list of (possibly stale) CGL clip snapshots to their live versions
+  const resolveLiveClips = useCallback((clips) =>
+    clips.map(clip => annotationDataById.get(clip.id) ?? clip),
+    [annotationDataById]);
+
   // Calculate items per page based on grid settings
   const itemsPerPage = settings.grid_rows * settings.grid_columns;
 
@@ -557,47 +569,48 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   // The active data source for pagination: cglSortedData (when CGL sort applied, no stratification),
   // filteredAnnotationData otherwise
   const paginationSource = useMemo(() => {
-    if (classifierGuidedMode.enabled && cglSortedData !== null) return cglSortedData;
+    // cglSortedData holds stale clip snapshots; resolve to live objects so edits are always visible
+    if (classifierGuidedMode.enabled && cglSortedData !== null) return resolveLiveClips(cglSortedData);
     return filteredAnnotationData;
-  }, [classifierGuidedMode.enabled, cglSortedData, filteredAnnotationData]);
+  }, [classifierGuidedMode.enabled, cglSortedData, filteredAnnotationData, resolveLiveClips]);
 
   const totalPages = Math.ceil(paginationSource.length / itemsPerPage);
 
   const getCurrentPageData = useCallback(() => {
-    // Stratification mode: use bin data
+    // Stratification mode: use bin data, resolved to live clip objects
     if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
       const currentBin = stratifiedBins[currentBinIndex];
-      return currentBin ? currentBin.clips : [];
+      return currentBin ? resolveLiveClips(currentBin.clips) : [];
     }
     // Normal pagination (uses sorted source if CGL sort applied)
     const start = currentPage * itemsPerPage;
     const end = start + itemsPerPage;
     return paginationSource.slice(start, end);
-  }, [currentPage, itemsPerPage, paginationSource, classifierGuidedMode.enabled, stratifiedBins, currentBinIndex]);
+  }, [currentPage, itemsPerPage, paginationSource, classifierGuidedMode.enabled, stratifiedBins, currentBinIndex, resolveLiveClips]);
 
   // Memoize current page data separately to reduce dependencies
   const currentPageData = useMemo(() => {
-    // Stratification mode: use bin data
+    // Stratification mode: use bin data, but resolve to live clip objects
     if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
       const currentBin = stratifiedBins[currentBinIndex];
-      return currentBin ? currentBin.clips : [];
+      return currentBin ? resolveLiveClips(currentBin.clips) : [];
     }
     // Normal pagination (uses sorted source if CGL sort applied)
     const start = currentPage * itemsPerPage;
     const end = start + itemsPerPage;
     return paginationSource.slice(start, end);
-  }, [currentPage, itemsPerPage, paginationSource, classifierGuidedMode.enabled, stratifiedBins, currentBinIndex]);
+  }, [currentPage, itemsPerPage, paginationSource, classifierGuidedMode.enabled, stratifiedBins, currentBinIndex, resolveLiveClips]);
 
   // Get data for the last rendered page/bin (to show old content while new one loads)
   const lastRenderedPageData = useMemo(() => {
     if (classifierGuidedMode.enabled && stratifiedBins.length > 0 && lastRenderedBinIndex < stratifiedBins.length) {
       const lastBin = stratifiedBins[lastRenderedBinIndex];
-      return lastBin ? lastBin.clips : [];
+      return lastBin ? resolveLiveClips(lastBin.clips) : [];
     }
     const start = lastRenderedPage * itemsPerPage;
     const end = start + itemsPerPage;
     return paginationSource.slice(start, end);
-  }, [lastRenderedPage, lastRenderedBinIndex, itemsPerPage, paginationSource, classifierGuidedMode.enabled, stratifiedBins]);
+  }, [lastRenderedPage, lastRenderedBinIndex, itemsPerPage, paginationSource, classifierGuidedMode.enabled, stratifiedBins, resolveLiveClips]);
 
   // Load spectrograms for current page
   const loadCurrentPageSpectrograms = useCallback(async () => {
@@ -3768,7 +3781,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 className={`toolbar-btn ${classifierGuidedMode.enabled ? 'active' : ''}`}
                 title="Classifier-Guided Listening"
               >
-                <span className="material-symbols-outlined">analytics</span>
+                <span className="material-symbols-outlined">sort</span>
               </button>
             )}
 
