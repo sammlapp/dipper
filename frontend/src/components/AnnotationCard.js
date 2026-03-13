@@ -11,11 +11,13 @@ const AnnotationCard = memo(function AnnotationCard({
   showComments = false,
   showFileName = true,
   showBinaryControls = true, // Show yes/no/uncertain controls in binary mode
-  isActive = false, // New prop to indicate active clip
+  isActive = false, // Primary active clip
+  isSelected = false, // In multi-select set (not necessarily primary)
+  isMultiSelect = false, // Multi-select mode is active
   onAnnotationChange,
   onCommentChange,
   onBoundingBoxChange, // Callback for bounding box changes
-  onCardClick, // New prop for click handler
+  onCardClick, // Click handler — receives the mouse event
   onPlayPause, // New prop to trigger play/pause from outside
   className = "",
   disableAutoLoad = false // New prop to disable auto-loading
@@ -130,9 +132,12 @@ const AnnotationCard = memo(function AnnotationCard({
   }, [onPlayPause, isActive, togglePlayPause, pause, play]);
 
   // Click to play/pause spectrogram
-  const handleSpectrogramClick = useCallback(async () => {
+  const handleSpectrogramClick = useCallback(async (event) => {
+    // Disable click-to-play when multi-select is active or a modifier key is held
+    if (isMultiSelect) return;
+    if (event && (event.shiftKey || event.metaKey || event.ctrlKey)) return;
     await togglePlayPause();
-  }, [togglePlayPause]);
+  }, [togglePlayPause, isMultiSelect]);
 
   // Parse annotation based on review mode
   const getAnnotationValue = () => {
@@ -436,7 +441,7 @@ const AnnotationCard = memo(function AnnotationCard({
         }),
         multiValue: (provided) => ({
           ...provided,
-          backgroundColor: '#10b981',
+          backgroundColor: '#70ad73',
           borderRadius: '4px',
         }),
         multiValueLabel: (provided) => ({
@@ -448,7 +453,7 @@ const AnnotationCard = memo(function AnnotationCard({
           ...provided,
           color: 'white',
           '&:hover': {
-            backgroundColor: '#047857',
+            backgroundColor: '#3a683b',
             color: 'white',
           }
         })
@@ -456,6 +461,8 @@ const AnnotationCard = memo(function AnnotationCard({
 
       return (
         <div className="multiclass-annotation-control">
+          {/* Hide per-card select in multi-select mode — a shared bar is shown at page level */}
+          {!isMultiSelect && (
           <Select
             isMulti
             options={multiclassOptions}
@@ -472,6 +479,7 @@ const AnnotationCard = memo(function AnnotationCard({
             menuPortalTarget={document.body}
             menuPosition="fixed"
           />
+          )}
 
           {/* Annotation status control */}
           <div className="annotation-status-control">
@@ -513,13 +521,13 @@ const AnnotationCard = memo(function AnnotationCard({
       target.closest('.react-select'); // Exclude react-select dropdowns
 
     if (!isFormControl && onCardClick) {
-      onCardClick();
+      onCardClick(event);
     }
   }, [onCardClick]);
 
   return (
     <div
-      className={`annotation-card ${className} ${isActive ? 'active-clip' : ''}`}
+      className={`annotation-card ${className} ${isActive && !isMultiSelect ? 'active-clip' : ''} ${isSelected && isMultiSelect ? (isActive ? 'active-clip-multi' : 'selected-clip') : ''}`}
       style={getCardStyle()}
       onClick={handleCardClick}
     >
@@ -538,7 +546,7 @@ const AnnotationCard = memo(function AnnotationCard({
       {/* Spectrogram area - clickable */}
       <div
         className={`annotation-spectrogram-container ${audioUrl ? 'clickable' : ''}`}
-        onClick={handleSpectrogramClick}
+        onClick={(e) => handleSpectrogramClick(e)}
         title={audioUrl ? (isPlaying ? 'Click to pause audio' : 'Click to play audio') : 'Audio not available'}
         style={{ position: 'relative' }}
       >

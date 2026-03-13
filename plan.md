@@ -12,8 +12,6 @@ take a close look at this codebase, especially documentation markdowns such as r
 - server mode: user clones github repo, runs install script, edits config file, launches server that can be accessed on web browser via port forwarding
 
 # Incomplete items / TODO /feature request
-- in binary annotation mode, settings pannel allows user to select which column to use as the annotation column (could be a class name like 'American Robin', could be the default column name 'annotation'). This column will be the one used to display current annotation status and to save annotations to. Status bar notes which column is being annotated. Eg instead of Annotated: 99/100, "[column name]: 99/100 annotated"
--> if the column contains invalid values, a helpful error message is posted and the annotation column is not changed. 
 
 - support  stereo audio
 
@@ -71,8 +69,6 @@ would be nice to have a audacity esq bar that tranverses the entire spectrogram 
 - I tried to implement this and it was a huge pain, kept doing ugly jupy thing
 would be nice to have arrow key functionality to navigate active clip (j/k navigate next/previous, but arrows navigate up/down/left/right for active clip in grid mode)
 
-would be nice to have multi selection feature (shift-click) to annotate a string of clips with the same label
-
 Santiago:
 configurable color for reference frequency line
 - should not be painted onto the spectrogram! should be displayed by the ui over the spectrogram
@@ -81,21 +77,13 @@ Louis/Lauren/lab:
 - alternative multi-class annotation mode: button for each class, click for present (green)/not (grey), or to be most general, click through yes/no/uncertain/unlabeled on each class
 - the latter suggests an extension of binary annotation mode where you add a multi-select for each class; settings panel choose column(s) for annotation
 
-Filter (min,max) and sort by continuous score column in Review mode. 
-
-### Allowing multiple active clips in grid mode:
-Selection:
-- if user holds shift and clicks clip other than active clip, all clips between them inclusive become active (in displayed order)
-- if user holds ctrl/cmd while clicking a clip, the clicked clip is added to the set of currently active clips
-- if a user clicks a clip without cmd/ctrl or shift held, that clip becomes the only active clip
 Display:
-(when holding down shift or ctrl/cmd key, curson icon changes to indicate multi-select mode)
+when holding down shift or ctrl/cmd key, curson icon changes to indicate multi-select capability
 
-- when multiple clips are active, active clip border-glow changes color and playback is disabled; all selected clips show the border-glow to indicate they are selected
 Annotation:
-when multiple clips are active, changes made to the annotations of any single clip are applied to all active clips
+when in multiple active clip mode, changes made to the annotations of any single clip are applied to all active clips
 Binary mode: annotating A/S/D/F or clicking yes/no/uncertain/unlabeled applies this label to all active clips
-Multiclass mode: adding or removing a class adds/removes the class from all active clips; changes to annotation status segmented control are applied to all active clips
+Multiclass mode: when multiple active clip mode is enabled, adding or removing a class from any clip adds/removes the class from all active clips; changes to annotation status segmented control are applied to all active clips
 
 ### minimum features for shallow training:
 load class list from file or type in manually

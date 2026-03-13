@@ -468,7 +468,7 @@ function FocusView({
                 <BoundingBoxOverlay
                   boundingBox={
                     bbox_start_time != null && bbox_end_time != null &&
-                    bbox_low_freq != null && bbox_high_freq != null
+                      bbox_low_freq != null && bbox_high_freq != null
                       ? { start_time: bbox_start_time, end_time: bbox_end_time, low_freq: bbox_low_freq, high_freq: bbox_high_freq }
                       : null
                   }
@@ -718,14 +718,7 @@ function FocusView({
           </div>
         </div>
 
-        {/* Keyboard shortcuts help */}
-        <div className="focus-shortcuts-help">
-          <small>
-            <strong>Shortcuts:</strong>
-            {reviewMode === 'binary' && ' a=Yes, s=No, d=Uncertain, f=Unlabeled |'}
-            j=Previous, k=Next | Space=Play/Pause
-          </small>
-        </div>
+
       </div>
     </div>
   );

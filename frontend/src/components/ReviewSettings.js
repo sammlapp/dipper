@@ -295,34 +295,11 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
 
   return (
     <div className="review-settings-content">
-      {/* Review Mode */}
+      {/* Annotation Column (binary mode only) */}
+      {settings.review_mode === 'binary' && (
       <div className="settings-section">
-        <h4>Review Mode</h4>
-        <div className="review-mode-selection">
-          <label className="radio-label">
-            <input
-              type="radio"
-              name="review_mode"
-              value="binary"
-              checked={settings.review_mode === 'binary'}
-              onChange={(e) => handleSettingChange('review_mode', e.target.value)}
-            />
-            <span>Binary Review (Yes/No/Uncertain)</span>
-          </label>
-          <label className="radio-label">
-            <input
-              type="radio"
-              name="review_mode"
-              value="multiclass"
-              checked={settings.review_mode === 'multiclass'}
-              onChange={(e) => handleSettingChange('review_mode', e.target.value)}
-            />
-            <span>Multi-class Review (Class Selection)</span>
-          </label>
-        </div>
-
-        {/* Binary mode: Annotation column selector */}
-        {settings.review_mode === 'binary' && csvColumns && csvColumns.length > 0 && (
+        <h4>Annotation Column</h4>
+        {csvColumns && csvColumns.length > 0 && (
           <div className="input-group" style={{ marginTop: '15px' }}>
             <label htmlFor="annotation_column">Column to use for binary annotations:</label>
             <FormControl size="small" fullWidth sx={{ mt: 1 }}>
@@ -390,6 +367,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
           </div>
         )}
       </div>
+      )}
 
       {/* Multi-class settings */}
       {settings.review_mode === 'multiclass' && (

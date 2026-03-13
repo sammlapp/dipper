@@ -363,9 +363,9 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
               // Draw each category as outline - filter by visibility
               const categories = [
                 { count: bin.grey, color: '#9ca3af', visible: showGrey },
-                { count: bin.yellow, color: '#fbbf24', visible: showYellow },
-                { count: bin.green, color: '#10b981', visible: showGreen },
-                { count: bin.red, color: '#ef4444', visible: showRed }
+                { count: bin.yellow, color: '#ecc76b', visible: showYellow },
+                { count: bin.green, color: '#82c176', visible: showGreen },
+                { count: bin.red, color: '#bb5858', visible: showRed }
               ];
 
               return (

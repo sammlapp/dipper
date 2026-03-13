@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import ReactSelect from 'react-select';
 import { Drawer, IconButton, Modal, Box, Typography, FormControl, Select, MenuItem } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import AnnotationCard from './AnnotationCard';
@@ -174,6 +175,101 @@ function LoadDialog({ open, headers, onConfirm, onCancel }) {
   );
 }
 
+function MultiSelectBar({ selectedCount, availableClasses, selectedClipIndices, currentPageData, onApply, onClearAll }) {
+  const [stagedLabels, setStagedLabels] = useState([]);
+
+  // Reset staged labels whenever the selection changes
+  useEffect(() => {
+    setStagedLabels([]);
+  }, [selectedClipIndices]);
+
+  const classOptions = availableClasses.map(cls => ({ value: cls, label: cls }));
+  const stagedValue = stagedLabels.map(l => ({ value: l, label: l }));
+
+  const handleApply = () => onApply(stagedLabels);
+
+  return (
+    <div
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          e.stopPropagation();
+          handleApply();
+        }
+      }}
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 1000,
+        background: 'var(--background, #fff)',
+        border: '2px solid rgba(139, 92, 246, 0.8)',
+        borderRadius: '10px',
+        boxShadow: '0 0 18px 6px rgba(139, 92, 246, 0.45)',
+        padding: '10px 16px',
+        minWidth: '340px',
+        maxWidth: '560px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        fontFamily: 'Rokkitt, sans-serif',
+      }}
+    >
+      <span style={{ fontSize: '0.82rem', color: 'rgba(139,92,246,1)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+        {selectedCount} clips selected
+      </span>
+      <div style={{ flex: 1 }}>
+        <ReactSelect
+          isMulti
+          options={classOptions}
+          value={stagedValue}
+          onChange={(opts) => setStagedLabels(opts ? opts.map(o => o.value) : [])}
+          placeholder="Stage classes to add..."
+          closeMenuOnSelect={false}
+          hideSelectedOptions={false}
+          menuPortalTarget={document.body}
+          menuPosition="fixed"
+          styles={{
+            control: (base) => ({
+              ...base,
+              borderColor: 'rgba(139,92,246,0.5)',
+              boxShadow: 'none',
+              '&:hover': { borderColor: 'rgba(139,92,246,0.9)' }
+            }),
+            multiValue: (base) => ({ ...base, backgroundColor: 'rgba(139,92,246,0.15)' }),
+            multiValueLabel: (base) => ({ ...base, color: 'rgba(109,40,217,1)' }),
+          }}
+        />
+      </div>
+
+      <button
+        onClick={handleApply}
+        title="Apply staged labels to all selected clips (Ctrl+Enter)"
+        style={{
+          background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.5)',
+          borderRadius: '5px', cursor: 'pointer', padding: '4px 10px',
+          color: 'rgba(139,92,246,1)', fontFamily: 'inherit', fontSize: '0.82rem',
+          whiteSpace: 'nowrap', lineHeight: 1, fontWeight: 600
+        }}
+      >
+        Apply
+      </button>
+      <button
+        onClick={onClearAll}
+        title="Clear all classes from selected clips"
+        style={{
+          background: 'none', border: '1px solid rgba(139,92,246,0.4)',
+          borderRadius: '5px', cursor: 'pointer', padding: '4px 8px',
+          color: 'rgba(139,92,246,0.7)', fontFamily: 'inherit', fontSize: '0.75rem',
+          whiteSpace: 'nowrap', lineHeight: 1
+        }}
+      >
+        Remove all labels
+      </button>
+    </div>
+  );
+}
+
 function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const backendUrl = useBackendUrl();
   const [selectedFile, setSelectedFile] = useState('');
@@ -212,6 +308,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [focusClipIndex, setFocusClipIndex] = useState(0);
   const [activeClipIndexOnPage, setActiveClipIndexOnPage] = useState(0); // Index of active clip within current page (0 to itemsPerPage-1)
+  const [selectedClipIndices, setSelectedClipIndices] = useState(new Set([0])); // Set of selected clip indices (multi-select)
+  const [isModifierHeld, setIsModifierHeld] = useState(false); // true when shift/ctrl/cmd is held (for cursor change)
   const activeClipAudioControlsRef = useRef(null); // Ref to store active clip's audio control functions {togglePlayPause, pause, play}
   const previousClipAudioControlsRef = useRef(null); // Ref to store previous clip's audio controls for pausing
   const shouldAutoplayNextClip = useRef(false); // Flag to trigger autoplay after annotation
@@ -405,6 +503,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
 
       // Update active clip index for new layout
       setActiveClipIndexOnPage(newActiveClipIndex);
+      setSelectedClipIndices(new Set([newActiveClipIndex]));
 
       // Clear flag after state updates complete
       setTimeout(() => {
@@ -681,6 +780,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   useEffect(() => {
     if (!isLayoutChanging.current) {
       setActiveClipIndexOnPage(0);
+      setSelectedClipIndices(new Set([0]));
     }
   }, [currentPage, currentBinIndex]);
 
@@ -740,6 +840,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
             if (clipIdxInBin !== -1) {
               setCurrentBinIndex(binIdx);
               setActiveClipIndexOnPage(clipIdxInBin);
+              setSelectedClipIndices(new Set([clipIdxInBin]));
             }
           }
         }
@@ -751,6 +852,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           setCurrentPage(newPage);
         }
         setActiveClipIndexOnPage(newActiveClipIndex);
+        setSelectedClipIndices(new Set([newActiveClipIndex]));
       }
     }
   }, [isFocusMode]); // Only run when entering/exiting focus mode
@@ -964,6 +1066,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     setIsFocusMode(false);
     setFocusClipIndex(0);
     setActiveClipIndexOnPage(0);
+    setSelectedClipIndices(new Set([0]));
     setGridModeAutoplay(false);
     setCsvColumns([]);
     setSettings(prev => ({ ...prev, annotation_column: 'annotation' }));
@@ -1456,17 +1559,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       // Update bounding box fields (null to clear)
       const updates = boundingBox
         ? {
-            [`${col}_start_time`]: boundingBox.start_time,
-            [`${col}_end_time`]: boundingBox.end_time,
-            [`${col}_low_freq`]: boundingBox.low_freq,
-            [`${col}_high_freq`]: boundingBox.high_freq
-          }
+          [`${col}_start_time`]: boundingBox.start_time,
+          [`${col}_end_time`]: boundingBox.end_time,
+          [`${col}_low_freq`]: boundingBox.low_freq,
+          [`${col}_high_freq`]: boundingBox.high_freq
+        }
         : {
-            [`${col}_start_time`]: null,
-            [`${col}_end_time`]: null,
-            [`${col}_low_freq`]: null,
-            [`${col}_high_freq`]: null
-          };
+          [`${col}_start_time`]: null,
+          [`${col}_end_time`]: null,
+          [`${col}_low_freq`]: null,
+          [`${col}_high_freq`]: null
+        };
 
       // Check if anything actually changed
       const hasChanges = Object.keys(updates).some(key => currentClip[key] !== updates[key]);
@@ -1611,11 +1714,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   // Helper to check if any filters are active
   const hasActiveFilters = useCallback((filterState) => {
     return (filterState.annotation.enabled && filterState.annotation.values.length > 0) ||
-           (filterState.labels.enabled && filterState.labels.values.length > 0) ||
-           (filterState.annotation_status.enabled && filterState.annotation_status.values.length > 0) ||
-           filterState.bounding_box.enabled ||
-           (filterState.numeric_range.enabled && filterState.numeric_range.column) ||
-           (filterState.categorical.enabled && filterState.categorical.column && filterState.categorical.values.length > 0);
+      (filterState.labels.enabled && filterState.labels.values.length > 0) ||
+      (filterState.annotation_status.enabled && filterState.annotation_status.values.length > 0) ||
+      filterState.bounding_box.enabled ||
+      (filterState.numeric_range.enabled && filterState.numeric_range.column) ||
+      (filterState.categorical.enabled && filterState.categorical.column && filterState.categorical.values.length > 0);
   }, []);
 
   // Apply filters function - captures snapshot of matching clip IDs
@@ -1721,39 +1824,47 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   const handleActiveClipAnnotation = useCallback((annotationValue) => {
     if (currentPageData.length === 0) return;
 
-    const activeClip = currentPageData[activeClipIndexOnPage];
-    if (!activeClip) return;
+    const isMultiSelect = selectedClipIndices.size > 1;
 
-    // Annotate the active clip
-    handleAnnotationChange(activeClip.id, annotationValue, undefined);
-
-    // Set flag for autoplay if enabled
-    if (gridModeAutoplay) {
-      shouldAutoplayNextClip.current = true;
-    }
-
-    // Advance to next clip within current page/bin
-    if (activeClipIndexOnPage < currentPageData.length - 1) {
-      // Move to next clip on current page/bin
-      setActiveClipIndexOnPage(prev => prev + 1);
+    if (isMultiSelect) {
+      // Annotate all selected clips, no auto-advance
+      selectedClipIndices.forEach(idx => {
+        const clip = currentPageData[idx];
+        if (clip) handleAnnotationChange(clip.id, annotationValue, undefined);
+      });
     } else {
-      // Last clip on page/bin
-      // In classifier-guided mode, do NOT auto-advance to next bin
-      // In normal mode, advance to next page
-      if (!classifierGuidedMode.enabled && currentPage < totalPages - 1) {
-        setCurrentPage(prev => prev + 1);
-        // activeClipIndexOnPage will be reset to 0 by the useEffect
+      const activeClip = currentPageData[activeClipIndexOnPage];
+      if (!activeClip) return;
+
+      handleAnnotationChange(activeClip.id, annotationValue, undefined);
+
+      if (gridModeAutoplay) {
+        shouldAutoplayNextClip.current = true;
+      }
+
+      // Advance to next clip
+      if (activeClipIndexOnPage < currentPageData.length - 1) {
+        const next = activeClipIndexOnPage + 1;
+        setActiveClipIndexOnPage(next);
+        setSelectedClipIndices(new Set([next]));
+      } else {
+        if (!classifierGuidedMode.enabled && currentPage < totalPages - 1) {
+          setCurrentPage(prev => prev + 1);
+        }
       }
     }
-  }, [currentPageData, activeClipIndexOnPage, handleAnnotationChange, currentPage, totalPages, gridModeAutoplay, classifierGuidedMode.enabled]);
+  }, [currentPageData, activeClipIndexOnPage, selectedClipIndices, handleAnnotationChange, currentPage, totalPages, gridModeAutoplay, classifierGuidedMode.enabled]);
 
-  // Navigate active clip within page
+  // Navigate active clip within page (always returns to single-select)
   const handleActiveClipNavigation = useCallback((direction) => {
+    let next = activeClipIndexOnPage;
     if (direction === 'next' && activeClipIndexOnPage < currentPageData.length - 1) {
-      setActiveClipIndexOnPage(prev => prev + 1);
+      next = activeClipIndexOnPage + 1;
     } else if (direction === 'previous' && activeClipIndexOnPage > 0) {
-      setActiveClipIndexOnPage(prev => prev - 1);
+      next = activeClipIndexOnPage - 1;
     }
+    setActiveClipIndexOnPage(next);
+    setSelectedClipIndices(new Set([next]));
   }, [activeClipIndexOnPage, currentPageData.length]);
 
   // Count completed bins in classifier-guided mode
@@ -1817,6 +1928,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         // If in grid mode, reset to first clip on page
         if (!isFocusMode) {
           setActiveClipIndexOnPage(0);
+          setSelectedClipIndices(new Set([0]));
         } else {
           // If in focus mode, jump to first clip of this bin in the full filtered data
           const firstClipOfBin = bin.clips[0];
@@ -1854,6 +1966,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         // If in grid mode, reset to first clip on page
         if (!isFocusMode) {
           setActiveClipIndexOnPage(0);
+          setSelectedClipIndices(new Set([0]));
         } else {
           // If in focus mode, jump to first clip of this bin in the full filtered data
           const firstClipOfBin = bin.clips[0];
@@ -1932,12 +2045,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         }
       }
 
-      // Handle Escape key for focus/grid toggle (works in both modes)
+      // Handle Escape key: clear multi-select first, then toggle focus mode
       if (event.key === 'Escape') {
         event.preventDefault();
-        setIsFocusMode(prev => !prev);
+        if (selectedClipIndices.size > 1) {
+          setSelectedClipIndices(new Set([activeClipIndexOnPage]));
+        } else {
+          setIsFocusMode(prev => !prev);
+        }
         return;
       }
+
 
       // Handle Ctrl/Cmd shortcuts
       if (cmdOrCtrl) {
@@ -2084,7 +2202,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           }
         }
 
-        // Navigation shortcuts: j/k to move active clip
+        // Navigation <shortcuts: >j/k to move active clip
         switch (event.key.toLowerCase()) {
           case 'j':
             // J: Move active clip to previous clip on page
@@ -2106,7 +2224,75 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange, handleActiveClipAnnotation, handleActiveClipNavigation, handleJumpToNextIncompleteBin, classifierGuidedMode.enabled, stratifiedBins.length, currentBinIndex]);
+  }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange, handleActiveClipAnnotation, handleActiveClipNavigation, handleJumpToNextIncompleteBin, classifierGuidedMode.enabled, stratifiedBins.length, currentBinIndex, selectedClipIndices, activeClipIndexOnPage]);
+
+  // Track modifier keys held (shift/ctrl/cmd) for cursor change and multi-select
+  useEffect(() => {
+    const isMac = navigator.userAgent.includes('Mac') || navigator.userAgent.includes('macOS');
+    const onKeyDown = (e) => {
+      if (e.shiftKey || (isMac ? e.metaKey : e.ctrlKey)) setIsModifierHeld(true);
+    };
+    const onKeyUp = (e) => {
+      if (!e.shiftKey && !e.metaKey && !e.ctrlKey) setIsModifierHeld(false);
+    };
+    const onBlur = () => setIsModifierHeld(false);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
+
+  // Multi-select card click handler
+  const handleCardClick = useCallback((indexOnPage, event) => {
+    const isMac = navigator.userAgent.includes('Mac') || navigator.userAgent.includes('macOS');
+    const cmdOrCtrl = isMac ? event.metaKey : event.ctrlKey;
+    const shift = event.shiftKey;
+
+    if (cmdOrCtrl) {
+      // Cmd/Ctrl+click: toggle this clip in/out of selection
+      setSelectedClipIndices(prev => {
+        const next = new Set(prev);
+        if (next.has(indexOnPage) && next.size > 1) {
+          next.delete(indexOnPage);
+        } else {
+          next.add(indexOnPage);
+        }
+        return next;
+      });
+      // Keep activeClipIndexOnPage as the anchor
+    } else if (shift) {
+      // Shift+click: select range from activeClipIndexOnPage to clicked
+      const lo = Math.min(activeClipIndexOnPage, indexOnPage);
+      const hi = Math.max(activeClipIndexOnPage, indexOnPage);
+      const range = new Set();
+      for (let i = lo; i <= hi; i++) range.add(i);
+      setSelectedClipIndices(range);
+    } else {
+      // Plain click: single select
+      setActiveClipIndexOnPage(indexOnPage);
+      setSelectedClipIndices(new Set([indexOnPage]));
+    }
+  }, [activeClipIndexOnPage]);
+
+  // Multi-select multiclass bar: apply staged labels to all selected clips, then exit multi-select
+  const handleMultiSelectApply = useCallback((stagedLabels) => {
+    selectedClipIndices.forEach(idx => {
+      const clip = currentPageData[idx];
+      if (!clip) return;
+      const raw = clip.labels || '';
+      let existing = [];
+      try {
+        existing = raw.startsWith('[') ? JSON.parse(raw.replace(/'/g, '"')) : raw.split(',').map(s => s.trim()).filter(Boolean);
+      } catch { }
+      const merged = Array.from(new Set([...existing, ...stagedLabels]));
+      handleAnnotationChange(clip.id, JSON.stringify(merged), undefined);
+    });
+    setSelectedClipIndices(new Set([activeClipIndexOnPage]));
+  }, [selectedClipIndices, currentPageData, handleAnnotationChange, activeClipIndexOnPage]);
 
   // Load current focus clip spectrogram when in focus mode
   useEffect(() => {
@@ -2452,7 +2638,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           </div>
         )}
 
-        <div className="annotation-grid-container">
+        <div className={`annotation-grid-container${isModifierHeld ? ' multi-select-cursor' : ''}`}>
           <div
             className="annotation-grid"
             style={{
@@ -2464,6 +2650,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
               // Find the loaded data for this clip
               const loadedClip = loadedPageData.find(loaded => loaded.clip_id === clip.id) || clip;
               const isActive = indexOnPage === activeClipIndexOnPage;
+              const isSelected = selectedClipIndices.has(indexOnPage);
+              const isMultiSelect = selectedClipIndices.size > 1;
 
               return (
                 <AnnotationCard
@@ -2482,11 +2670,23 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                   showFileName={settings.show_file_name}
                   showBinaryControls={settings.show_binary_controls}
                   isActive={isActive}
-                  onAnnotationChange={(annotation, annotationStatus) => handleAnnotationChange(clip.id, annotation, annotationStatus)}
+                  isSelected={isSelected}
+                  isMultiSelect={isMultiSelect}
+                  onAnnotationChange={(annotation, annotationStatus) => {
+                    if (isMultiSelect) {
+                      // Fan out to all selected clips
+                      selectedClipIndices.forEach(idx => {
+                        const c = dataToShow[idx];
+                        if (c) handleAnnotationChange(c.id, annotation, annotationStatus);
+                      });
+                    } else {
+                      handleAnnotationChange(clip.id, annotation, annotationStatus);
+                    }
+                  }}
                   onCommentChange={(comment) => handleCommentChange(clip.id, comment)}
                   onBoundingBoxChange={settings.enable_bounding_boxes ? (boundingBox) => handleBoundingBoxChange(clip.id, boundingBox) : undefined}
-                  onCardClick={() => setActiveClipIndexOnPage(indexOnPage)}
-                  onPlayPause={isActive ? (audioControls) => {
+                  onCardClick={(event) => handleCardClick(indexOnPage, event)}
+                  onPlayPause={isActive && !isMultiSelect ? (audioControls) => {
                     // Store previous clip's controls before updating to new clip
                     if (activeClipAudioControlsRef.current) {
                       previousClipAudioControlsRef.current = activeClipAudioControlsRef.current;
@@ -2503,7 +2703,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         </div>
       </>
     );
-  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridDimensions, settings.review_mode, settings.annotation_column, availableClasses, settings.show_comments, settings.show_file_name, settings.show_binary_controls, settings.enable_bounding_boxes, handleAnnotationChange, handleCommentChange, handleBoundingBoxChange, classifierGuidedMode, stratifiedBins]);
+  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, selectedClipIndices, isModifierHeld, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridDimensions, settings.review_mode, settings.annotation_column, availableClasses, settings.show_comments, settings.show_file_name, settings.show_binary_controls, settings.enable_bounding_boxes, handleAnnotationChange, handleCommentChange, handleBoundingBoxChange, handleCardClick, classifierGuidedMode, stratifiedBins]);
 
   return (
     <div className="review-tab-layout">
@@ -3729,6 +3929,22 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 // Grid Mode View
                 <>
                   {renderAnnotationGrid}
+                  {/* Floating multi-select bar for multiclass mode */}
+                  {selectedClipIndices.size > 1 && settings.review_mode === 'multiclass' && (
+                    <MultiSelectBar
+                      selectedCount={selectedClipIndices.size}
+                      availableClasses={availableClasses}
+                      selectedClipIndices={selectedClipIndices}
+                      currentPageData={currentPageData}
+                      onApply={handleMultiSelectApply}
+                      onClearAll={() => {
+                        selectedClipIndices.forEach(idx => {
+                          const clip = currentPageData[idx];
+                          if (clip) handleAnnotationChange(clip.id, JSON.stringify([]), undefined);
+                        });
+                      }}
+                    />
+                  )}
                 </>
               )}
             </>

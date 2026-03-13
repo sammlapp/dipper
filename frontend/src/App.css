@@ -13,10 +13,15 @@
   --border: #d1d5db;
   --shadow: rgba(57, 87, 86, 0.1);
   --primary-color: #5287f0;
+  --yes: #82c176;
+  --uncertain: #ecc76b;
+  --no: #bb5858;
 }
 
 * {
   box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 body {
@@ -2251,8 +2256,23 @@ button:disabled {
 
 /* Active clip styling - thicker border */
 .annotation-card.active-clip {
-  /* border: 4px solid var(--primary-color); */
   box-shadow: 0 0 15px 5px rgba(9, 98, 171, 1);
+}
+
+/* Multi-select: all selected clips get purple glow */
+.annotation-card.selected-clip {
+  box-shadow: 0 0 15px 5px rgba(139, 92, 246, 1);
+}
+
+/* Multi-select: primary active clip gets brighter purple */
+.annotation-card.active-clip-multi {
+  box-shadow: 0 0 18px 7px rgba(109, 40, 217, 1);
+}
+
+/* Cursor changes to crosshair when shift/ctrl/cmd held to indicate multi-select */
+.annotation-grid-container.multi-select-cursor,
+.annotation-grid-container.multi-select-cursor .annotation-card {
+  cursor: crosshair;
 }
 
 .annotation-spectrogram-container {
@@ -3771,7 +3791,7 @@ button:disabled {
 }
 
 .save-status-indicator .material-symbols-outlined.saved {
-  color: #10b981;
+  color: var(--yes);
 }
 
 /* Bulk Annotation Controls in Toolbar */
