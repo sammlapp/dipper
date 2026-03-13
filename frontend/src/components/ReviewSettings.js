@@ -49,7 +49,7 @@ const StyledSlider = styled(Slider)({
   },
 });
 
-function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache, currentSettings, onSaveConfig, onLoadConfig, csvColumns, onApplyClassesOnly, onApplyClassesAndSubset }) {
+function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache, currentSettings, onSaveConfig, onLoadConfig, csvColumns, onApplyClassesOnly, onApplyClassesAndSubset, onCreateColumn }) {
   const [settings, setSettings] = useState({
     // Spectrogram settings
     spec_window_size: 512,
@@ -102,6 +102,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
   const [localImageWidth, setLocalImageWidth] = useState(settings.image_width);
   const [localImageHeight, setLocalImageHeight] = useState(settings.image_height);
   const [localManualClasses, setLocalManualClasses] = useState(settings.manual_classes);
+  const [newColumnName, setNewColumnName] = useState('');
 
   const colormapOptions = [
     { value: 'greys_r', label: 'Inverse Grayscale (Default)' },
@@ -338,6 +339,54 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
             <small className="help-text" style={{ display: 'block', marginTop: '5px' }}>
               Select which CSV column contains the binary annotation values (yes/no/uncertain).
             </small>
+            {onCreateColumn && (
+              <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                <input
+                  type="text"
+                  value={newColumnName}
+                  onChange={(e) => setNewColumnName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newColumnName.trim()) {
+                      onCreateColumn(newColumnName.trim());
+                      setNewColumnName('');
+                    }
+                  }}
+                  placeholder="New column name..."
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    fontSize: '0.85rem',
+                    border: '1px solid var(--border)',
+                    borderRadius: '4px',
+                    background: 'var(--background)',
+                    color: 'var(--text)',
+                    fontFamily: 'inherit'
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (newColumnName.trim()) {
+                      onCreateColumn(newColumnName.trim());
+                      setNewColumnName('');
+                    }
+                  }}
+                  disabled={!newColumnName.trim()}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.85rem',
+                    backgroundColor: newColumnName.trim() ? 'var(--dark-accent)' : 'var(--border)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: newColumnName.trim() ? 'pointer' : 'not-allowed',
+                    fontFamily: 'inherit',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  + Add Column
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -13,16 +13,16 @@ take a close look at this codebase, especially documentation markdowns such as r
 
 # Incomplete items / TODO /feature request
 - in binary annotation mode, settings pannel allows user to select which column to use as the annotation column (could be a class name like 'American Robin', could be the default column name 'annotation'). This column will be the one used to display current annotation status and to save annotations to. Status bar notes which column is being annotated. Eg instead of Annotated: 99/100, "[column name]: 99/100 annotated"
+-> if the column contains invalid values, a helpful error message is posted and the annotation column is not changed. 
 
 - support  stereo audio
 
-- when pasting a path to navigate to in server mode file browser: if its a file path instead of a folder, navigate to the folder and select the file as the 'active' file
+- when pasting a path to navigate to in server mode file browser and hitting Enter/Return: if its a file path instead of a folder, navigate to the folder and activate that file as the 'selected' file
 
 - select subset of classes to save inference results for
 
 WandB integration: need to allow user to provide API key and configure group name and project name for a run. Run name should match the dipper run name. 
 
-- need to resolve issues with building conda-pack env for Windows
 - made a working env on Windows: needed to make edits to the windows env yml, then uninstall soundfile and force-reinstall with pip
 - used dipper env to run conda-pack, creating dipper_pytorch_env.tar.gz file
 
@@ -49,7 +49,7 @@ Regional/date bird species list filtering using ebird meta-model.
 
 - search/filter for clip by name
 
-- right click menu on a spectrogram: download audio, download spectrogram, copy audio file path
+- right click menu on a spectrogram/audio widget in Grid Mode or Focus Mode: download audio, download spectrogram, copy audio file path
 
 - dark mode
 
@@ -58,9 +58,6 @@ Jeff Larkin:
 
 JT Larkin:
 - CGL stopping criterion for number of negative clips in bin
-
-Matt Weldy:
-GCL should work without stratification; eg should be able to sort by score (be cautious: sorting could be slow for large set of clips; but maybe we don't really use clip tables that big)
 
 Lauren Chronister:
 should not create annotation_status column when using binary annotation

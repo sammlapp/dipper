@@ -130,7 +130,7 @@ export function createStratifiedBins(data, config) {
  * @param {Object} completionConfig - Completion configuration
  * @returns {boolean} Whether the bin is complete
  */
-export function isBinComplete(clips, reviewMode, completionConfig) {
+export function isBinComplete(clips, reviewMode, completionConfig, annotationColumn = 'annotation') {
   const { strategy, targetCount = 1, targetLabels = [] } = completionConfig;
 
   if (!clips || clips.length === 0) {
@@ -142,7 +142,7 @@ export function isBinComplete(clips, reviewMode, completionConfig) {
       // All clips must be annotated
       if (reviewMode === 'binary') {
         return clips.every(clip =>
-          clip.annotation && clip.annotation !== ''
+          clip[annotationColumn] && clip[annotationColumn] !== ''
         );
       } else {
         // Multi-class: all must be marked complete
@@ -157,9 +157,9 @@ export function isBinComplete(clips, reviewMode, completionConfig) {
         return false;
       }
 
-      const yesCount = clips.filter(clip => clip.annotation === 'yes').length;
+      const yesCount = clips.filter(clip => clip[annotationColumn] === 'yes').length;
       const allAnnotated = clips.every(clip =>
-        clip.annotation && clip.annotation !== ''
+        clip[annotationColumn] && clip[annotationColumn] !== ''
       );
 
       // Complete if target reached OR all clips annotated

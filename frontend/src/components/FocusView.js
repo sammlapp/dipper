@@ -10,6 +10,7 @@ function FocusView({
   onBoundingBoxChange,
   onNavigate,
   settings,
+  annotationColumn = 'annotation',
   reviewMode = 'binary',
   availableClasses = [],
   isLastClip = false,
@@ -26,7 +27,6 @@ function FocusView({
     file = '',
     start_time = 0,
     end_time = 0,
-    annotation = '',
     labels = '',
     annotation_status = 'unreviewed',
     comments = '',
@@ -34,11 +34,14 @@ function FocusView({
     spectrogram_base64 = null,
     frequency_range = null,
     time_range = null,
-    bbox_start_time = null,
-    bbox_end_time = null,
-    bbox_low_freq = null,
-    bbox_high_freq = null
   } = clipData || {};
+
+  // Read annotation and bbox from dynamic column keys based on annotationColumn prop
+  const annotation = (clipData && clipData[annotationColumn]) ?? '';
+  const bbox_start_time = (clipData && clipData[`${annotationColumn}_start_time`]) ?? null;
+  const bbox_end_time = (clipData && clipData[`${annotationColumn}_end_time`]) ?? null;
+  const bbox_low_freq = (clipData && clipData[`${annotationColumn}_low_freq`]) ?? null;
+  const bbox_high_freq = (clipData && clipData[`${annotationColumn}_high_freq`]) ?? null;
 
   // Local state for comment to prevent re-renders on every keystroke
   const [localComment, setLocalComment] = useState(comments || '');

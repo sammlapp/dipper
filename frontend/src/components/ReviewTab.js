@@ -265,6 +265,22 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     if (newSettings.review_mode !== settings.review_mode) {
       extractAvailableClasses(annotationData);
     }
+
+    // Validate annotation_column if it changed
+    if (newSettings.annotation_column !== settings.annotation_column && annotationData.length > 0) {
+      const col = newSettings.annotation_column;
+      const validValues = new Set(['yes', 'no', 'uncertain', '', null, undefined]);
+      const invalidClip = annotationData.find(clip => {
+        const val = clip[col];
+        return val !== null && val !== undefined && !validValues.has(String(val).toLowerCase()) && String(val) !== '';
+      });
+      if (invalidClip) {
+        const badVal = invalidClip[col];
+        setError(`Column "${col}" contains invalid value "${badVal}". Annotation column must contain only yes/no/uncertain or be empty.`);
+        // Revert to old annotation column
+        setSettings(prev => ({ ...prev, annotation_column: settings.annotation_column }));
+      }
+    }
   };
 
   // Apply filters to annotation data using snapshot of visible clip IDs
@@ -787,6 +803,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     setFocusClipIndex(0);
     setActiveClipIndexOnPage(0);
     setGridModeAutoplay(false);
+    setCsvColumns([]);
+    setSettings(prev => ({ ...prev, annotation_column: 'annotation' }));
     setClassifierGuidedMode({
       enabled: false,
       stratificationColumns: [],
@@ -917,6 +935,12 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         setError(data.error);
       } else {
         setAnnotationData(data.clips);
+
+        // Extract CSV column names from the loaded data
+        if (data.clips.length > 0) {
+          const internalCols = new Set(['id', 'spectrogram_base64', 'audio_base64', 'clip_id', 'frequency_range', 'time_range']);
+          setCsvColumns(Object.keys(data.clips[0]).filter(k => !internalCols.has(k)));
+        }
 
         // Auto-detect review mode based on response format
         const hasLabelsField = data.clips.length > 0 && 'labels' in data.clips[0];
@@ -1167,6 +1191,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   }, [annotationData]);
 
   // Handler for "Change Classes + Subset Labels" button - updates classes AND subsets labels
+  const handleCreateColumn = useCallback((columnName) => {
+    if (!columnName || csvColumns.includes(columnName)) return;
+    // Add the column to csvColumns
+    setCsvColumns(prev => [...prev, columnName]);
+    // Add the column to every clip with an empty value
+    setAnnotationData(prev => prev.map(clip => ({ ...clip, [columnName]: '' })));
+    // Switch to the new column
+    setSettings(prev => ({ ...prev, annotation_column: columnName }));
+    setHasUnsavedChanges(true);
+  }, [csvColumns]);
+
   const handleApplyClassesAndSubset = useCallback((manualClassesText) => {
     // Update settings with new manual_classes
     setSettings(prev => ({ ...prev, manual_classes: manualClassesText }));
@@ -1197,7 +1232,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       // Create updates object
       const updates = {};
       if (settings.review_mode === 'binary') {
-        updates.annotation = newAnnotation;
+        // Write to the currently selected annotation column
+        updates[settings.annotation_column] = newAnnotation;
       } else {
         updates.labels = newAnnotation;
         if (newAnnotationStatus !== undefined) {
@@ -1218,7 +1254,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     setHasUnsavedChanges(true);
 
     // Individual annotation changes don't trigger auto-save - only page/navigation changes do
-  }, [settings.review_mode]);
+  }, [settings.review_mode, settings.annotation_column]);
 
   const handleCommentChange = useCallback((clipId, newComment) => {
     setAnnotationData(prev => {
@@ -1238,27 +1274,28 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     setHasUnsavedChanges(true);
   }, []);
 
-  // Bounding box change handler
+  // Bounding box change handler - uses [annotation_column]_start_time etc. for bbox keys
   const handleBoundingBoxChange = useCallback((clipId, boundingBox) => {
     setAnnotationData(prev => {
       const clipIndex = prev.findIndex(clip => clip.id === clipId);
       if (clipIndex === -1) return prev;
 
       const currentClip = prev[clipIndex];
+      const col = settings.annotation_column;
 
       // Update bounding box fields (null to clear)
       const updates = boundingBox
         ? {
-            bbox_start_time: boundingBox.start_time,
-            bbox_end_time: boundingBox.end_time,
-            bbox_low_freq: boundingBox.low_freq,
-            bbox_high_freq: boundingBox.high_freq
+            [`${col}_start_time`]: boundingBox.start_time,
+            [`${col}_end_time`]: boundingBox.end_time,
+            [`${col}_low_freq`]: boundingBox.low_freq,
+            [`${col}_high_freq`]: boundingBox.high_freq
           }
         : {
-            bbox_start_time: null,
-            bbox_end_time: null,
-            bbox_low_freq: null,
-            bbox_high_freq: null
+            [`${col}_start_time`]: null,
+            [`${col}_end_time`]: null,
+            [`${col}_low_freq`]: null,
+            [`${col}_high_freq`]: null
           };
 
       // Check if anything actually changed
@@ -1270,7 +1307,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       return newArray;
     });
     setHasUnsavedChanges(true);
-  }, []);
+  }, [settings.annotation_column]);
 
   // Focus mode navigation
   const handleFocusNavigation = useCallback((direction) => {
@@ -1313,8 +1350,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     };
 
     annotationData.forEach(clip => {
-      // Binary annotation options
-      const annotation = clip.annotation || 'unlabeled';
+      // Binary annotation options (use current annotation column)
+      const annotation = clip[settings.annotation_column] || 'unlabeled';
       options.annotation.add(annotation);
 
       // Multi-class label options
@@ -1342,13 +1379,14 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       labels: Array.from(options.labels).sort(),
       annotation_status: Array.from(options.annotation_status).sort()
     };
-  }, [annotationData]);
+  }, [annotationData, settings.annotation_column]);
 
   // Check if bbox columns exist in the annotation data
   const hasBboxColumns = useMemo(() => {
     if (!annotationData || annotationData.length === 0) return false;
-    return 'bbox_start_time' in annotationData[0];
-  }, [annotationData]);
+    const col = settings.annotation_column || 'annotation';
+    return `${col}_start_time` in annotationData[0];
+  }, [annotationData, settings.annotation_column]);
 
   // Get all columns in the data that aren't internal/system columns
   const filterableColumns = useMemo(() => {
@@ -1420,7 +1458,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         annotationData.filter(clip => {
           // Filter by annotation (binary mode)
           if (filters.annotation.enabled && filters.annotation.values.length > 0) {
-            const clipAnnotation = clip.annotation || 'unlabeled';
+            const clipAnnotation = clip[settings.annotation_column] || 'unlabeled';
             if (!filters.annotation.values.includes(clipAnnotation)) {
               return false;
             }
@@ -1451,8 +1489,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           }
           // Filter by bounding box presence
           if (filters.bounding_box.enabled) {
-            const hasBbox = clip.bbox_start_time !== null && clip.bbox_start_time !== undefined &&
-                            !isNaN(parseFloat(clip.bbox_start_time));
+            const bboxKey = `${settings.annotation_column}_start_time`;
+            const bboxVal = clip[bboxKey];
+            const hasBbox = bboxVal !== null && bboxVal !== undefined && !isNaN(parseFloat(bboxVal));
             if (filters.bounding_box.value === 'has' && !hasBbox) return false;
             if (filters.bounding_box.value === 'does_not_have' && hasBbox) return false;
           }
@@ -1482,7 +1521,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     setLastRenderedPage(0); // Reset rendered page tracker
     setFocusClipIndex(0);
     setLastRenderedFocusClipIndex(0); // Reset focus clip index
-  }, [filters, annotationData, hasActiveFilters]);
+  }, [filters, annotationData, hasActiveFilters, settings.annotation_column]);
 
   // Clear filters function
   const clearFilters = useCallback(() => {
@@ -1561,7 +1600,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           strategy: classifierGuidedMode.completionStrategy,
           targetCount: classifierGuidedMode.completionTargetCount,
           targetLabels: classifierGuidedMode.completionTargetLabels
-        }
+        },
+        settings.annotation_column
       );
     }).length;
 
@@ -1597,7 +1637,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           strategy: classifierGuidedMode.completionStrategy,
           targetCount: classifierGuidedMode.completionTargetCount,
           targetLabels: classifierGuidedMode.completionTargetLabels
-        }
+        },
+        settings.annotation_column
       );
 
       if (!binCompleteStatus) {
@@ -1633,7 +1674,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           strategy: classifierGuidedMode.completionStrategy,
           targetCount: classifierGuidedMode.completionTargetCount,
           targetLabels: classifierGuidedMode.completionTargetLabels
-        }
+        },
+        settings.annotation_column
       );
 
       if (!binCompleteStatus) {
@@ -1678,13 +1720,13 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         const clipIndex = newArray.findIndex(c => c.id === clip.id);
         if (clipIndex !== -1) {
           const currentClip = newArray[clipIndex];
-          const isUnlabeled = !currentClip.annotation || currentClip.annotation === '';
+          const isUnlabeled = !currentClip[settings.annotation_column] || currentClip[settings.annotation_column] === '';
 
           // Only update if: setting to unlabeled OR clip is currently unlabeled
           if (!onlyUpdateUnlabeled || isUnlabeled) {
             newArray[clipIndex] = {
               ...currentClip,
-              annotation: annotationValue === 'unlabeled' ? '' : annotationValue
+              [settings.annotation_column]: annotationValue === 'unlabeled' ? '' : annotationValue
             };
           }
         }
@@ -1692,7 +1734,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
       return newArray;
     });
     setHasUnsavedChanges(true);
-  }, [currentPageData]);
+  }, [currentPageData, settings.annotation_column]);
 
   // Keyboard shortcuts for both grid and focus view
   useEffect(() => {
@@ -2083,10 +2125,13 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     // Get all column names from the first clip, preserving order
     // Standard columns first, then annotation columns, bounding box columns, then extra metadata columns
     const standardCols = ['file', 'start_time', 'end_time'];
+    const annotCol = settingsToUse.annotation_column || 'annotation';
     const annotationCols = settingsToUse.review_mode === 'multiclass'
       ? ['labels', 'annotation_status', 'comments']
-      : ['annotation', 'comments'];
-    const bboxCols = ['bbox_start_time', 'bbox_end_time', 'bbox_low_freq', 'bbox_high_freq'];
+      : [annotCol, 'comments'];
+    const bboxCols = settingsToUse.review_mode === 'binary'
+      ? [`${annotCol}_start_time`, `${annotCol}_end_time`, `${annotCol}_low_freq`, `${annotCol}_high_freq`]
+      : [];
     // Exclude transient/internal columns from export
     const excludedCols = new Set([
       ...standardCols, ...annotationCols, ...bboxCols,
@@ -2110,7 +2155,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         }
 
         // Handle empty string annotations in binary mode
-        if (header === 'annotation' && value === '') {
+        if (header === annotCol && settingsToUse.review_mode === 'binary' && value === '') {
           return null;
         }
 
@@ -2261,6 +2306,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                     time_range: loadedClip.time_range
                   }}
                   reviewMode={settings.review_mode}
+                  annotationColumn={settings.annotation_column}
                   availableClasses={availableClasses}
                   showComments={settings.show_comments}
                   showFileName={settings.show_file_name}
@@ -2287,7 +2333,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
         </div>
       </>
     );
-  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridDimensions, settings.review_mode, availableClasses, settings.show_comments, settings.show_file_name, settings.show_binary_controls, settings.enable_bounding_boxes, handleAnnotationChange, handleCommentChange, handleBoundingBoxChange, classifierGuidedMode, stratifiedBins]);
+  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridDimensions, settings.review_mode, settings.annotation_column, availableClasses, settings.show_comments, settings.show_file_name, settings.show_binary_controls, settings.enable_bounding_boxes, handleAnnotationChange, handleCommentChange, handleBoundingBoxChange, classifierGuidedMode, stratifiedBins]);
 
   return (
     <div className="review-tab-layout">
@@ -2498,6 +2544,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 csvColumns={csvColumns}
                 onApplyClassesOnly={handleApplyClassesOnly}
                 onApplyClassesAndSubset={handleApplyClassesAndSubset}
+                onCreateColumn={handleCreateColumn}
               />
               <HttpServerStatus
                 serverUrl={backendUrl}
@@ -3167,7 +3214,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                 {/* Bulk Annotation Controls - Only show in Grid mode for binary mode */}
                 {!isFocusMode && settings.review_mode === 'binary' && currentPageData.length > 0 && (() => {
                   // Count unlabeled clips on current page
-                  const unlabeledCount = currentPageData.filter(clip => !clip.annotation || clip.annotation === '').length;
+                  const unlabeledCount = currentPageData.filter(clip => !clip[settings.annotation_column] || clip[settings.annotation_column] === '').length;
 
                   return (
                     <div className="toolbar-bulk-controls">
@@ -3504,6 +3551,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                         onBoundingBoxChange={settings.enable_bounding_boxes ? (boundingBox) => handleBoundingBoxChange(clipToShow?.id, boundingBox) : undefined}
                         onNavigate={handleFocusNavigation}
                         settings={settings}
+                        annotationColumn={settings.annotation_column}
                         reviewMode={settings.review_mode}
                         availableClasses={availableClasses}
                         isLastClip={focusClipIndex === filteredAnnotationData.length - 1}
@@ -3623,13 +3671,15 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
               <span className="status-value">{currentPage + 1} of {totalPages}</span>
             </div>
             <div className="status-section">
-              <span className="status-label">Annotated:</span>
+              <span className="status-label">
+                {settings.review_mode === 'binary' ? `${settings.annotation_column}:` : 'Annotated:'}
+              </span>
               <span className="status-value">
                 {annotationData.filter(item =>
                   settings.review_mode === 'binary'
-                    ? item.annotation && item.annotation !== ''
+                    ? item[settings.annotation_column] && item[settings.annotation_column] !== ''
                     : item.annotation_status === 'complete'
-                ).length} of {annotationData.length}
+                ).length} of {annotationData.length} annotated
               </span>
             </div>
             <div className="status-section">
@@ -3637,7 +3687,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
               <span className="status-value">
                 {Math.round((annotationData.filter(item =>
                   settings.review_mode === 'binary'
-                    ? item.annotation && item.annotation !== ''
+                    ? item[settings.annotation_column] && item[settings.annotation_column] !== ''
                     : item.annotation_status === 'complete'
                 ).length / annotationData.length) * 100)}%
               </span>
