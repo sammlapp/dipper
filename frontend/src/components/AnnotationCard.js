@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { basename } from 'pathe';
 import Select from 'react-select';
 import BoundingBoxOverlay from './BoundingBoxOverlay';
+import SpectrogramContextMenu from './SpectrogramContextMenu';
 
 const AnnotationCard = memo(function AnnotationCard({
   clipData,
@@ -20,13 +21,16 @@ const AnnotationCard = memo(function AnnotationCard({
   onCardClick, // Click handler — receives the mouse event
   onPlayPause, // New prop to trigger play/pause from outside
   className = "",
-  disableAutoLoad = false // New prop to disable auto-loading
+  disableAutoLoad = false, // New prop to disable auto-loading
+  audioRootPath = '',
+  isDesktop = false,
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [spectrogramUrl, setSpectrogramUrl] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null); // {x, y} or null
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef(null);
@@ -138,6 +142,12 @@ const AnnotationCard = memo(function AnnotationCard({
     if (event && (event.shiftKey || event.metaKey || event.ctrlKey)) return;
     await togglePlayPause();
   }, [togglePlayPause, isMultiSelect]);
+
+  const handleSpectrogramContextMenu = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
 
   // Parse annotation based on review mode
   const getAnnotationValue = () => {
@@ -526,6 +536,7 @@ const AnnotationCard = memo(function AnnotationCard({
   }, [onCardClick]);
 
   return (
+    <>
     <div
       className={`annotation-card ${className} ${isActive && !isMultiSelect ? 'active-clip' : ''} ${isSelected && isMultiSelect ? (isActive ? 'active-clip-multi' : 'selected-clip') : ''}`}
       style={getCardStyle()}
@@ -547,6 +558,7 @@ const AnnotationCard = memo(function AnnotationCard({
       <div
         className={`annotation-spectrogram-container ${audioUrl ? 'clickable' : ''}`}
         onClick={(e) => handleSpectrogramClick(e)}
+        onContextMenu={handleSpectrogramContextMenu}
         title={audioUrl ? (isPlaying ? 'Click to pause audio' : 'Click to play audio') : 'Audio not available'}
         style={{ position: 'relative' }}
       >
@@ -623,6 +635,21 @@ const AnnotationCard = memo(function AnnotationCard({
         )}
       </div>
     </div>
+
+    {contextMenu && (
+      <SpectrogramContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onClose={() => setContextMenu(null)}
+        filePath={file}
+        audioRootPath={audioRootPath}
+        audioBase64={audio_base64}
+        spectrogramBase64={spectrogram_base64}
+        clipLabel={`${file ? file.replace(/.*[\\/]/, '').replace(/\.[^.]+$/, '') : 'clip'}_${start_time}-${end_time}`}
+        isDesktop={isDesktop}
+      />
+    )}
+    </>
   );
 });
 

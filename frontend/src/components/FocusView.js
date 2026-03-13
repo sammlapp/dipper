@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { basename } from 'pathe';
 import Select from 'react-select';
 import BoundingBoxOverlay from './BoundingBoxOverlay';
+import SpectrogramContextMenu from './SpectrogramContextMenu';
 
 function FocusView({
   clipData,
@@ -14,7 +15,9 @@ function FocusView({
   reviewMode = 'binary',
   availableClasses = [],
   isLastClip = false,
-  autoAdvance = true
+  autoAdvance = true,
+  audioRootPath = '',
+  isDesktop = false,
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -411,7 +414,15 @@ function FocusView({
     togglePlayPause();
   }, [togglePlayPause]);
 
+  const [contextMenu, setContextMenu] = useState(null);
+  const handleSpectrogramContextMenu = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
   return (
+    <>
     <div className="focus-view">
       <div className="focus-view-inner">
         {/* Hidden audio element */}
@@ -447,6 +458,7 @@ function FocusView({
             <div
               className="focus-spectrogram"
               onClick={handleSpectrogramClick}
+              onContextMenu={handleSpectrogramContextMenu}
               title={audioUrl ? (isPlaying ? 'Click to pause audio' : 'Click to play audio') : 'Audio not available'}
               style={{ position: 'relative' }}
             >
@@ -721,6 +733,21 @@ function FocusView({
 
       </div>
     </div>
+
+    {contextMenu && (
+      <SpectrogramContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onClose={() => setContextMenu(null)}
+        filePath={file}
+        audioRootPath={audioRootPath}
+        audioBase64={audio_base64}
+        spectrogramBase64={spectrogram_base64}
+        clipLabel={`${file ? file.replace(/.*[\\/]/, '').replace(/\.[^.]+$/, '') : 'clip'}_${start_time}-${end_time}`}
+        isDesktop={isDesktop}
+      />
+    )}
+    </>
   );
 }
 

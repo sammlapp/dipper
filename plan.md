@@ -1,7 +1,7 @@
 This project will create a cross-platform desktop app that runs pytorch machine learning models and allows users to train models in an active learning loop. 
 
 ## claude start up prompt
-take a close look at this codebase, especially documentation markdowns such as readme.md claude.md build.md. We're going to work from plan.md on ## next steps but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, lightweight_server.py, scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
+take a close look at this codebase, especially documentation markdowns such as readme.md claude.md build.md. We're going to work from plan.md but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, lightweight_server.py, scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
 
 # Build and release
 - lightweight python executable for GUI back-end is built with pyinstaller
@@ -18,6 +18,7 @@ take a close look at this codebase, especially documentation markdowns such as r
 - when pasting a path to navigate to in server mode file browser and hitting Enter/Return: if its a file path instead of a folder, navigate to the folder and activate that file as the 'selected' file
 
 - select subset of classes to save inference results for
+- potentially call eBird API, BirdNET meta-model, or something else to get a local species list
 
 WandB integration: need to allow user to provide API key and configure group name and project name for a run. Run name should match the dipper run name. 
 
@@ -40,14 +41,11 @@ Task manager status updates for training tasks: similar to inference tasks, stat
 
 Regional/date bird species list filtering using ebird meta-model. 
 
-
 ### User feature requests
-
-- sort entire annotation table by score
 
 - search/filter for clip by name
 
-- right click menu on a spectrogram/audio widget in Grid Mode or Focus Mode: download audio, download spectrogram, copy audio file path
+- [in progress] implement right click menu and actions on a spectrogram/audio widget, available both in Grid Mode and Focus Mode: download audio, download spectrogram, copy audio file path
 
 - dark mode
 
@@ -56,10 +54,6 @@ Jeff Larkin:
 
 JT Larkin:
 - CGL stopping criterion for number of negative clips in bin
-
-Lauren Chronister:
-should not create annotation_status column when using binary annotation
-(currently creates it if you flip the UI to multi-class annotation, even if you don't add any annotations)
 
 Davis Hines:
 when you annotate, it continues playing the old clip even after youve selected a label with asdf-keys, which plays overtop of the other clip, which detracted from the softwares intended function of fast review

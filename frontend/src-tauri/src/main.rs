@@ -174,6 +174,14 @@ async fn write_file(file_path: String, content: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to write file: {}", e))
 }
 
+/// Open a file with the system default application
+#[tauri::command]
+async fn open_file(app: tauri::AppHandle, file_path: String) -> Result<(), String> {
+    app.shell()
+        .open(&file_path, None)
+        .map_err(|e| format!("Failed to open file: {}", e))
+}
+
 /// Read text content from a file
 #[tauri::command]
 async fn read_text_file(file_path: String) -> Result<String, String> {
@@ -549,6 +557,7 @@ fn main() {
             select_model_files,
             save_file,
             write_file,
+            open_file,
             read_text_file,
             generate_unique_folder_name,
             get_backend_port

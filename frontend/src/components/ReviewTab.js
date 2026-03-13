@@ -17,6 +17,7 @@ import {
   getNumericColumns
 } from '../utils/stratificationUtils';
 import { selectCSVFiles, selectFolder, selectJSONFiles, saveFile, writeFile, readFile } from '../utils/fileOperations';
+import { isLocalMode } from '../utils/mode';
 import { useBackendUrl } from '../hooks/useBackendUrl';
 import { dirname, basename } from 'pathe';
 
@@ -2708,6 +2709,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                     activeClipAudioControlsRef.current = audioControls;
                   } : undefined}
                   disableAutoLoad={true} // Use batch loading instead
+                  audioRootPath={rootAudioPath}
+                  isDesktop={isLocalMode()}
                 />
               );
             })}
@@ -3934,6 +3937,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                         availableClasses={availableClasses}
                         isLastClip={focusClipIndex === filteredAnnotationData.length - 1}
                         autoAdvance={true}
+                        audioRootPath={rootAudioPath}
+                        isDesktop={isLocalMode()}
                       />
                     </div>
                   );
