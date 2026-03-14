@@ -1,0 +1,74 @@
+name: Create Release from Artifacts
+
+# Use this when the build workflow succeeded but the release step failed.
+# Find the failed workflow run URL, extract the run ID from the URL
+# (e.g. https://github.com/sammlapp/dipper/actions/runs/23056504483 → run_id = 23056504483)
+# then trigger this workflow manually with that run ID and the tag.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Run ID of the build workflow that produced the artifacts (from the Actions URL)'
+        required: true
+        type: string
+      tag:
+        description: 'Tag name for the release (e.g. v0.0.12)'
+        required: true
+        type: string
+      draft:
+        description: 'Create as draft release'
+        required: false
+        default: true
+        type: boolean
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts from specified run
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          run_id: ${{ inputs.run_id }}
+          path: artifacts/
+          allow_forks: false
+          skip_unpack: false
+
+      - name: List downloaded files
+        run: |
+          echo "=== Artifacts from run ${{ inputs.run_id }} ==="
+          find artifacts/ -type f | sort || echo "(none)"
+
+      - name: Fail if no installable files found
+        run: |
+          count=$(find artifacts/ -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" \) | wc -l)
+          echo "Found $count installable files"
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No .dmg / .exe / .AppImage files found in run ${{ inputs.run_id }}."
+            echo "::error::Check that the run ID is correct and artifacts have not expired."
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.tag }}
+          draft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
+            artifacts/**/*.AppImage
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -8,11 +8,12 @@ Run Dipper on a remote server and access it from your laptop's browser.
 
 ```bash
 # 1. Clone repository
-git clone <repository-url>
-cd training_gui
+git clone https://github.com/sammlapp/dipper.git
+cd dipper
 
-# 2. Run installer (installs Python + Node.js dependencies)
-./scripts/install-server.sh
+# 2. Run installer (installs Python + Node.js dependencies) with admin privelages
+# enter password if prompted
+sudo ./scripts/install-server.sh
 ```
 
 The installer will:
@@ -47,7 +48,7 @@ server:
   static_port: 3000      # React app port
 
 jobs:
-  max_concurrent: 3      # Adjust based on RAM (2-4GB per job)
+  max_concurrent: 3      # Adjust based on system capacity
 ```
 
 ## Launch (1 command)
@@ -70,6 +71,8 @@ Press Ctrl+C to stop
 ## Access from Your Laptop
 
 ### Option 1: SSH Tunnel (Recommended)
+Note: if you run the above commands from VS Code, the program automatically sets up port forwarding and you can skip this step (forwarded ports listed in the Ports panel).
+
 
 ```bash
 # On your laptop
@@ -101,10 +104,11 @@ Both Python backend and static server will shut down gracefully.
 lsof -i :3000
 lsof -i :8000
 
-# Kill process
+# change ports in server_config.yml
+
+# or kill process
 kill <PID>
 
-# Or change ports in server_config.yml
 ```
 
 ### React build missing
@@ -162,10 +166,6 @@ tail -f static-server.log
 # Use a different config file
 ./scripts/launch-server.sh /path/to/my-config.yml
 ```
-
-## Production Deployment
-
-For production use with nginx, systemd, and HTTPS, see `SERVER_DEPLOYMENT.md`.
 
 ## Architecture
 

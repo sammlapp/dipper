@@ -211,6 +211,8 @@ jobs:
     needs: build-tauri-full
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
 
     steps:
       - name: Download all artifacts
@@ -258,7 +260,6 @@ jobs:
             ### ML Environment
 
             The conda-pack ML environment (~700MB) is built separately and will be downloaded automatically by the app when needed.
-            You can also manually download pre-built environments from the [conda environment releases](https://github.com/YOUR_ORG/training_gui/releases?q=conda-env).
 
             ### What's New
             - See CHANGELOG.md for details
