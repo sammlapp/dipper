@@ -4,18 +4,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dipper — Bioacoustics ML Tool</title>
+  <title>Dipper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+    rel="stylesheet">
   <style>
     :root {
       --bg: #0f1117;
       --surface: #1a1d27;
       --surface2: #222636;
       --border: #2e3348;
-      --accent: #4f9eff;
+      --accent: #6b95cd;
       --accent2: #7ecba1;
       --text: #e8eaf0;
       --muted: #8892a4;
       --danger: #ff6b6b;
+      --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --font-display: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
 
     * {
@@ -27,7 +34,7 @@
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: var(--font-body);
       font-size: 16px;
       line-height: 1.6;
     }
@@ -60,14 +67,23 @@
     }
 
     .logo {
-      font-size: 3.2rem;
-      font-weight: 800;
+      font-size: 2.7rem;
+      font-family: var(--font-display);
+      font-weight: 100;
       letter-spacing: -1px;
-      background: linear-gradient(135deg, #4f9eff, #7ecba1);
+      background: #8bafdc;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       margin-bottom: 8px;
+    }
+
+    .header-icon {
+      width: 150px;
+      /* height: 88px; */
+      margin: 0 auto 14px;
+      display: block;
+      filter: drop-shadow(0 10px 10px rgba(9, 4, 4, 0.7));
     }
 
     .tagline {
@@ -118,9 +134,10 @@
     h2 {
       font-size: 1.4rem;
       font-weight: 700;
+      font-family: var(--font-display);
       color: var(--text);
       margin-bottom: 6px;
-      padding-bottom: 10px;
+      padding-bottom: 10x;
       border-bottom: 1px solid var(--border);
     }
 
@@ -347,6 +364,39 @@
       text-decoration: none;
     }
 
+    /* ── Screenshots ── */
+    .screenshots-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    @media (max-width: 860px) {
+      .screenshots-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .screenshot-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .screenshot-card img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .screenshot-caption {
+      padding: 12px 14px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+
     /* ── Info boxes ── */
     .info-grid {
       display: grid;
@@ -394,12 +444,14 @@
 <body>
 
   <header>
+    <img class="header-icon" src="../frontend/assets/icon.svg" alt="Dipper icon" />
+
     <div class="logo">Dipper</div>
     <p class="tagline">Bioacoustics ML training, inference, and annotation — cross-platform desktop app</p>
     <div class="badge-row">
       <span class="badge blue">macOS · Windows · Linux</span>
       <span class="badge green">Open Source · MIT</span>
-      <span class="badge">Python · Rust · React</span>
+      <span class="badge">Efficient keyboard annotation</span>
     </div>
     <a href="https://github.com/sammlapp/dipper" style="
     display:inline-flex;align-items:center;gap:8px;
@@ -472,7 +524,9 @@
             <li>Clip extraction</li>
             <li>~700 MB ML environment</li>
           </ul>
-          <div class="dl-grid" id="full-downloads">
+          <div class="edition-label green">Coming soon! <p>
+              (currently available in Server Mode)</div>
+          <!-- <div class="dl-grid" id="full-downloads">
             <a class="dl-btn" id="full-macos" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
               <span class="platform-icon"></span>
               <span class="platform-name">macOS</span>
@@ -489,15 +543,22 @@
               <span class="platform-name">Linux</span>
               <span class="platform-detail">x64 · AppImage</span>
             </a>
-          </div>
+          </div> -->
         </div>
       </div>
 
       <div class="info-grid">
         <div class="info-card">
+          <h3>Server Mode + Remote Access </h3>
+          <p>To run Dipper on a server and access via a remote browser, see <a
+              href="https://github.com/sammlapp/dipper?tab=readme-ov-file#server-mode">Server Mode instructions</a>
+          </p>
+        </div>
+        <!-- <div class="info-card">
           <h3>macOS note</h3>
           <p>On first launch, right-click → Open to bypass Gatekeeper if the app is unsigned.</p>
-        </div>
+        </div> -->
+
         <div class="info-card">
           <h3>Linux note</h3>
           <p>Make the AppImage executable: <code
@@ -509,6 +570,44 @@
         </div>
       </div>
     </section>
+
+    <!-- ── Screenshots ── -->
+    <section id="screenshots">
+      <h2>Screenshots</h2>
+      <p class="section-sub">Annotate efficiently with fluid switching between Grid and
+        Focus layouts and keyboard-based annotation. </p>
+      <div class="screenshots-grid">
+        <figure class="screenshot-card">
+          <img src="img/grid_mode_screenshot.png" alt="Dipper grid mode screenshot" loading="lazy" />
+          <figcaption class="screenshot-caption">Grid Mode</figcaption>
+        </figure>
+        <figure class="screenshot-card">
+          <img src="img/focus_mode_screenshot.png" alt="Dipper focus mode screenshot" loading="lazy" />
+          <figcaption class="screenshot-caption">Focus Mode</figcaption>
+        </figure>
+      </div>
+
+    </section>
+    <!-- ── Video Tutorials ── -->
+    <section id="tutorials">
+      <h2>Video Tutorials</h2>
+      <div class="info-grid">
+
+        <div class="info-card">
+          <a href="https://drive.google.com/file/d/1JSfkiSOju1JeOL3t6V905DDMyA8eFYam/view?t=3">1. Basic Annotation</a>
+        </div>
+        <div class="info-card">
+          <a href="https://drive.google.com/file/d/1PGjZ7lxBVXkaiy1jJBCZNQr4MzlTDG6U/view">2. Classifier-Guided
+            Listening</a>
+        </div>
+        <div class="info-card">
+          <a href="https://drive.google.com/file/d/1Gy4gl7mWVbvwPlGeXL8t1eezI9ExViPk/view">3. Configuration
+            and View Settings</a>
+        </div>
+
+      </div>
+    </section>
+
 
     <!-- ── All Releases ── -->
     <section id="releases">
@@ -542,11 +641,11 @@
           <p>Built with Tauri + React. Native desktop experience on macOS, Windows, and Linux.</p>
         </div>
         <div class="info-card">
-          <h3>Server Mode</h3>
-          <p>To run Dipper on a server and access via a remote browser, see <a
-              href="https://github.com/sammlapp/dipper?tab=readme-ov-file#server-mode">Server Mode instructions</a>
-          </p>
+          <h3>Bugs and Feature Requests</h3>
+          <p>Report issues or request new features on our <a href="https://github.com/sammlapp/dipper/issues">GitHub
+              Issues</a> page.</p>
         </div>
+
       </div>
     </section>
 
