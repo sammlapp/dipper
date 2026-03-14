@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dipper — Bioacoustics ML Tool</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #222636;
+      --border: #2e3348;
+      --accent: #4f9eff;
+      --accent2: #7ecba1;
+      --text: #e8eaf0;
+      --muted: #8892a4;
+      --danger: #ff6b6b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #0d1a2e 0%, #12243d 50%, #0f1a2e 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 60px 24px 48px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(79,158,255,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .logo {
+      font-size: 3.2rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, #4f9eff, #7ecba1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+    .tagline {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 520px;
+      margin: 0 auto 24px;
+    }
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+    .badge {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .badge.green { border-color: #7ecba155; color: var(--accent2); }
+    .badge.blue  { border-color: #4f9eff55; color: var(--accent); }
+
+    /* ── Main ── */
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    section { margin-bottom: 56px; }
+    h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-sub {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+
+    /* ── Edition cards ── */
+    .editions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 640px) { .editions { grid-template-columns: 1fr; } }
+
+    .edition-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .edition-card.featured {
+      border-color: #4f9eff44;
+      background: linear-gradient(135deg, var(--surface), #1a2238);
+    }
+    .edition-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .edition-label.blue { color: var(--accent); }
+    .edition-label.green { color: var(--accent2); }
+    .edition-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .edition-desc {
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+      min-height: 48px;
+    }
+    .feature-list {
+      list-style: none;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .feature-list li { padding: 3px 0; }
+    .feature-list li::before { content: '✓  '; color: var(--accent2); }
+    .feature-list li.no::before { content: '✗  '; color: var(--border); }
+
+    /* ── Download buttons ── */
+    .dl-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .dl-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 14px;
+      color: var(--text);
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      text-decoration: none;
+    }
+    .dl-btn:hover {
+      border-color: var(--accent);
+      background: #1e2d45;
+      text-decoration: none;
+    }
+    .dl-btn .platform-icon { font-size: 1.1rem; width: 20px; text-align: center; }
+    .dl-btn .platform-name { flex: 1; font-weight: 500; }
+    .dl-btn .platform-detail { color: var(--muted); font-size: 0.78rem; }
+    .dl-btn.unavailable { opacity: 0.4; cursor: default; pointer-events: none; }
+
+    /* ── Releases table ── */
+    .releases-loading {
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 20px 0;
+    }
+    #releases-container { margin-top: 4px; }
+
+    .release-entry {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 12px;
+    }
+    .release-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .release-tag {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+    }
+    .release-date { color: var(--muted); font-size: 0.82rem; }
+    .release-pill {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 9px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .pill-review { background: #4f9eff22; color: var(--accent); border: 1px solid #4f9eff44; }
+    .pill-full   { background: #7ecba122; color: var(--accent2); border: 1px solid #7ecba144; }
+    .pill-pre    { background: #ff6b6b22; color: var(--danger); border: 1px solid #ff6b6b44; }
+    .release-assets {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .asset-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      color: var(--text);
+      text-decoration: none;
+      transition: border-color 0.15s;
+    }
+    .asset-btn:hover { border-color: var(--accent); text-decoration: none; }
+
+    /* ── Info boxes ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .info-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .info-card h3 { font-size: 0.95rem; margin-bottom: 8px; color: var(--text); }
+    .info-card p  { font-size: 0.84rem; color: var(--muted); }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Dipper</div>
+  <p class="tagline">Bioacoustics ML training, inference, and annotation — cross-platform desktop app</p>
+  <div class="badge-row">
+    <span class="badge blue">macOS · Windows · Linux</span>
+    <span class="badge green">Open Source · MIT</span>
+    <span class="badge">Python · Rust · React</span>
+  </div>
+  <a href="https://github.com/sammlapp/dipper" style="
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:8px;padding:10px 18px;font-size:0.9rem;color:var(--text);
+    transition:border-color 0.15s;
+  " onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+    <svg height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    View on GitHub
+  </a>
+</header>
+
+<main>
+
+  <!-- ── Download Section ── -->
+  <section id="download">
+    <h2>Download</h2>
+    <p class="section-sub">Choose the edition that fits your workflow. Both editions run on macOS (Apple Silicon), Windows (x64), and Linux (x64).</p>
+
+    <div class="editions">
+      <!-- Review Edition -->
+      <div class="edition-card">
+        <div class="edition-label blue">Dipper Review</div>
+        <div class="edition-title">Review &amp; Annotate</div>
+        <div class="edition-desc">Lightweight app for reviewing and annotating audio clips. Share with annotators who don't need ML tools.</div>
+        <ul class="feature-list">
+          <li>Binary &amp; multi-class annotation</li>
+          <li>Spectrogram + audio playback</li>
+          <li>Bounding box annotation</li>
+          <li>CGL classifier-guided listening</li>
+          <li class="no">ML training / inference</li>
+        </ul>
+        <div class="dl-grid" id="review-downloads">
+          <a class="dl-btn" id="review-macos" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+            <span class="platform-icon"></span>
+            <span class="platform-name">macOS</span>
+            <span class="platform-detail">Apple Silicon · DMG</span>
+          </a>
+          <a class="dl-btn" id="review-windows" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+            <span class="platform-icon">⊞</span>
+            <span class="platform-name">Windows</span>
+            <span class="platform-detail">x64 · NSIS Installer</span>
+          </a>
+          <a class="dl-btn" id="review-linux" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+            <span class="platform-icon">🐧</span>
+            <span class="platform-name">Linux</span>
+            <span class="platform-detail">x64 · AppImage</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Full Edition -->
+      <div class="edition-card featured">
+        <div class="edition-label green">Dipper Full</div>
+        <div class="edition-title">Full ML Toolkit</div>
+        <div class="edition-desc">Complete application with annotation, training, inference, and extraction. Requires ~700 MB ML environment (downloaded on first use).</div>
+        <ul class="feature-list">
+          <li>Everything in Dipper Review</li>
+          <li>Model training</li>
+          <li>Batch inference</li>
+          <li>Clip extraction</li>
+          <li>~700 MB ML environment</li>
+        </ul>
+        <div class="dl-grid" id="full-downloads">
+          <a class="dl-btn" id="full-macos" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+            <span class="platform-icon"></span>
+            <span class="platform-name">macOS</span>
+            <span class="platform-detail">Apple Silicon · DMG</span>
+          </a>
+          <a class="dl-btn" id="full-windows" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+            <span class="platform-icon">⊞</span>
+            <span class="platform-name">Windows</span>
+            <span class="platform-detail">x64 · NSIS Installer</span>
+          </a>
+          <a class="dl-btn" id="full-linux" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+            <span class="platform-icon">🐧</span>
+            <span class="platform-name">Linux</span>
+            <span class="platform-detail">x64 · AppImage</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-card">
+        <h3>macOS note</h3>
+        <p>On first launch, right-click → Open to bypass Gatekeeper if the app is unsigned.</p>
+      </div>
+      <div class="info-card">
+        <h3>Linux note</h3>
+        <p>Make the AppImage executable: <code style="color:var(--accent);font-size:0.8rem">chmod +x Dipper*.AppImage</code>, then run it.</p>
+      </div>
+      <div class="info-card">
+        <h3>ML environment</h3>
+        <p>The full app downloads its PyTorch environment (~700 MB) automatically on first use.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── All Releases ── -->
+  <section id="releases">
+    <h2>All Releases</h2>
+    <p class="section-sub">Click any asset to download directly from GitHub Releases.</p>
+    <div id="releases-container">
+      <p class="releases-loading">Loading releases…</p>
+    </div>
+  </section>
+
+  <!-- ── About ── -->
+  <section id="about">
+    <h2>About Dipper</h2>
+    <p class="section-sub">Dipper is an open-source desktop application for bioacoustics machine learning workflows.</p>
+    <div class="info-grid">
+      <div class="info-card">
+        <h3>Annotation</h3>
+        <p>Binary, multi-class, and bounding-box annotation of audio clips with spectrogram visualization.</p>
+      </div>
+      <div class="info-card">
+        <h3>Inference</h3>
+        <p>Run trained models over large audio datasets and review detections in the built-in reviewer.</p>
+      </div>
+      <div class="info-card">
+        <h3>Training</h3>
+        <p>Fine-tune or train bioacoustics classifiers using OpenSoundscape and PyTorch.</p>
+      </div>
+      <div class="info-card">
+        <h3>Cross-platform</h3>
+        <p>Built with Tauri + React. Native desktop experience on macOS, Windows, and Linux.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>
+    <a href="https://github.com/sammlapp/dipper">GitHub</a> ·
+    <a href="https://github.com/sammlapp/dipper/releases">Releases</a> ·
+    <a href="https://github.com/sammlapp/dipper/issues">Issues</a> ·
+    MIT License
+  </p>
+</footer>
+
+<script>
+const REPO = 'sammlapp/dipper';
+const API  = `https://api.github.com/repos/${REPO}/releases`;
+
+const PLATFORM_ICONS = { dmg: '', exe: '⊞', AppImage: '🐧' };
+const PLATFORM_NAMES = { dmg: 'macOS', exe: 'Windows', AppImage: 'Linux' };
+
+function assetPlatform(name) {
+  if (name.endsWith('.dmg'))      return 'macos';
+  if (name.endsWith('.exe'))      return 'windows';
+  if (name.endsWith('.AppImage')) return 'linux';
+  return null;
+}
+
+function isReviewAsset(name) {
+  return name.toLowerCase().includes('review');
+}
+
+function isFullAsset(name) {
+  return !name.toLowerCase().includes('review') &&
+         (name.endsWith('.dmg') || name.endsWith('.exe') || name.endsWith('.AppImage'));
+}
+
+function assetExt(name) {
+  if (name.endsWith('.dmg'))      return 'dmg';
+  if (name.endsWith('.exe'))      return 'exe';
+  if (name.endsWith('.AppImage')) return 'AppImage';
+  return null;
+}
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+async function loadReleases() {
+  let releases;
+  try {
+    const res = await fetch(API + '?per_page=20');
+    if (!res.ok) throw new Error(`GitHub API: ${res.status}`);
+    releases = await res.json();
+  } catch (e) {
+    document.getElementById('releases-container').innerHTML =
+      `<p style="color:var(--muted)">Could not load releases. <a href="https://github.com/${REPO}/releases">View on GitHub →</a></p>`;
+    return;
+  }
+
+  const published = releases.filter(r => !r.draft);
+
+  // ── Wire up "latest" download buttons ──
+  const latest = published[0];
+  if (latest) {
+    const reviewAssets = latest.assets.filter(a => isReviewAsset(a.name));
+    const fullAssets   = latest.assets.filter(a => isFullAsset(a.name));
+
+    ['macos','windows','linux'].forEach(plat => {
+      const ext = { macos: 'dmg', windows: 'exe', linux: 'AppImage' }[plat];
+      const rv = reviewAssets.find(a => a.name.endsWith('.' + ext));
+      const fv = fullAssets.find(a =>   a.name.endsWith('.' + ext));
+
+      const rb = document.getElementById(`review-${plat}`);
+      const fb = document.getElementById(`full-${plat}`);
+
+      if (rv && rb) { rb.href = rv.browser_download_url; rb.title = rv.name; }
+      else if (rb)  { rb.classList.add('unavailable'); }
+
+      if (fv && fb) { fb.href = fv.browser_download_url; fb.title = fv.name; }
+      else if (fb)  { fb.classList.add('unavailable'); }
+    });
+  }
+
+  // ── Render all-releases list ──
+  if (!published.length) {
+    document.getElementById('releases-container').innerHTML =
+      '<p style="color:var(--muted)">No published releases yet.</p>';
+    return;
+  }
+
+  const html = published.map(r => {
+    const hasReview = r.assets.some(a => isReviewAsset(a.name));
+    const hasFull   = r.assets.some(a => isFullAsset(a.name));
+    const pills = [
+      r.prerelease ? '<span class="release-pill pill-pre">Pre-release</span>' : '',
+      hasFull   ? '<span class="release-pill pill-full">Full</span>' : '',
+      hasReview ? '<span class="release-pill pill-review">Review</span>' : '',
+    ].filter(Boolean).join('');
+
+    const assets = r.assets
+      .filter(a => a.name.endsWith('.dmg') || a.name.endsWith('.exe') || a.name.endsWith('.AppImage'))
+      .map(a => {
+        const ext  = assetExt(a.name);
+        const icon = PLATFORM_ICONS[ext] || '📦';
+        const plat = PLATFORM_NAMES[ext] || '';
+        const type = isReviewAsset(a.name) ? 'Review' : 'Full';
+        const mb   = (a.size / 1048576).toFixed(0);
+        return `<a class="asset-btn" href="${a.browser_download_url}" title="${a.name}">
+          <span>${icon}</span> ${plat} ${type} <span style="color:var(--muted);font-size:0.76rem">${mb} MB</span>
+        </a>`;
+      }).join('');
+
+    return `<div class="release-entry">
+      <div class="release-header">
+        <span class="release-tag">${r.tag_name}</span>
+        ${pills}
+        <span class="release-date">${formatDate(r.published_at)}</span>
+        <a href="${r.html_url}" style="margin-left:auto;font-size:0.8rem;color:var(--muted)" target="_blank">Release notes →</a>
+      </div>
+      <div class="release-assets">
+        ${assets || '<span style="color:var(--muted);font-size:0.84rem">No binary assets attached</span>'}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('releases-container').innerHTML = html;
+}
+
+loadReleases();
+</script>
+</body>
+</html>

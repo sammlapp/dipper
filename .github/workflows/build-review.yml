@@ -2,7 +2,7 @@ name: Build Review-Only App
 
 on:
   push:
-    branches: [ main, develop ]
+    # branches: [ main, develop ]
     tags:
       - 'v*'  # -review' Only tags ending with -review (e.g., v0.0.6-review)
   # pull_request:

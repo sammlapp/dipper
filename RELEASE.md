@@ -2,274 +2,148 @@
 
 This document describes how to create releases for Dipper using the automated GitHub Actions workflows.
 
+## Download Page
+
+Releases are published at: **https://sammlapp.github.io/dipper/**
+
+The page auto-fetches the latest GitHub Release assets and shows per-platform download buttons.
+It updates automatically whenever a release is published.
+
+---
+
 ## Quick Start
 
-### Review-Only Release
+### Step 1 — Bump the version
+
 ```bash
-git tag v0.0.6-review
-git push origin v0.0.6-review
+cd frontend
+npm run version-bump 0.0.13   # updates package.json, Cargo.toml, tauri.conf.json
+cd src-tauri && cargo check   # updates Cargo.lock
+cd ../..
+git add -A && git commit -m "bump version to 0.0.13"
+git push origin main
 ```
-→ Builds lightweight review-only app (~20-30 min)
 
-### Full App Release
+### Step 2 — Tag and push
+
 ```bash
-git tag v0.0.6
-git push origin v0.0.6
+# Dipper Review build only (lightweight, ~20-30 min)
+git tag -a v0.0.13 -m "Release v0.0.13"
+git push origin v0.0.13
+
+# Full app build (includes ML environment, ~50-90 min)
+# Uses the build-full.yml workflow — tag format: vX.Y.Z (no suffix)
 ```
-→ Builds complete app with ML environment (~50-90 min)
 
-## What Gets Built
+### Step 3 — Publish the draft release
 
-### Review-Only Build (`v*-review` tags)
-- [YES] PyInstaller lightweight_server for all platforms
-- [YES] Tauri desktop app (DMG, EXE, AppImage)
-- [NO] ML training environment
-- **Size:** ~100-200 MB per platform
-- **Use for:** Distribution to annotators for review tasks only
+1. Go to **https://github.com/sammlapp/dipper/releases**
+2. Find the draft release created by the workflow
+3. Add release notes, then click **Publish release**
+4. The GitHub Pages site updates automatically within ~1 minute
 
-### Full App Build (`v*` tags, excluding `v*-review`)
-- [YES] PyInstaller lightweight_server for all platforms
-- [YES] Conda-pack ML environment (~700 MB) for all platforms
-- [YES] Tauri desktop app (DMG, EXE, AppImage)
-- **Size:** ~100-200 MB app + ~700 MB ML environment
-- **Use for:** Full production releases with training capabilities
+---
+
+## Workflows
+
+| Workflow | Trigger | Builds |
+|---|---|---|
+| `build-review.yml` | Any `v*` tag or push to `main`/`develop` | Dipper Review (PyInstaller + Tauri review-only) |
+| `build-full.yml` | Tags matching `vX.Y.Z` (no suffix) | Dipper Full (PyInstaller + Tauri full app) |
+| `deploy-pages.yml` | Release published, push to `docs/`, or manual | GitHub Pages download site |
+
+Both build workflows create a **draft GitHub Release** with assets attached when triggered by a tag.
+
+---
+
+## Build Outputs
+
+### Dipper Review
+- `Dipper-Review-X.Y.Z-arm64.dmg` — macOS Apple Silicon
+- `Dipper-Review-X.Y.Z-x64-setup.exe` — Windows x64
+- `Dipper-Review-X.Y.Z-x64.AppImage` — Linux x64
+- Size: ~100–200 MB per platform
+
+### Dipper Full
+- `Dipper-X.Y.Z-arm64.dmg` — macOS Apple Silicon
+- `Dipper-X.Y.Z-x64-setup.exe` — Windows x64
+- `Dipper-X.Y.Z-x64.AppImage` — Linux x64
+- Size: ~100–200 MB app + ~700 MB ML environment (downloaded on first use)
+
+---
 
 ## Supported Platforms
 
-| Platform | Architecture | Output Format |
-|----------|-------------|---------------|
+| Platform | Architecture | Format |
+|---|---|---|
 | macOS | Apple Silicon (arm64) | DMG |
 | Windows | x64 | NSIS Installer (EXE) |
 | Linux | x64 | AppImage |
 
-## Release Process
+---
 
-### Step 1: Prepare Release
+## Version Numbers
 
-1. Update version in `frontend/package.json`:
-   ```json
-   {
-     "version": "0.0.6"
-   }
-   ```
+Three files must stay in sync — `npm run version-bump` handles all three:
 
-2. Update version in `frontend/src-tauri/Cargo.toml`:
-   ```toml
-   [package]
-   version = "0.0.6"
-   ```
+1. `frontend/package.json`
+2. `frontend/src-tauri/Cargo.toml`
+3. `frontend/src-tauri/tauri.conf.json`
 
-3. Update CHANGELOG.md with release notes
+Follow semantic versioning (`MAJOR.MINOR.PATCH`):
+- `v0.0.X` — bug fixes / minor improvements
+- `v0.X.0` — new features (backwards compatible)
+- `vX.0.0` — breaking changes
 
-4. Commit changes:
-   ```bash
-   git add .
-   git commit -m "Prepare release v0.0.6"
-   git push origin main
-   ```
+Pre-releases: `v0.0.13-alpha`, `v0.0.13-beta`, `v0.0.13-rc1`
 
-### Step 2: Create Tag
+---
 
-**For Review-Only:**
-```bash
-git tag -a v0.0.6-review -m "Release v0.0.6 (Review Only)"
-git push origin v0.0.6-review
-```
+## GitHub Pages Setup (one-time)
 
-**For Full App:**
-```bash
-git tag -a v0.0.6 -m "Release v0.0.6"
-git push origin v0.0.6
-```
+The download site lives in `docs/` and deploys via the `deploy-pages.yml` workflow.
 
-### Step 3: Monitor Build
+To enable it the first time:
+1. Go to **Settings → Pages** in the GitHub repo
+2. Under **Source**, select **GitHub Actions**
+3. Save — the site will be live at `https://sammlapp.github.io/dipper/` after the next deploy
 
-1. Go to https://github.com/YOUR_ORG/training_gui/actions
-2. Watch the workflow run (green = success, red = failure)
-3. Wait for completion:
-   - Review-only: ~20-30 minutes
-   - Full app: ~50-90 minutes
-
-### Step 4: Publish Release
-
-1. Go to https://github.com/YOUR_ORG/training_gui/releases
-2. Find the draft release
-3. Edit the release:
-   - Add detailed release notes
-   - Add screenshots if UI changed
-   - Add upgrade instructions if needed
-4. **Publish release**
-
-## Build Outputs
-
-### Review-Only Release Files
-```
-Dipper-Review-0.0.6-arm64.dmg            # macOS ARM
-Dipper-Review-0.0.6-x64-setup.exe        # Windows
-Dipper-Review-0.0.6-x64.AppImage         # Linux
-```
-
-### Full App Release Files
-```
-Dipper-0.0.6-arm64.dmg                   # macOS ARM
-Dipper-0.0.6-x64-setup.exe               # Windows
-Dipper-0.0.6-x64.AppImage                # Linux
-dipper_pytorch_env-macos-arm64.tar.gz    # ML env macOS ARM
-dipper_pytorch_env-windows-x64.tar.gz    # ML env Windows
-dipper_pytorch_env-linux-x64.tar.gz      # ML env Linux
-```
+---
 
 ## Manual Workflow Trigger
 
-If you need to rebuild without creating a new tag:
+To rebuild without creating a new tag:
+1. **Actions** tab → select workflow
+2. Click **Run workflow** → select branch → **Run workflow**
 
-1. Go to **Actions** tab
-2. Select workflow: "Build Review-Only App" or "Build Full App"
-3. Click **Run workflow**
-4. Select branch (usually `main`)
-5. Click green **Run workflow** button
-
-This is useful for:
-- Testing workflow changes
-- Rebuilding after fixing a build issue
-- Creating test builds from feature branches
-
-## Version Numbering
-
-Follow semantic versioning: `MAJOR.MINOR.PATCH`
-
-**Examples:**
-- `v0.0.6` - Patch release (bug fixes)
-- `v0.1.0` - Minor release (new features, backwards compatible)
-- `v1.0.0` - Major release (breaking changes)
-
-**Review-only variants:**
-- `v0.0.6-review` - Review-only version of v0.0.6
-
-**Pre-releases:**
-- `v0.0.6-alpha` - Alpha release
-- `v0.0.6-beta` - Beta release
-- `v0.0.6-rc1` - Release candidate
+---
 
 ## Troubleshooting
 
-### "Build Failed" - PyInstaller Stage
-
-**Check:**
-1. Does `backend/build_pyinstaller.py` run locally?
-2. Are requirements in `backend/requirements-lightweight.txt` up to date?
-3. Check workflow logs for Python errors
-
-**Fix:**
+**PyInstaller build fails**
 ```bash
-cd backend
-python build_pyinstaller.py
-# Fix any errors, commit, and re-tag
+cd backend && python build_pyinstaller.py   # reproduce locally, fix, commit, retag
 ```
 
-### "Build Failed" - Conda-Pack Stage
-
-**Check:**
-1. Does `backend/build_conda_pack.py` run locally?
-2. Is `backend/dipper_pytorch_env.yml` valid?
-3. Check for package conflicts in conda solver
-
-**Fix:**
+**Tauri build fails**
+- Check that PyInstaller artifact was produced in the prior job
+- Check `frontend/src-tauri/tauri.conf.json` for syntax errors
 ```bash
-cd backend
-conda env create -f dipper_pytorch_env.yml
-# Fix conflicts, update yml, commit, and re-tag
+cd frontend && npm run tauri:build:review   # reproduce locally
 ```
 
-### "Build Failed" - Tauri Stage
-
-**Check:**
-1. Did previous stages (PyInstaller/conda-pack) complete?
-2. Are artifacts being downloaded correctly?
-3. Check `frontend/src-tauri/tauri.conf.json` for errors
-
-**Fix:**
-```bash
-cd frontend
-npm run tauri:build:review  # or tauri:build:all
-# Fix errors, commit, and re-tag
-```
-
-### Release Doesn't Appear
-
-**Problem:** GitHub Release not created
-**Solution:**
+**Release draft not created**
 - Release is only created for tag pushes starting with `v`
-- Check if tag exists: `git tag -l`
-- Check Actions tab for workflow run status
+- Check: `git tag -l` and the Actions tab
 
-### Wrong Files in Release
+**GitHub Pages not updating**
+- Confirm Pages source is set to "GitHub Actions" (not a branch)
+- Check the `deploy-pages` workflow run in the Actions tab
 
-**Problem:** Missing or incorrect artifacts
-**Solution:**
-- Check artifact upload steps in workflow
-- Verify file paths match actual build outputs
-- Re-run workflow manually if needed
+**macOS: "App is damaged" / Gatekeeper block**
+- Right-click → Open, or: `xattr -cr /Applications/Dipper\ Review.app`
 
-## Testing Before Release
-
-Before creating an official release, test the build process:
-
-### Test Review Build
+**Linux: AppImage won't launch**
 ```bash
-git checkout -b test-review-build
-# Make version changes if needed
-git commit -am "Test review build"
-git tag v0.0.6-review-test
-git push origin test-review-build --tags
-# Monitor build, then delete tag if successful
-git tag -d v0.0.6-review-test
-git push origin :refs/tags/v0.0.6-review-test
+chmod +x Dipper-Review-*.AppImage && ./Dipper-Review-*.AppImage
 ```
-
-### Test Full Build
-```bash
-git checkout -b test-full-build
-git commit -am "Test full build"
-git tag v0.0.6-test
-git push origin test-full-build --tags
-# Monitor build, then delete tag if successful
-git tag -d v0.0.6-test
-git push origin :refs/tags/v0.0.6-test
-```
-
-## Best Practices
-
-1. **Always test locally first**
-   ```bash
-   npm run build:python-pyinstaller
-   npm run build:conda-pack
-   npm run tauri:build:review
-   ```
-
-2. **Update CHANGELOG before tagging**
-   - Document all changes
-   - Include breaking changes
-   - Add migration guide if needed
-
-3. **Use semantic versioning**
-   - Patch (0.0.X): Bug fixes only
-   - Minor (0.X.0): New features, backwards compatible
-   - Major (X.0.0): Breaking changes
-
-4. **Test on all platforms when possible**
-   - Especially for breaking changes
-   - Check platform-specific bugs
-   - Verify installers work correctly
-
-5. **Keep release notes user-friendly**
-   - What's new
-   - What's fixed
-   - What's changed (breaking)
-   - How to upgrade
-
-## Questions?
-
-- Workflow details: See [.github/workflows/README.md](.github/workflows/README.md)
-- Build scripts: See `backend/build_pyinstaller.py` and `backend/build_conda_pack.py`
-- Issues: Open an issue on GitHub
