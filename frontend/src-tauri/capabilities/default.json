@@ -10,6 +10,7 @@
     "dialog:default",
     "fs:default",
     "http:default",
-    "shell:default"
+    "shell:default",
+    "opener:default"
   ]
 }

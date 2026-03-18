@@ -9,6 +9,7 @@ use std::thread;
 use std::time::Duration;
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::ShellExt;
 
 // State to store the backend server port and process
@@ -177,8 +178,8 @@ async fn write_file(file_path: String, content: String) -> Result<(), String> {
 /// Open a file with the system default application
 #[tauri::command]
 async fn open_file(app: tauri::AppHandle, file_path: String) -> Result<(), String> {
-    app.shell()
-        .open(&file_path, None)
+    app.opener()
+        .open_path(&file_path, None::<&str>)
         .map_err(|e| format!("Failed to open file: {}", e))
 }
 
@@ -379,6 +380,7 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(BackendState {
             port: Mutex::new(None),
             process: Mutex::new(None),

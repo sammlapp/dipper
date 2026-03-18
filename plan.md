@@ -87,6 +87,8 @@ save publication-ready metrics summary and visualization as html in output dir
 
 ## known bugs
 
+Lauren [McNeil Lab]: out of memory error! always happens after annotating 10% of a large dataset. decrease cache size somewhere? make configurable? 
+
 LMC: when random order is enabled in CGL, clip order shuffles every time user adds an annotation or comment
 
 BRG: aiohttp_cors missing as dependency for server mode after install (not sure why, its listed in requirements so should be installed during install-server.sh)
