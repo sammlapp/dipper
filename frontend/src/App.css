@@ -1,8 +1,9 @@
 /* Modern Bioacoustics GUI Theme with Inter Font */
 
 /* Color Palette */
+/* font families tried: Plus Jakarta Sans, Outfit, Inter,  */
 :root {
-  --app-font: 'Inter', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  --app-font: 'Outfit', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
   --light-bg: #ffffff;
   --dark: #395756;
   --dark-accent: #4f5d75;
@@ -2775,6 +2776,62 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.multiclass-select .select__control {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  min-height: 34px;
+}
+
+.multiclass-select .select__control:hover {
+  border-color: var(--border-color);
+}
+
+.multiclass-select .select__menu {
+  background-color: var(--dropdown-bg);
+  border: 1px solid var(--dropdown-border);
+}
+
+.multiclass-select .select__option {
+  color: var(--text-primary);
+  background-color: var(--dropdown-bg);
+}
+
+.multiclass-select .select__option--is-focused {
+  background-color: var(--toolbar-btn-hover);
+}
+
+.multiclass-select .select__multi-value {
+  background-color: rgba(82, 135, 240, 0.15);
+}
+
+.multiclass-select .select__multi-value__label,
+.multiclass-select .select__input-container,
+.multiclass-select .select__placeholder,
+.multiclass-select .select__single-value {
+  color: var(--text-primary);
+}
+
+/* Narrower Select Classes input on extraction Task Setup */
+.extraction-class-select-narrow {
+  max-width: 560px;
+}
+
+body.dark-mode .multiclass-select .select__control {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+}
+
+body.dark-mode .multiclass-select .select__menu {
+  background-color: var(--dropdown-bg);
+  border-color: var(--dropdown-border);
+}
+
+body.dark-mode .multiclass-select .select__indicator,
+body.dark-mode .multiclass-select .select__indicator-separator {
+  color: var(--text-secondary);
+  background-color: var(--border-color);
+}
+
 /* Comments Field */
 .comments-field {
   width: 100%;
@@ -5194,6 +5251,30 @@ button:disabled {
   transform: scale(0.95);
 }
 
+.help-icon-tooltip {
+  position: fixed;
+  z-index: 99999;
+  max-width: 280px;
+  padding: 8px 11px;
+  background: var(--bg-elevated, var(--panel-bg, #fff));
+  color: var(--text-primary, #111);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.help-icon-tooltip-hint {
+  font-size: 11px;
+  opacity: 0.55;
+  font-style: italic;
+}
+
 /* Task Management Styles */
 
 /* Task Creation Form */
@@ -6167,10 +6248,23 @@ body.dark-mode .toolbar-bulk-controls {
 }
 
 /* Buttons */
-body.dark-mode button:not(.toolbar-btn):not(.annotation-btn):not(.segment):not([class*="yes"]):not([class*="no"]):not([class*="uncertain"]):not([class*="MuiButton"]) {
+body.dark-mode button:not(.toolbar-btn):not(.annotation-btn):not(.segment):not(.clear-button):not(.button-clear):not([class*="yes"]):not([class*="no"]):not([class*="uncertain"]):not([class*="MuiButton"]) {
   background-color: var(--bg-elevated);
   color: var(--text-primary);
   border-color: var(--border-color);
+}
+
+body.dark-mode .clear-button,
+body.dark-mode .button-clear {
+  background-color: var(--alert);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+body.dark-mode .clear-button:hover,
+body.dark-mode .button-clear:hover {
+  background-color: #b91c1c;
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Segmented controls: preserve clear selected vs unselected states in dark mode */

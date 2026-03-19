@@ -355,6 +355,21 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
               </div>
             </div>
 
+            {availableClasses.length > 0 && (
+              <div className="form-group full-width">
+                <label>Select Classes <HelpIcon section="extraction-class-selection" /></label>
+                <Select
+                  isMulti
+                  options={classOptions}
+                  value={selectedClassOptions}
+                  onChange={handleClassListChange}
+                  placeholder="Select classes to create extraction tasks for..."
+                  className="multiclass-select extraction-class-select-narrow"
+                  classNamePrefix="select"
+                />
+              </div>
+            )}
+
             <div className="form-group full-width">
               <label>Extraction Methods <HelpIcon section="extraction-methods" /></label>
               <div className="help-text">Choose how to select clips from each stratification group</div>
@@ -572,21 +587,6 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {settingsTab === 1 && (
           <div className="form-grid extraction-tab-grid">
-            {availableClasses.length > 0 && (
-              <div className="form-group full-width">
-                <label>Select Classes <HelpIcon section="extraction-class-selection" /></label>
-                <Select
-                  isMulti
-                  options={classOptions}
-                  value={selectedClassOptions}
-                  onChange={handleClassListChange}
-                  placeholder="Select classes to create extraction tasks for..."
-                  className="multiclass-select"
-                  classNamePrefix="select"
-                />
-              </div>
-            )}
-
             <div className="form-group full-width">
               <label>Stratification <HelpIcon section="extraction-stratification" /></label>
               <div className="help-text">Choose how to stratify clips across different groups for balanced sampling</div>

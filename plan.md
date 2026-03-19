@@ -20,6 +20,8 @@ take a close look at this codebase, especially documentation markdowns such as r
 - select subset of classes to save inference results for
 - potentially call eBird API, BirdNET meta-model, or something else to get a local species list
 
+If create task or create and run task buttons are disabled, hovering over them should inform the user which required fields have not been filled in. 
+
 WandB integration: need to allow user to provide API key and configure group name and project name for a run. Run name should match the dipper run name. 
 
 - made a working env on Windows: needed to make edits to the windows env yml, then uninstall soundfile and force-reinstall with pip
@@ -32,7 +34,7 @@ https://mui.com/material-ui/react-snackbar/
 Colors match coloring of tasks in task pane for running (started)/queued/canceled/failed/pending/completed
 - [task name] started (<task type>) (blue)
 - [task name] queued (task type) (purple)
-- [task name] created (Waiting on user to start) (grey)
+- [task name] created (Waiting on user to start) (neutral?)
 - [task name] completed  (task type) (green)
 - [task name] failed (task type) (red)
 - [task name] canceled (task type) (yellow)

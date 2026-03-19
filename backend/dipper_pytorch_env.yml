@@ -20,7 +20,7 @@ dependencies:
 
     # Bioacoustics libraries (with development code)
     - git+https://github.com/kitzeslab/opensoundscape.git@dev.20251120
-    - git+https://github.com/kitzeslab/bioacoustics-model-zoo.git@main
+    - bioacoustics-model-zoo==0.12.3
     
     # optional BMZ dependencies for extended model support
     - timm>=1.0.0 # for HawkEars
