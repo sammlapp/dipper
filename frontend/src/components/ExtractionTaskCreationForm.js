@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { basename } from 'pathe';
 import Select from 'react-select';
+import { Tabs, Tab, Box, Checkbox } from '@mui/material';
 import HelpIcon from './HelpIcon';
 import { selectFolder, saveFile, selectJSONFiles } from '../utils/fileOperations';
 import { getBackendUrl } from '../utils/backendConfig';
@@ -38,6 +39,7 @@ const DEFAULT_VALUES = {
 
 function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
+  const [settingsTab, setSettingsTab] = useState(0);
   const [config, setConfig] = useState(DEFAULT_VALUES.config);
   const [availableClasses, setAvailableClasses] = useState([]);
   const [fileCount, setFileCount] = useState(0);
@@ -183,6 +185,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const resetForm = () => {
     setTaskName(DEFAULT_VALUES.taskName);
+    setSettingsTab(0);
     setConfig({ ...DEFAULT_VALUES.config });
     setAvailableClasses([]);
     setFileCount(0);
@@ -298,405 +301,389 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   }));
 
   return (
-    <div className="task-creation-form">
+    <div className="task-creation-form extraction-task-form">
       <h3>Create Extraction Task</h3>
 
-      <div className="form-grid">
-        {/* Task Name */}
-        <div className="form-group full-width">
-          <label>Task Name (optional)</label>
-          <input
-            type="text"
-            value={taskName}
-            onChange={(e) => setTaskName(e.target.value)}
-            placeholder="Leave empty for auto-generated name"
-          />
-        </div>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Tabs value={settingsTab} onChange={(_event, newValue) => setSettingsTab(newValue)} variant="fullWidth">
+          <Tab label="Task Setup" />
+          <Tab label="Filter & Stratify" />
+          <Tab label="Advanced" />
+        </Tabs>
+      </Box>
 
-        {/* Predictions Folder */}
-        <div className="form-group full-width">
-          <label>Predictions Folder <HelpIcon section="extraction-predictions-folder" /></label>
-          <div className="file-selection">
-            <div className="file-selection-buttons">
-              <button onClick={handlePredictionsFolderSelection}>
-                Select Folder with Predictions
-              </button>
-              {config.predictions_folder && (
-                <button
-                  onClick={() => {
-                    setConfig(prev => ({ ...prev, predictions_folder: '', class_list: [] }));
-                    setAvailableClasses([]);
-                    setFileCount(0);
-                  }}
-                  className="button-clear"
-                  title="Clear selected folder"
-                >
-                  Clear
-                </button>
-              )}
+      <div className="task-settings-outline">
+        {settingsTab === 0 && (
+          <div className="form-grid extraction-tab-grid">
+            <div className="form-group full-width">
+              <label>Task Name (optional)</label>
+              <input
+                type="text"
+                value={taskName}
+                onChange={(e) => setTaskName(e.target.value)}
+                placeholder="Leave empty for auto-generated name"
+              />
             </div>
-            {config.predictions_folder && (
-              <div>
-                <span className="selected-path">
-                  {config.predictions_folder}
-                </span>
-                <div className="file-count">
-                  {isScanningFiles ? 'Scanning for prediction files...' : `${fileCount} prediction files found, ${availableClasses.length} classes available`}
+
+            <div className="form-group full-width">
+              <label>Predictions Folder <HelpIcon section="extraction-predictions-folder" /></label>
+              <div className="file-selection">
+                <div className="file-selection-buttons">
+                  <button onClick={handlePredictionsFolderSelection}>Select Folder with Predictions</button>
+                  {config.predictions_folder && (
+                    <button
+                      onClick={() => {
+                        setConfig(prev => ({ ...prev, predictions_folder: '', class_list: [] }));
+                        setAvailableClasses([]);
+                        setFileCount(0);
+                      }}
+                      className="button-clear"
+                      title="Clear selected folder"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {config.predictions_folder && (
+                  <div>
+                    <span className="selected-path">{config.predictions_folder}</span>
+                    <div className="file-count">
+                      {isScanningFiles ? 'Scanning for prediction files...' : `${fileCount} prediction files found, ${availableClasses.length} classes available`}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="form-group full-width">
+              <label>Extraction Methods <HelpIcon section="extraction-methods" /></label>
+              <div className="help-text">Choose how to select clips from each stratification group</div>
+
+              <div className="extraction-method-grid">
+                <div className="extraction-method">
+                  <label>
+                    <Checkbox
+                      size="small"
+                      checked={config.extraction.random_clips.enabled}
+                      onChange={(e) => setConfig(prev => ({
+                        ...prev,
+                        extraction: {
+                          ...prev.extraction,
+                          random_clips: { ...prev.extraction.random_clips, enabled: e.target.checked }
+                        }
+                      }))}
+                      sx={{ p: 0.25, mr: 0.5 }}
+                    />
+                    Random N clips
+                  </label>
+                  {config.extraction.random_clips.enabled && (
+                    <div style={{ marginLeft: '24px', marginTop: '8px' }}>
+                      <label>Number of clips per group</label>
+                      <input
+                        className="compact-input"
+                        type="number"
+                        min="1"
+                        max="1000"
+                        value={config.extraction.random_clips.count}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          extraction: {
+                            ...prev.extraction,
+                            random_clips: { ...prev.extraction.random_clips, count: parseInt(e.target.value) }
+                          }
+                        }))}
+                        style={{ marginLeft: '8px' }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="extraction-method">
+                  <label>
+                    <Checkbox
+                      size="small"
+                      checked={config.extraction.score_bin_stratified.enabled}
+                      onChange={(e) => setConfig(prev => ({
+                        ...prev,
+                        extraction: {
+                          ...prev.extraction,
+                          score_bin_stratified: { ...prev.extraction.score_bin_stratified, enabled: e.target.checked }
+                        }
+                      }))}
+                      sx={{ p: 0.25, mr: 0.5 }}
+                    />
+                    Score-bin stratified
+                  </label>
+                  {config.extraction.score_bin_stratified.enabled && (
+                    <div style={{ marginLeft: '24px', marginTop: '8px' }}>
+                      <div>
+                        <label>Clips per score bin</label>
+                        <input
+                          className="compact-input"
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={config.extraction.score_bin_stratified.count_per_bin}
+                          onChange={(e) => setConfig(prev => ({
+                            ...prev,
+                            extraction: {
+                              ...prev.extraction,
+                              score_bin_stratified: { ...prev.extraction.score_bin_stratified, count_per_bin: parseInt(e.target.value) }
+                            }
+                          }))}
+                          style={{ marginLeft: '8px' }}
+                        />
+                      </div>
+                      <div style={{ marginTop: '8px' }}>
+                        <label>Score percentile bins</label>
+                        <input
+                          type="text"
+                          value={config.extraction.score_bin_stratified.percentile_bins}
+                          onChange={(e) => setConfig(prev => ({
+                            ...prev,
+                            extraction: {
+                              ...prev.extraction,
+                              score_bin_stratified: { ...prev.extraction.score_bin_stratified, percentile_bins: e.target.value }
+                            }
+                          }))}
+                          placeholder="[[0,75],[75,90],[90,95],[95,100]]"
+                          style={{ width: '300px', marginLeft: '8px' }}
+                        />
+                        <div className="help-text">Percentile ranges for score bins (after applying threshold)</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="extraction-method">
+                  <label>
+                    <Checkbox
+                      size="small"
+                      checked={config.extraction.highest_scoring.enabled}
+                      onChange={(e) => setConfig(prev => ({
+                        ...prev,
+                        extraction: {
+                          ...prev.extraction,
+                          highest_scoring: { ...prev.extraction.highest_scoring, enabled: e.target.checked }
+                        }
+                      }))}
+                      sx={{ p: 0.25, mr: 0.5 }}
+                    />
+                    Highest scoring clips
+                  </label>
+                  {config.extraction.highest_scoring.enabled && (
+                    <div style={{ marginLeft: '24px', marginTop: '8px' }}>
+                      <label>Number of clips per group</label>
+                      <input
+                        className="compact-input"
+                        type="number"
+                        min="1"
+                        max="1000"
+                        value={config.extraction.highest_scoring.count}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          extraction: {
+                            ...prev.extraction,
+                            highest_scoring: { ...prev.extraction.highest_scoring, count: parseInt(e.target.value) }
+                          }
+                        }))}
+                        style={{ marginLeft: '8px' }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* Class Selection */}
-        {availableClasses.length > 0 && (
-          <div className="form-group full-width">
-            <label>Select Classes <HelpIcon section="extraction-class-selection" /></label>
-            <Select
-              isMulti
-              options={classOptions}
-              value={selectedClassOptions}
-              onChange={handleClassListChange}
-              placeholder="Select classes to create extraction tasks for..."
-              className="multiclass-select"
-              classNamePrefix="select"
-            />
+            <div className="form-group">
+              <label>Output Directory <HelpIcon section="extraction-output" /></label>
+              <div className="file-selection">
+                <div className="file-selection-buttons">
+                  <button onClick={handleOutputDirSelection}>Select Output Directory</button>
+                  {config.output_dir && (
+                    <button
+                      onClick={() => setConfig(prev => ({ ...prev, output_dir: '' }))}
+                      className="button-clear"
+                      title="Clear selected output directory"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {config.output_dir && <span className="selected-path">{config.output_dir}</span>}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <Checkbox
+                  size="small"
+                  checked={config.export_audio_clips}
+                  onChange={(e) => setConfig(prev => ({ ...prev, export_audio_clips: e.target.checked }))}
+                  sx={{ p: 0.25, mr: 0.5 }}
+                />
+                Export Associated Audio Clips <HelpIcon section="extraction-audio-export" />
+              </label>
+              <div className="help-text">Extract audio clips for each selected prediction to output_directory/clips/</div>
+              {config.export_audio_clips && (
+                <div style={{ marginLeft: '24px', marginTop: '8px' }}>
+                  <label>Clip Duration (seconds)</label>
+                  <input
+                    className="compact-input"
+                    type="number"
+                    min="1"
+                    max="60"
+                    step="0.5"
+                    value={config.clip_duration}
+                    onChange={(e) => setConfig(prev => ({ ...prev, clip_duration: parseFloat(e.target.value) }))}
+                    style={{ marginLeft: '8px' }}
+                  />
+                  <div className="help-text">Total duration of extracted clips, centered on prediction interval</div>
+                </div>
+              )}
+            </div>
+
+            <div className="form-group full-width">
+              <label>Output Mode <HelpIcon section="extraction-output-mode" /></label>
+              <div className="segmented-control extraction-output-mode-control">
+                <button
+                  type="button"
+                  className={`segment ${config.extraction_mode === 'binary' ? 'active' : ''}`}
+                  onClick={() => setConfig(prev => ({ ...prev, extraction_mode: 'binary' }))}
+                >
+                  Binary Annotation
+                </button>
+                <button
+                  type="button"
+                  className={`segment ${config.extraction_mode === 'multiclass' ? 'active' : ''}`}
+                  onClick={() => setConfig(prev => ({ ...prev, extraction_mode: 'multiclass' }))}
+                >
+                  Multiclass Annotation
+                </button>
+              </div>
+              <div className="help-text">
+                {config.extraction_mode === 'binary'
+                  ? 'Will create one CSV file per species for yes/no annotation'
+                  : 'Will create one CSV file for all species with multi-label annotation'}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Stratification */}
-        <div className="form-group full-width">
-          <label>Stratification <HelpIcon section="extraction-stratification" /></label>
-          <div className="help-text">
-            Choose how to stratify clips across different groups for balanced sampling
-          </div>
-          <div className="checkbox-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={config.stratification.by_subfolder}
-                onChange={(e) => setConfig(prev => ({
-                  ...prev,
-                  stratification: { ...prev.stratification, by_subfolder: e.target.checked }
-                }))}
-              />
-              Stratify by subfolder
-            </label>
-          </div>
-        </div>
-
-        {/* Filtering */}
-        <div className="form-group full-width">
-          <label>Filtering <HelpIcon section="extraction-filtering" /></label>
-          <div className="help-text">
-            Apply filters to remove unwanted predictions before sampling
-          </div>
-          <div className="checkbox-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={config.filtering.score_threshold_enabled}
-                onChange={(e) => setConfig(prev => ({
-                  ...prev,
-                  filtering: { ...prev.filtering, score_threshold_enabled: e.target.checked }
-                }))}
-              />
-              Filter by score threshold
-            </label>
-            {config.filtering.score_threshold_enabled && (
-              <div style={{ marginLeft: '24px', marginTop: '8px' }}>
-                <label>Minimum Score</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={config.filtering.score_threshold}
-                  onChange={(e) => setConfig(prev => ({
-                    ...prev,
-                    filtering: { ...prev.filtering, score_threshold: parseFloat(e.target.value) }
-                  }))}
-                  style={{ width: '100px', marginLeft: '8px' }}
+        {settingsTab === 1 && (
+          <div className="form-grid extraction-tab-grid">
+            {availableClasses.length > 0 && (
+              <div className="form-group full-width">
+                <label>Select Classes <HelpIcon section="extraction-class-selection" /></label>
+                <Select
+                  isMulti
+                  options={classOptions}
+                  value={selectedClassOptions}
+                  onChange={handleClassListChange}
+                  placeholder="Select classes to create extraction tasks for..."
+                  className="multiclass-select"
+                  classNamePrefix="select"
                 />
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Extraction Methods */}
-        <div className="form-group full-width">
-          <label>Extraction Methods <HelpIcon section="extraction-methods" /></label>
-          <div className="help-text">
-            Choose how to select clips from each stratification group
-          </div>
-
-          {/* Random Clips */}
-          <div className="extraction-method">
-            <label>
-              <input
-                type="checkbox"
-                checked={config.extraction.random_clips.enabled}
-                onChange={(e) => setConfig(prev => ({
-                  ...prev,
-                  extraction: {
-                    ...prev.extraction,
-                    random_clips: { ...prev.extraction.random_clips, enabled: e.target.checked }
-                  }
-                }))}
-              />
-              Random N clips
-            </label>
-            {config.extraction.random_clips.enabled && (
-              <div style={{ marginLeft: '24px', marginTop: '8px' }}>
-                <label>Number of clips per group</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={config.extraction.random_clips.count}
-                  onChange={(e) => setConfig(prev => ({
-                    ...prev,
-                    extraction: {
-                      ...prev.extraction,
-                      random_clips: { ...prev.extraction.random_clips, count: parseInt(e.target.value) }
-                    }
-                  }))}
-                  style={{ width: '100px', marginLeft: '8px' }}
-                />
+            <div className="form-group full-width">
+              <label>Stratification <HelpIcon section="extraction-stratification" /></label>
+              <div className="help-text">Choose how to stratify clips across different groups for balanced sampling</div>
+              <div className="checkbox-group">
+                <label>
+                  <Checkbox
+                    size="small"
+                    checked={config.stratification.by_subfolder}
+                    onChange={(e) => setConfig(prev => ({
+                      ...prev,
+                      stratification: { ...prev.stratification, by_subfolder: e.target.checked }
+                    }))}
+                    sx={{ p: 0.25, mr: 0.5 }}
+                  />
+                  Stratify by subfolder
+                </label>
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Score Bin Stratified */}
-          <div className="extraction-method">
-            <label>
-              <input
-                type="checkbox"
-                checked={config.extraction.score_bin_stratified.enabled}
-                onChange={(e) => setConfig(prev => ({
-                  ...prev,
-                  extraction: {
-                    ...prev.extraction,
-                    score_bin_stratified: { ...prev.extraction.score_bin_stratified, enabled: e.target.checked }
-                  }
-                }))}
-              />
-              Score-bin stratified
-            </label>
-            {config.extraction.score_bin_stratified.enabled && (
-              <div style={{ marginLeft: '24px', marginTop: '8px' }}>
-                <div>
-                  <label>Clips per score bin</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={config.extraction.score_bin_stratified.count_per_bin}
+            <div className="form-group full-width">
+              <label>Filtering <HelpIcon section="extraction-filtering" /></label>
+              <div className="help-text">Apply filters to remove unwanted predictions before sampling</div>
+              <div className="checkbox-group">
+                <label>
+                  <Checkbox
+                    size="small"
+                    checked={config.filtering.score_threshold_enabled}
                     onChange={(e) => setConfig(prev => ({
                       ...prev,
-                      extraction: {
-                        ...prev.extraction,
-                        score_bin_stratified: { ...prev.extraction.score_bin_stratified, count_per_bin: parseInt(e.target.value) }
-                      }
+                      filtering: { ...prev.filtering, score_threshold_enabled: e.target.checked }
                     }))}
-                    style={{ width: '100px', marginLeft: '8px' }}
+                    sx={{ p: 0.25, mr: 0.5 }}
                   />
-                </div>
-                <div style={{ marginTop: '8px' }}>
-                  <label>Score percentile bins</label>
-                  <input
-                    type="text"
-                    value={config.extraction.score_bin_stratified.percentile_bins}
-                    onChange={(e) => setConfig(prev => ({
-                      ...prev,
-                      extraction: {
-                        ...prev.extraction,
-                        score_bin_stratified: { ...prev.extraction.score_bin_stratified, percentile_bins: e.target.value }
-                      }
-                    }))}
-                    placeholder="[[0,75],[75,90],[90,95],[95,100]]"
-                    style={{ width: '300px', marginLeft: '8px' }}
-                  />
-                  <div className="help-text">
-                    Percentile ranges for score bins (after applying threshold)
+                  Filter by score threshold
+                </label>
+                {config.filtering.score_threshold_enabled && (
+                  <div style={{ marginLeft: '24px', marginTop: '8px' }}>
+                    <label>Minimum Score</label>
+                    <input
+                      className="compact-input"
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={config.filtering.score_threshold}
+                      onChange={(e) => setConfig(prev => ({
+                        ...prev,
+                        filtering: { ...prev.filtering, score_threshold: parseFloat(e.target.value) }
+                      }))}
+                      style={{ marginLeft: '8px' }}
+                    />
                   </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Highest Scoring */}
-          <div className="extraction-method">
-            <label>
-              <input
-                type="checkbox"
-                checked={config.extraction.highest_scoring.enabled}
-                onChange={(e) => setConfig(prev => ({
-                  ...prev,
-                  extraction: {
-                    ...prev.extraction,
-                    highest_scoring: { ...prev.extraction.highest_scoring, enabled: e.target.checked }
-                  }
-                }))}
-              />
-              Highest scoring clips
-            </label>
-            {config.extraction.highest_scoring.enabled && (
-              <div style={{ marginLeft: '24px', marginTop: '8px' }}>
-                <label>Number of clips per group</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={config.extraction.highest_scoring.count}
-                  onChange={(e) => setConfig(prev => ({
-                    ...prev,
-                    extraction: {
-                      ...prev.extraction,
-                      highest_scoring: { ...prev.extraction.highest_scoring, count: parseInt(e.target.value) }
-                    }
-                  }))}
-                  style={{ width: '100px', marginLeft: '8px' }}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Output Directory */}
-        <div className="form-group full-width">
-          <label>Output Directory <HelpIcon section="extraction-output" /></label>
-          <div className="file-selection">
-            <div className="file-selection-buttons">
-              <button onClick={handleOutputDirSelection}>
-                Select Output Directory
-              </button>
-              {config.output_dir && (
-                <button
-                  onClick={() => setConfig(prev => ({ ...prev, output_dir: '' }))}
-                  className="button-clear"
-                  title="Clear selected output directory"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            {config.output_dir && (
-              <span className="selected-path">
-                {config.output_dir}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Audio Clip Export */}
-        <div className="form-group full-width">
-          <label>
-            <input
-              type="checkbox"
-              checked={config.export_audio_clips}
-              onChange={(e) => setConfig(prev => ({ ...prev, export_audio_clips: e.target.checked }))}
-              style={{ marginRight: '8px' }}
-            />
-            Export Associated Audio Clips <HelpIcon section="extraction-audio-export" />
-          </label>
-          <div className="help-text">
-            Extract audio clips for each selected prediction to output_directory/clips/
-          </div>
-          {config.export_audio_clips && (
-            <div style={{ marginLeft: '24px', marginTop: '8px' }}>
-              <label>Clip Duration (seconds)</label>
-              <input
-                type="number"
-                min="1"
-                max="60"
-                step="0.5"
-                value={config.clip_duration}
-                onChange={(e) => setConfig(prev => ({ ...prev, clip_duration: parseFloat(e.target.value) }))}
-                style={{ width: '100px', marginLeft: '8px' }}
-              />
-              <div className="help-text">
-                Total duration of extracted clips, centered on prediction interval
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Python Environment */}
-        <div className="form-group full-width">
-          <label>
-            <input
-              type="checkbox"
-              checked={config.use_custom_python_env}
-              onChange={(e) => setConfig(prev => ({ ...prev, use_custom_python_env: e.target.checked }))}
-              style={{ marginRight: '8px' }}
-            />
-            Use Custom Python Environment <HelpIcon section="extraction-python-env" />
-          </label>
-          <div className="help-text">
-            Use a custom Python environment instead of the default dipper_pytorch_env
-          </div>
-          {config.use_custom_python_env && (
-            <div style={{ marginLeft: '24px', marginTop: '8px' }}>
-              <div className="file-selection-buttons" style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <button
-                  type="button"
-                  onClick={handleCustomPythonEnvSelection}
-                  className="button-secondary"
-                >
-                  Select Python Environment Folder
-                </button>
-                {config.custom_python_env_path && (
-                  <button
-                    type="button"
-                    onClick={() => setConfig(prev => ({ ...prev, custom_python_env_path: '' }))}
-                    className="button-clear"
-                    title="Clear selected Python environment"
-                  >
-                    Clear
-                  </button>
                 )}
               </div>
-              {config.custom_python_env_path && (
-                <span className="selected-path">
-                  {config.custom_python_env_path}
-                </span>
+            </div>
+          </div>
+        )}
+
+        {settingsTab === 2 && (
+          <div className="form-grid extraction-tab-grid">
+            <div className="form-group full-width">
+              <label>
+                <Checkbox
+                  size="small"
+                  checked={config.use_custom_python_env}
+                  onChange={(e) => setConfig(prev => ({ ...prev, use_custom_python_env: e.target.checked }))}
+                  sx={{ p: 0.25, mr: 0.5 }}
+                />
+                Use Custom Python Environment <HelpIcon section="extraction-python-env" />
+              </label>
+              {config.use_custom_python_env && (
+                <div style={{ marginLeft: '24px', marginTop: '8px' }}>
+                  <div className="file-selection-buttons" style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <button type="button" onClick={handleCustomPythonEnvSelection} className="button-secondary">
+                      Select Python Environment Folder
+                    </button>
+                    {config.custom_python_env_path && (
+                      <button
+                        type="button"
+                        onClick={() => setConfig(prev => ({ ...prev, custom_python_env_path: '' }))}
+                        className="button-clear"
+                        title="Clear selected Python environment"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {config.custom_python_env_path && <span className="selected-path">{config.custom_python_env_path}</span>}
+                </div>
               )}
             </div>
-          )}
-        </div>
-
-        {/* Annotation Mode */}
-        <div className="form-group full-width">
-          <label>Output Mode <HelpIcon section="extraction-output-mode" /></label>
-          <div className="segmented-control">
-            <button
-              type="button"
-              className={`segment ${config.extraction_mode === 'binary' ? 'active' : ''}`}
-              onClick={() => setConfig(prev => ({ ...prev, extraction_mode: 'binary' }))}
-            >
-              Binary Annotation
-            </button>
-            <button
-              type="button"
-              className={`segment ${config.extraction_mode === 'multiclass' ? 'active' : ''}`}
-              onClick={() => setConfig(prev => ({ ...prev, extraction_mode: 'multiclass' }))}
-            >
-              Multiclass Annotation
-            </button>
           </div>
-          <div className="help-text">
-            {config.extraction_mode === 'binary' ?
-              'Creates one CSV file per species for yes/no annotation' :
-              'Creates one CSV file for all species with multi-label annotation'
-            }
-          </div>
-        </div>
-
+        )}
       </div>
 
       {/* Config Management and Task Launch Buttons */}
-      <div className="config-actions" style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+      <div className="config-actions task-form-actions" style={{ marginBottom: '16px' }}>
         <div className="button-group" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>
           <button
             type="button"

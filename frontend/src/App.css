@@ -4955,8 +4955,15 @@ button:disabled {
   margin-bottom: 12px;
 }
 
+.extraction-task-form .extraction-tab-grid {
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  align-items: start;
+  margin-bottom: 12px;
+}
+
 .inference-task-form .compact-input,
-.training-task-form .compact-input {
+.training-task-form .compact-input,
+.extraction-task-form .compact-input {
   width: 140px;
   max-width: 100%;
 }
@@ -5026,6 +5033,10 @@ button:disabled {
   }
 
   .training-task-form .training-tab-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .extraction-task-form .extraction-tab-grid {
     grid-template-columns: 1fr;
   }
 
@@ -5232,6 +5243,14 @@ button:disabled {
   box-shadow: 0 0 0 2px rgba(79, 93, 117, 0.1);
 }
 
+.task-creation-form .MuiCheckbox-root {
+  color: var(--medium-gray);
+}
+
+.task-creation-form .MuiCheckbox-root.Mui-checked {
+  color: var(--dark-accent);
+}
+
 .file-selection {
   display: flex;
   gap: 8px;
@@ -5264,8 +5283,7 @@ button:disabled {
 
 /* Task Monitor */
 .task-monitor {
-  max-height: 600px;
-  overflow-y: auto;
+  min-height: 0;
 }
 
 .current-task,
@@ -5657,6 +5675,22 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 6px;
   background-color: var(--light-bg);
+}
+
+.extraction-method-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  align-items: start;
+  margin-top: 10px;
+}
+
+.extraction-method-grid .extraction-method {
+  margin-bottom: 0;
+}
+
+.extraction-output-mode-control {
+  max-width: 420px;
 }
 
 .extraction-method label {

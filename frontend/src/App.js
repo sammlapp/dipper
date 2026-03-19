@@ -19,6 +19,7 @@ import RuleIcon from '@mui/icons-material/Rule';
 import HelpIcon from '@mui/icons-material/Help';
 import ColorizeIcon from '@mui/icons-material/Colorize';
 import SettingsIcon from '@mui/icons-material/Settings';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 import './App.css';
 import ExploreTab from './components/ExploreTab';
 import ReviewTab from './components/ReviewTab';
@@ -108,6 +109,7 @@ function App() {
     { id: 'inference', name: 'Inference', icon: <PlayArrowIcon /> },
     { id: 'training', name: 'Training', icon: <SchoolIcon /> },
     { id: 'extraction', name: 'Extraction', icon: <ColorizeIcon /> },
+    { id: 'tasks', name: 'Task Queue', icon: <ListAltIcon /> },
     { id: 'explore', name: 'Explore', icon: <ExploreIcon /> },
     { id: 'review', name: 'Review', icon: <RuleIcon /> },
     { id: 'settings', name: 'Settings', icon: <SettingsIcon /> },
@@ -298,11 +300,6 @@ function App() {
             onTaskCreate={handleTaskCreate}
             onTaskCreateAndRun={handleTaskCreateAndRun}
           />
-
-          <div className="section">
-            <h3>Task Management</h3>
-            <TaskMonitor taskManager={taskManager} />
-          </div>
         </div>
 
         <div className="tab-content" style={{ display: activeTab === 'training' ? 'block' : 'none' }}>
@@ -310,11 +307,6 @@ function App() {
             onTaskCreate={handleTaskCreate}
             onTaskCreateAndRun={handleTaskCreateAndRun}
           />
-
-          <div className="section">
-            <h3>Training Task Management</h3>
-            <TaskMonitor taskManager={taskManager} />
-          </div>
         </div>
 
         <div className="tab-content" style={{ display: activeTab === 'extraction' ? 'block' : 'none' }}>
@@ -322,11 +314,10 @@ function App() {
             onTaskCreate={handleTaskCreate}
             onTaskCreateAndRun={handleTaskCreateAndRun}
           />
+        </div>
 
-          <div className="section">
-            <h3>Extraction Task Management</h3>
-            <TaskMonitor taskManager={taskManager} />
-          </div>
+        <div style={{ display: activeTab === 'tasks' ? 'block' : 'none', padding: '24px' }}>
+          <TaskMonitor taskManager={taskManager} />
         </div>
 
         <div style={{ display: activeTab === 'explore' ? 'block' : 'none' }}>
@@ -358,7 +349,7 @@ function App() {
           })
         }}>
           {runningTasks.length > 0 ? (
-            <div className="status-running">
+            <div className="status-running" onClick={() => setActiveTab('tasks')} style={{ cursor: 'pointer' }}>
               <span className="status-icon">🔄</span>
               {runningTasks.length === 1 ? (
                 <>
@@ -372,7 +363,7 @@ function App() {
               )}
             </div>
           ) : (
-            <div className="status-idle">
+            <div className="status-idle" onClick={() => setActiveTab('tasks')} style={{ cursor: 'pointer' }}>
               <span className="status-icon">✅</span>
               <span>Ready • {taskHistory.filter(t => t.status === 'completed').length} completed tasks</span>
               {taskHistory.filter(t => t.status === 'queued').length > 0 && (

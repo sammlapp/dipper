@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { basename } from 'pathe';
-import { FormControl, Select, MenuItem, Tabs, Tab, Box } from '@mui/material';
+import { FormControl, Select, MenuItem, Tabs, Tab, Box, Checkbox } from '@mui/material';
 import HelpIcon from './HelpIcon';
 import { selectFiles, selectFolder, selectTextFiles, selectModelFiles, saveFile, selectJSONFiles } from '../utils/fileOperations';
 import { getBackendUrl } from '../utils/backendConfig';
@@ -544,10 +544,11 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                       <div className="extension-checkboxes">
                         {availableExtensions.map(({ ext, label, description }) => (
                           <label key={ext} className="extension-checkbox">
-                            <input
-                              type="checkbox"
+                            <Checkbox
+                              size="small"
                               checked={selectedExtensions.includes(ext)}
                               onChange={(e) => handleExtensionChange(ext, e.target.checked)}
+                              sx={{ p: 0.25, mr: 0.5 }}
                             />
                             <span className="extension-label">
                               {label}
@@ -590,10 +591,11 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                       <div className="extension-checkboxes">
                         {availableExtensions.map(({ ext, label, description }) => (
                           <label key={ext} className="extension-checkbox">
-                            <input
-                              type="checkbox"
+                            <Checkbox
+                              size="small"
                               checked={selectedExtensions.includes(ext)}
                               onChange={(e) => handleExtensionChange(ext, e.target.checked)}
+                              sx={{ p: 0.25, mr: 0.5 }}
                             />
                             <span className="extension-label">
                               {label}
@@ -836,11 +838,11 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
             {/* Sparse Outputs */}
             <div className="form-group full-width">
               <label>
-                <input
-                  type="checkbox"
+                <Checkbox
+                  size="small"
                   checked={config.sparse_outputs_enabled}
                   onChange={(e) => setConfig(prev => ({ ...prev, sparse_outputs_enabled: e.target.checked }))}
-                  style={{ marginRight: '8px' }}
+                  sx={{ p: 0.25, mr: 0.5 }}
                 />
                 Save sparse outputs <HelpIcon section="inference-sparse-outputs" />
               </label>
@@ -870,11 +872,11 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
             {/* Subfolder Splitting */}
             <div className="form-group full-width">
               <label>
-                <input
-                  type="checkbox"
+                <Checkbox
+                  size="small"
                   checked={config.split_by_subfolder}
                   onChange={(e) => setConfig(prev => ({ ...prev, split_by_subfolder: e.target.checked }))}
-                  style={{ marginRight: '8px' }}
+                  sx={{ p: 0.25, mr: 0.5 }}
                 />
                 Separate inference by subfolders
               </label>
@@ -886,11 +888,11 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
             {/* Python Environment */}
             <div className="form-group full-width">
               <label>
-                <input
-                  type="checkbox"
+                <Checkbox
+                  size="small"
                   checked={config.use_custom_python_env}
                   onChange={(e) => setConfig(prev => ({ ...prev, use_custom_python_env: e.target.checked }))}
-                  style={{ marginRight: '8px' }}
+                  sx={{ p: 0.25, mr: 0.5 }}
                 />
                 Use Custom Python Environment <HelpIcon section="inference-python-env" />
               </label>
@@ -925,11 +927,11 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
             {/* Testing Mode */}
             <div className="form-group full-width">
               <label>
-                <input
-                  type="checkbox"
+                <Checkbox
+                  size="small"
                   checked={config.testing_mode_enabled}
                   onChange={(e) => setConfig(prev => ({ ...prev, testing_mode_enabled: e.target.checked }))}
-                  style={{ marginRight: '8px' }}
+                  sx={{ p: 0.25, mr: 0.5 }}
                 />
                 Testing Mode <HelpIcon section="inference-testing-mode" />
               </label>

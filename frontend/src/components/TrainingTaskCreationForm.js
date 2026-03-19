@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { basename } from 'pathe';
-import { FormControl, Select, MenuItem, Tabs, Tab, Box } from '@mui/material';
+import { FormControl, Select, MenuItem, Tabs, Tab, Box, Checkbox } from '@mui/material';
 import HelpIcon from './HelpIcon';
 import { selectCSVFiles, selectFolder, saveFile, selectJSONFiles, selectModelFiles } from '../utils/fileOperations';
 import { getBackendUrl } from '../utils/backendConfig';
@@ -821,11 +821,11 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             {config.mode === 'train_on_embeddings' && (
               <div className="form-group full-width" style={{ marginLeft: '20px', paddingLeft: '16px', borderLeft: '2px solid var(--border)' }}>
                 <label>
-                  <input
-                    type="checkbox"
+                  <Checkbox
+                    size="small"
                     checked={config.use_existing_hoplite_db}
                     onChange={(e) => setConfig(prev => ({ ...prev, use_existing_hoplite_db: e.target.checked, hoplite_db_path: '' }))}
-                    style={{ marginRight: '8px' }}
+                    sx={{ p: 0.25, mr: 0.5 }}
                   />
                   Use Existing Hoplite Embedding Database
                 </label>
@@ -895,10 +895,11 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
             <div className="form-group full-width">
               <label>
-                <input
-                  type="checkbox"
+                <Checkbox
+                  size="small"
                   checked={config.freeze_feature_extractor}
                   onChange={(e) => setConfig(prev => ({ ...prev, freeze_feature_extractor: e.target.checked }))}
+                  sx={{ p: 0.25, mr: 0.5 }}
                 />
                 Freeze Feature Extractor <HelpIcon section="training-freeze" />
               </label>
@@ -925,10 +926,11 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
             <div className="form-group full-width">
               <label>
-                <input
-                  type="checkbox"
+                <Checkbox
+                  size="small"
                   checked={config.use_multi_layer_classifier}
                   onChange={(e) => setConfig(prev => ({ ...prev, use_multi_layer_classifier: e.target.checked }))}
+                  sx={{ p: 0.25, mr: 0.5 }}
                 />
                 Multi-layer Classifier <HelpIcon section="training-multi-layer" />
               </label>
@@ -948,11 +950,11 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
             <div className="form-group full-width">
               <label>
-                <input
-                  type="checkbox"
+                <Checkbox
+                  size="small"
                   checked={config.use_custom_python_env}
                   onChange={(e) => setConfig(prev => ({ ...prev, use_custom_python_env: e.target.checked }))}
-                  style={{ marginRight: '8px' }}
+                  sx={{ p: 0.25, mr: 0.5 }}
                 />
                 Use Custom Python Environment <HelpIcon section="training-python-env" />
               </label>
@@ -977,11 +979,11 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
             <div className="form-group full-width">
               <label>
-                <input
-                  type="checkbox"
+                <Checkbox
+                  size="small"
                   checked={config.testing_mode_enabled}
                   onChange={(e) => setConfig(prev => ({ ...prev, testing_mode_enabled: e.target.checked }))}
-                  style={{ marginRight: '8px' }}
+                  sx={{ p: 0.25, mr: 0.5 }}
                 />
                 Testing Mode <HelpIcon section="training-testing-mode" />
               </label>
