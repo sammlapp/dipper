@@ -131,6 +131,7 @@ function LoadDialog({ open, headers, onConfirm, onCancel }) {
                 control: (p) => ({ ...p, backgroundColor: cssVar('input-bg'), borderColor: cssVar('border-color'), fontSize: '0.88rem', '&:hover': { borderColor: cssVar('border-color') }, boxShadow: 'none' }),
                 menu: (p) => ({ ...p, backgroundColor: cssVar('panel-bg'), border: `1px solid ${cssVar('border-color')}` }),
                 menuList: (p) => ({ ...p, backgroundColor: cssVar('panel-bg') }),
+                menuPortal: (p) => ({ ...p, zIndex: 10001 }),
                 option: (p, s) => ({ ...p, backgroundColor: s.isFocused ? cssVar('toolbar-btn-hover') : cssVar('panel-bg'), color: cssVar('text-primary'), cursor: 'pointer' }),
                 singleValue: (p) => ({ ...p, color: cssVar('text-primary') }),
                 input: (p) => ({ ...p, color: cssVar('text-primary') }),
@@ -789,21 +790,32 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
   useEffect(() => {
     const lightDefault = 'greys_r';
     const darkDefault = 'magma';
-    setSettings(prev => {
-      const current = prev.spectrogram_colormap;
-      const isAtOppositeDefault = darkMode
-        ? current === lightDefault
-        : current === darkDefault;
-      if (!isAtOppositeDefault) return prev; // user chose a custom colormap — don't override
-      const next = darkMode ? darkDefault : lightDefault;
-      // Also update visualization_settings in localStorage so the clip loader picks it up
-      try {
-        const saved = localStorage.getItem('visualization_settings');
-        const vs = saved ? JSON.parse(saved) : {};
-        localStorage.setItem('visualization_settings', JSON.stringify({ ...vs, spectrogram_colormap: next }));
-      } catch {}
-      return { ...prev, spectrogram_colormap: next };
-    });
+    const targetColormap = darkMode ? darkDefault : lightDefault;
+    const oppositeDefault = darkMode ? lightDefault : darkDefault;
+
+    // Read current colormap from localStorage (authoritative source for clip loading)
+    let currentColormap = lightDefault;
+    try {
+      const saved = localStorage.getItem('visualization_settings');
+      if (saved) {
+        const vs = JSON.parse(saved);
+        currentColormap = vs.spectrogram_colormap || lightDefault;
+      }
+    } catch {}
+
+    // Only switch if currently at the opposite mode's default (don't override user's custom choice)
+    if (currentColormap !== oppositeDefault) return;
+
+    // Update localStorage so loadCurrentPageSpectrograms picks it up
+    try {
+      const saved = localStorage.getItem('visualization_settings');
+      const vs = saved ? JSON.parse(saved) : {};
+      localStorage.setItem('visualization_settings', JSON.stringify({ ...vs, spectrogram_colormap: targetColormap }));
+    } catch {}
+
+    // Update settings state so ReviewSettings UI reflects the change
+    setSettings(prev => ({ ...prev, spectrogram_colormap: targetColormap }));
+
     // Trigger spectrogram reload
     setCurrentDataVersion(v => v + 1);
   }, [darkMode]);

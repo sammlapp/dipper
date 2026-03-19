@@ -34,6 +34,7 @@ const DEFAULT_VALUES = {
 
 function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
   const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
+  const [settingsTab, setSettingsTab] = useState(0);
   const [fileSelectionMode, setFileSelectionMode] = useState(DEFAULT_VALUES.fileSelectionMode);
   const [globPatterns, setGlobPatterns] = useState(DEFAULT_VALUES.globPatterns);
   const [fileCount, setFileCount] = useState(DEFAULT_VALUES.fileCount);
@@ -306,6 +307,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const resetForm = () => {
     setTaskName(DEFAULT_VALUES.taskName);
+    setSettingsTab(0);
     setFileSelectionMode(DEFAULT_VALUES.fileSelectionMode);
     setGlobPatterns(DEFAULT_VALUES.globPatterns);
     setFileCount(DEFAULT_VALUES.fileCount);
@@ -442,498 +444,521 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
   };
 
   return (
-    <div className="task-creation-form">
+    <div className="task-creation-form inference-task-form">
       <h3>Create Inference Task</h3>
 
-      <div className="form-grid">
-        {/* Task Name */}
-        <div className="form-group full-width">
-          <label>Task Name (optional)</label>
-          <input
-            type="text"
-            value={taskName}
-            onChange={(e) => setTaskName(e.target.value)}
-            placeholder="Leave empty for auto-generated name"
-          />
-        </div>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Tabs
+          value={settingsTab}
+          onChange={(_event, newValue) => setSettingsTab(newValue)}
+          variant="fullWidth"
+        >
+          <Tab label="Audio Files" />
+          <Tab label="Model Config" />
+          <Tab label="Advanced Settings" />
+        </Tabs>
+      </Box>
 
-        {/* File Selection Mode */}
-        <div className="form-group full-width">
-          <label>Audio File Selection <HelpIcon section="inference-file-selection" /></label>
-          <div className="segmented-control not-too-big">
-            <button
-              type="button"
-              className={`segment ${fileSelectionMode === 'files' ? 'active' : ''}`}
-              onClick={() => setFileSelectionMode('files')}
-            >
-              Select Files
-            </button>
-            <button
-              type="button"
-              className={`segment ${fileSelectionMode === 'folder' ? 'active' : ''}`}
-              onClick={() => setFileSelectionMode('folder')}
-            >
-              Select Folder
-            </button>
-            <button
-              type="button"
-              className={`segment ${fileSelectionMode === 'patterns' ? 'active' : ''}`}
-              onClick={() => setFileSelectionMode('patterns')}
-            >
-              Glob Patterns
-            </button>
-            <button
-              type="button"
-              className={`segment ${fileSelectionMode === 'filelist' ? 'active' : ''}`}
-              onClick={() => setFileSelectionMode('filelist')}
-            >
-              File List
-            </button>
-          </div>
-
-          {/* Dynamic file selection UI based on mode */}
-          <div className="file-selection-content">
-            {fileSelectionMode === 'files' && (
-              <div className="file-selection">
-                <div className="file-selection-buttons">
-                  <button onClick={handleFileSelection}>
-                    Select Audio Files
-                  </button>
-                  {config.files.length > 0 && (
-                    <button
-                      onClick={() => {
-                        setConfig(prev => ({ ...prev, files: [] }));
-                        setFileCount(0);
-                        setFirstFile('');
-                      }}
-                      className="button-clear"
-                      title="Clear selected files"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                {config.files.length > 0 && (
-                  <span className="file-count">
-                    {config.files.length} files selected
-                  </span>
-                )}
-              </div>
-            )}
-
-            {fileSelectionMode === 'folder' && (
-              <div className="file-selection">
-                <div className="extension-selection">
-                  <label>File Extensions to Include:</label>
-                  <div className="extension-checkboxes">
-                    {availableExtensions.map(({ ext, label, description }) => (
-                      <label key={ext} className="extension-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={selectedExtensions.includes(ext)}
-                          onChange={(e) => handleExtensionChange(ext, e.target.checked)}
-                        />
-                        <span className="extension-label">
-                          {label}
-                          <span className="extension-description">({description})</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div className="file-selection-buttons">
-                  <button onClick={handleFolderSelection}>
-                    Select Folder (Recursive)
-                  </button>
-                  {config.file_globbing_patterns.length > 0 && (
-                    <button
-                      onClick={() => {
-                        setConfig(prev => ({ ...prev, file_globbing_patterns: [] }));
-                        setFileCount(0);
-                        setFirstFile('');
-                      }}
-                      className="button-clear"
-                      title="Clear selected folder"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                {config.file_globbing_patterns.length > 0 && (
-                  <span className="file-count">
-                    {isCountingFiles ? 'Searching for files...' : `Searching in folder - ${fileCount} files found`}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {fileSelectionMode === 'patterns' && (
-              <div className="glob-patterns">
-                <div className="extension-selection">
-                  <label>File Extensions to Include:</label>
-                  <div className="extension-checkboxes">
-                    {availableExtensions.map(({ ext, label, description }) => (
-                      <label key={ext} className="extension-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={selectedExtensions.includes(ext)}
-                          onChange={(e) => handleExtensionChange(ext, e.target.checked)}
-                        />
-                        <span className="extension-label">
-                          {label}
-                          <span className="extension-description">({description})</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <textarea
-                  value={globPatterns}
-                  onChange={handlePatternChange}
-                  placeholder="Use * for wildcard in folder/file name and ** for all subfolders (recursive)&#10;/Users/name/data/project1/**/*.WAV&#10;/Users/name/data/project2/**/*.mp3&#10;/path/to/audio/*_103000.wav"
-                  rows={4}
-                  style={{ width: '100%', marginBottom: '8px' }}
-                />
-                <div className="pattern-actions">
-                  <button onClick={handleFindFiles}>
-                    Find Files
-                  </button>
-                  {config.file_globbing_patterns.length > 0 && (
-                    <button
-                      onClick={() => {
-                        setConfig(prev => ({ ...prev, file_globbing_patterns: [] }));
-                        setGlobPatterns('');
-                        setFileCount(0);
-                        setFirstFile('');
-                      }}
-                      className="button-clear"
-                      title="Clear patterns and found files"
-                    >
-                      Clear
-                    </button>
-                  )}
-                  {config.file_globbing_patterns.length > 0 && (
-                    <span className="file-count">
-                      {isCountingFiles ? 'Searching for files...' : `${fileCount} files found`}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {fileSelectionMode === 'filelist' && (
-              <div className="file-selection">
-                <div className="file-selection-buttons">
-                  <button onClick={handleFileListSelection}>
-                    Select Text File (One File Per Line)
-                  </button>
-                  {config.file_list && (
-                    <button
-                      onClick={() => {
-                        setConfig(prev => ({ ...prev, file_list: '' }));
-                        setFileCount(0);
-                        setFirstFile('');
-                      }}
-                      className="button-clear"
-                      title="Clear selected file list"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                {config.file_list && (
-                  <div>
-                    <span className="selected-path">
-                      {basename(config.file_list)}
-                    </span>
-                    <span className="file-count">
-                      {isCountingFiles ? 'Counting files...' : `${fileCount} files listed`}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* File count display */}
-            {fileCount > 0 && (
-              <div className="total-file-count">
-                Total files: <strong>{fileCount}</strong>
-                {firstFile && (
-                  <div style={{ marginTop: '4px', fontSize: '0.9em', color: '#666' }}>
-                    First file: {basename(firstFile)}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Output Directory */}
-        <div className="form-group full-width">
-          <label>Output Directory <HelpIcon section="inference-output" /></label>
-          <div className="file-selection">
-            <div className="file-selection-buttons">
-              <button onClick={handleOutputDirSelection}>
-                Select Output Directory
-              </button>
-              {config.output_dir && (
-                <button
-                  onClick={() => setConfig(prev => ({ ...prev, output_dir: '' }))}
-                  className="button-clear"
-                  title="Clear selected output directory"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            {config.output_dir && (
-              <span className="selected-path">
-                {config.output_dir}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Model Source Selection */}
-        <div className="form-group full-width">
-          <label>Model Source <HelpIcon section="inference-model-source" /></label>
-          <div className="segmented-control not-too-big">
-            <button
-              type="button"
-              className={`segment ${config.model_source === 'bmz' ? 'active' : ''}`}
-              onClick={() => {
-                setConfig(prev => ({
-                  ...prev,
-                  model_source: 'bmz',
-                  model: 'BirdSetEfficientNetB1' // Reset to default BMZ model
-                }));
-              }}
-            >
-              Bioacoustics Model Zoo
-            </button>
-            <button
-              type="button"
-              className={`segment ${config.model_source === 'local_file' ? 'active' : ''}`}
-              onClick={() => {
-                setConfig(prev => ({
-                  ...prev,
-                  model_source: 'local_file',
-                  model: '' // Clear model path when switching to local file
-                }));
-              }}
-            >
-              Local Model File
-            </button>
-          </div>
-        </div>
-
-        {/* Conditional Model Selection */}
-        {config.model_source === 'bmz' ? (
-          <div className="form-group">
-            <label>Model <HelpIcon section="inference-models" /></label>
-            <FormControl size="small" fullWidth sx={{ mt: 0.5 }}>
-              <Select
-                value={config.model}
-                onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
-              >
-                <MenuItem value="HawkEars">HawkEars</MenuItem>
-                <MenuItem value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</MenuItem>
-                <MenuItem value="HawkEars_Low_Band">Ruffed & Spruce Grouse (HawkEars Low-band)</MenuItem>
-                <MenuItem value="BirdNET">BirdNET Global bird species classifier</MenuItem>
-                <MenuItem value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</MenuItem>
-                <MenuItem value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</MenuItem>
-                {/* <MenuItem value="Perch">Perch Global bird species classifier </MenuItem> */}
-                {/* haven't created TF environments yet */}
-              </Select>
-            </FormControl>
-          </div>
-        ) : (
-          <div className="form-group full-width">
-            <label>Local Model File <HelpIcon section="inference-local-model" /></label>
-            <div className="file-selection">
-              <div className="file-selection-buttons">
-                <button onClick={handleModelFileSelection}>
-                  Select Model File
-                </button>
-                {config.model && (
-                  <button
-                    onClick={() => setConfig(prev => ({ ...prev, model: '' }))}
-                    className="button-clear"
-                    title="Clear selected model file"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              {config.model && (
-                <span className="selected-path">
-                  {basename(config.model)}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Overlap */}
-        <div className="form-group">
-          <label>Clip Overlap (sec) <HelpIcon section="inference-overlap" /></label>
-          <input
-            type="number"
-            min="0"
-            max="1"
-            step="0.1"
-            value={config.overlap}
-            onChange={(e) => setConfig(prev => ({ ...prev, overlap: parseFloat(e.target.value) }))}
-          />
-        </div>
-
-        {/* Batch Size */}
-        <div className="form-group">
-          <label>Batch Size <HelpIcon section="inference-batch-size" /></label>
-          <input
-            type="number"
-            min="1"
-            max="32"
-            value={config.batch_size}
-            onChange={(e) => setConfig(prev => ({ ...prev, batch_size: parseInt(e.target.value) }))}
-          />
-        </div>
-
-        {/* Worker Count */}
-        <div className="form-group">
-          <label>Workers <HelpIcon section="inference-workers" /></label>
-          <input
-            type="number"
-            min="1"
-            max="8"
-            value={config.worker_count}
-            onChange={(e) => setConfig(prev => ({ ...prev, worker_count: parseInt(e.target.value) }))}
-          />
-        </div>
-
-        {/* Sparse Outputs */}
-        <div className="form-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={config.sparse_outputs_enabled}
-              onChange={(e) => setConfig(prev => ({ ...prev, sparse_outputs_enabled: e.target.checked }))}
-              style={{ marginRight: '8px' }}
-            />
-            Save sparse outputs <HelpIcon section="inference-sparse-outputs" />
-          </label>
-          <small style={{ display: 'block', marginTop: '4px', color: '#6b7280' }}>
-            Only save scores above threshold, output as .pkl file instead of .csv
-          </small>
-        </div>
-
-        {config.sparse_outputs_enabled && (
-          <div className="form-group" style={{ marginLeft: '20px' }}>
-            <label>Score Threshold <HelpIcon section="inference-sparse-threshold" /></label>
-            <input
-              type="number"
-              min="-10"
-              max="5"
-              step="0.1"
-              value={config.sparse_save_threshold}
-              onChange={(e) => setConfig(prev => ({ ...prev, sparse_save_threshold: parseFloat(e.target.value) }))}
-            />
-            <small style={{ display: 'block', marginTop: '4px', color: '#6b7280' }}>
-              Logit scores below this threshold will be discarded (default: -3.0)
-            </small>
-          </div>
-        )}
-        {/* Subfolder Splitting */}
-        <div className="form-group full-width">
-          <label>
-            <input
-              type="checkbox"
-              checked={config.split_by_subfolder}
-              onChange={(e) => setConfig(prev => ({ ...prev, split_by_subfolder: e.target.checked }))}
-              style={{ marginRight: '8px' }}
-            />
-            Separate inference by subfolders
-          </label>
-          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
-            Create separate output files for each subfolder containing audio files
-          </div>
-        </div>
-
-        {/* Python Environment */}
-        <div className="form-group full-width">
-          <label>
-            <input
-              type="checkbox"
-              checked={config.use_custom_python_env}
-              onChange={(e) => setConfig(prev => ({ ...prev, use_custom_python_env: e.target.checked }))}
-              style={{ marginRight: '8px' }}
-            />
-            Use Custom Python Environment <HelpIcon section="inference-python-env" />
-          </label>
-          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
-            Use a custom Python environment instead of the default dipper_pytorch_env
-          </div>
-          {config.use_custom_python_env && (
-            <div className="file-selection" style={{ marginTop: '8px', marginLeft: '24px' }}>
-              <div className="file-selection-buttons">
-                <button onClick={handleCustomPythonEnvSelection}>
-                  Select Python Environment Folder
-                </button>
-                {config.custom_python_env_path && (
-                  <button
-                    onClick={() => setConfig(prev => ({ ...prev, custom_python_env_path: '' }))}
-                    className="button-clear"
-                    title="Clear selected Python environment"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              {config.custom_python_env_path && (
-                <span className="selected-path" style={{ marginTop: '4px', display: 'block' }}>
-                  {config.custom_python_env_path}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Testing Mode */}
-        <div className="form-group full-width">
-          <label>
-            <input
-              type="checkbox"
-              checked={config.testing_mode_enabled}
-              onChange={(e) => setConfig(prev => ({ ...prev, testing_mode_enabled: e.target.checked }))}
-              style={{ marginRight: '8px' }}
-            />
-            Testing Mode <HelpIcon section="inference-testing-mode" />
-          </label>
-          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
-            Run inference on a small subset of files for quick testing
-          </div>
-          {config.testing_mode_enabled && (
-            <div className="form-group" style={{ marginTop: '8px', marginLeft: '24px' }}>
-              <label>Subset Size</label>
+      <div className="task-settings-outline">
+        {settingsTab === 0 && (
+          <div className="form-grid inference-tab-grid">
+            {/* Task Name */}
+            <div className="form-group full-width">
+              <label>Task Name (optional)</label>
               <input
+                type="text"
+                value={taskName}
+                onChange={(e) => setTaskName(e.target.value)}
+                placeholder="Leave empty for auto-generated name"
+              />
+            </div>
+
+            {/* File Selection Mode */}
+            <div className="form-group full-width">
+              <label>Audio File Selection <HelpIcon section="inference-file-selection" /></label>
+              <div className="segmented-control not-too-big">
+                <button
+                  type="button"
+                  className={`segment ${fileSelectionMode === 'files' ? 'active' : ''}`}
+                  onClick={() => setFileSelectionMode('files')}
+                >
+                  Select Files
+                </button>
+                <button
+                  type="button"
+                  className={`segment ${fileSelectionMode === 'folder' ? 'active' : ''}`}
+                  onClick={() => setFileSelectionMode('folder')}
+                >
+                  Select Folder
+                </button>
+                <button
+                  type="button"
+                  className={`segment ${fileSelectionMode === 'patterns' ? 'active' : ''}`}
+                  onClick={() => setFileSelectionMode('patterns')}
+                >
+                  Glob Patterns
+                </button>
+                <button
+                  type="button"
+                  className={`segment ${fileSelectionMode === 'filelist' ? 'active' : ''}`}
+                  onClick={() => setFileSelectionMode('filelist')}
+                >
+                  File List
+                </button>
+              </div>
+
+              {/* Dynamic file selection UI based on mode */}
+              <div className="file-selection-content">
+                {fileSelectionMode === 'files' && (
+                  <div className="file-selection">
+                    <div className="file-selection-buttons">
+                      <button onClick={handleFileSelection}>
+                        Select Audio Files
+                      </button>
+                      {config.files.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setConfig(prev => ({ ...prev, files: [] }));
+                            setFileCount(0);
+                            setFirstFile('');
+                          }}
+                          className="button-clear"
+                          title="Clear selected files"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    {config.files.length > 0 && (
+                      <span className="file-count">
+                        {config.files.length} files selected
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {fileSelectionMode === 'folder' && (
+                  <div className="file-selection">
+                    <div className="extension-selection">
+                      <label>File Extensions to Include:</label>
+                      <div className="extension-checkboxes">
+                        {availableExtensions.map(({ ext, label, description }) => (
+                          <label key={ext} className="extension-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={selectedExtensions.includes(ext)}
+                              onChange={(e) => handleExtensionChange(ext, e.target.checked)}
+                            />
+                            <span className="extension-label">
+                              {label}
+                              <span className="extension-description">({description})</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="file-selection-buttons">
+                      <button onClick={handleFolderSelection}>
+                        Select Folder (Recursive)
+                      </button>
+                      {config.file_globbing_patterns.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setConfig(prev => ({ ...prev, file_globbing_patterns: [] }));
+                            setFileCount(0);
+                            setFirstFile('');
+                          }}
+                          className="button-clear"
+                          title="Clear selected folder"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    {config.file_globbing_patterns.length > 0 && (
+                      <span className="file-count">
+                        {isCountingFiles ? 'Searching for files...' : `Searching in folder - ${fileCount} files found`}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {fileSelectionMode === 'patterns' && (
+                  <div className="glob-patterns">
+                    <div className="extension-selection">
+                      <label>File Extensions to Include:</label>
+                      <div className="extension-checkboxes">
+                        {availableExtensions.map(({ ext, label, description }) => (
+                          <label key={ext} className="extension-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={selectedExtensions.includes(ext)}
+                              onChange={(e) => handleExtensionChange(ext, e.target.checked)}
+                            />
+                            <span className="extension-label">
+                              {label}
+                              <span className="extension-description">({description})</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <textarea
+                      value={globPatterns}
+                      onChange={handlePatternChange}
+                      placeholder="Use * for wildcard in folder/file name and ** for all subfolders (recursive)&#10;/Users/name/data/project1/**/*.WAV&#10;/Users/name/data/project2/**/*.mp3&#10;/path/to/audio/*_103000.wav"
+                      rows={4}
+                      style={{ width: '100%', marginBottom: '8px' }}
+                    />
+                    <div className="pattern-actions">
+                      <button onClick={handleFindFiles}>
+                        Find Files
+                      </button>
+                      {config.file_globbing_patterns.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setConfig(prev => ({ ...prev, file_globbing_patterns: [] }));
+                            setGlobPatterns('');
+                            setFileCount(0);
+                            setFirstFile('');
+                          }}
+                          className="button-clear"
+                          title="Clear patterns and found files"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      {config.file_globbing_patterns.length > 0 && (
+                        <span className="file-count">
+                          {isCountingFiles ? 'Searching for files...' : `${fileCount} files found`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {fileSelectionMode === 'filelist' && (
+                  <div className="file-selection">
+                    <div className="file-selection-buttons">
+                      <button onClick={handleFileListSelection}>
+                        Select Text File (One File Per Line)
+                      </button>
+                      {config.file_list && (
+                        <button
+                          onClick={() => {
+                            setConfig(prev => ({ ...prev, file_list: '' }));
+                            setFileCount(0);
+                            setFirstFile('');
+                          }}
+                          className="button-clear"
+                          title="Clear selected file list"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    {config.file_list && (
+                      <div>
+                        <span className="selected-path">
+                          {basename(config.file_list)}
+                        </span>
+                        <span className="file-count">
+                          {isCountingFiles ? 'Counting files...' : `${fileCount} files listed`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* File count display */}
+                {fileCount > 0 && (
+                  <div className="total-file-count">
+                    Total files: <strong>{fileCount}</strong>
+                    {firstFile && (
+                      <div style={{ marginTop: '4px', fontSize: '0.9em', color: 'var(--medium-gray)' }}>
+                        First file: {basename(firstFile)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Output Directory */}
+            <div className="form-group full-width">
+              <label>Output Directory <HelpIcon section="inference-output" /></label>
+              <div className="file-selection">
+                <div className="file-selection-buttons">
+                  <button onClick={handleOutputDirSelection}>
+                    Select Output Directory
+                  </button>
+                  {config.output_dir && (
+                    <button
+                      onClick={() => setConfig(prev => ({ ...prev, output_dir: '' }))}
+                      className="button-clear"
+                      title="Clear selected output directory"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {config.output_dir && (
+                  <span className="selected-path">
+                    {config.output_dir}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {settingsTab === 1 && (
+          <div className="form-grid inference-tab-grid">
+            {/* Model Source Selection */}
+            <div className="form-group full-width">
+              <label>Model Source <HelpIcon section="inference-model-source" /></label>
+              <div className="segmented-control not-too-big">
+                <button
+                  type="button"
+                  className={`segment ${config.model_source === 'bmz' ? 'active' : ''}`}
+                  onClick={() => {
+                    setConfig(prev => ({
+                      ...prev,
+                      model_source: 'bmz',
+                      model: 'BirdSetEfficientNetB1'
+                    }));
+                  }}
+                >
+                  Bioacoustics Model Zoo
+                </button>
+                <button
+                  type="button"
+                  className={`segment ${config.model_source === 'local_file' ? 'active' : ''}`}
+                  onClick={() => {
+                    setConfig(prev => ({
+                      ...prev,
+                      model_source: 'local_file',
+                      model: ''
+                    }));
+                  }}
+                >
+                  Local Model File
+                </button>
+              </div>
+            </div>
+
+            {/* Conditional Model Selection */}
+            {config.model_source === 'bmz' ? (
+              <div className="form-group">
+                <label>Model <HelpIcon section="inference-models" /></label>
+                <FormControl size="small" sx={{ mt: 0.5, minWidth: 320, maxWidth: '100%' }}>
+                  <Select
+                    value={config.model}
+                    onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
+                  >
+                    <MenuItem value="HawkEars">HawkEars</MenuItem>
+                    <MenuItem value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</MenuItem>
+                    <MenuItem value="HawkEars_Low_Band">Ruffed & Spruce Grouse (HawkEars Low-band)</MenuItem>
+                    <MenuItem value="BirdNET">BirdNET Global bird species classifier</MenuItem>
+                    <MenuItem value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</MenuItem>
+                    <MenuItem value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</MenuItem>
+                  </Select>
+                </FormControl>
+              </div>
+            ) : (
+              <div className="form-group full-width">
+                <label>Local Model File <HelpIcon section="inference-local-model" /></label>
+                <div className="file-selection">
+                  <div className="file-selection-buttons">
+                    <button onClick={handleModelFileSelection}>
+                      Select Model File
+                    </button>
+                    {config.model && (
+                      <button
+                        onClick={() => setConfig(prev => ({ ...prev, model: '' }))}
+                        className="button-clear"
+                        title="Clear selected model file"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {config.model && (
+                    <span className="selected-path">
+                      {basename(config.model)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label>Clip Overlap (sec) <HelpIcon section="inference-overlap" /></label>
+              <input
+                className="compact-input"
+                type="number"
+                min="0"
+                max="1"
+                step="0.1"
+                value={config.overlap}
+                onChange={(e) => setConfig(prev => ({ ...prev, overlap: parseFloat(e.target.value) }))}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Batch Size <HelpIcon section="inference-batch-size" /></label>
+              <input
+                className="compact-input"
                 type="number"
                 min="1"
-                max="1000"
-                value={config.subset_size}
-                onChange={(e) => setConfig(prev => ({ ...prev, subset_size: parseInt(e.target.value) }))}
-                style={{ width: '100px' }}
+                max="32"
+                value={config.batch_size}
+                onChange={(e) => setConfig(prev => ({ ...prev, batch_size: parseInt(e.target.value) }))}
               />
-              <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
-                Number of files to process (default: 10)
+            </div>
+
+            <div className="form-group">
+              <label>Workers <HelpIcon section="inference-workers" /></label>
+              <input
+                className="compact-input"
+                type="number"
+                min="1"
+                max="8"
+                value={config.worker_count}
+                onChange={(e) => setConfig(prev => ({ ...prev, worker_count: parseInt(e.target.value) }))}
+              />
+            </div>
+          </div>
+        )}
+
+        {settingsTab === 2 && (
+          <div className="form-grid inference-tab-grid">
+            {/* Sparse Outputs */}
+            <div className="form-group full-width">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={config.sparse_outputs_enabled}
+                  onChange={(e) => setConfig(prev => ({ ...prev, sparse_outputs_enabled: e.target.checked }))}
+                  style={{ marginRight: '8px' }}
+                />
+                Save sparse outputs <HelpIcon section="inference-sparse-outputs" />
+              </label>
+              <small style={{ display: 'block', marginTop: '4px', color: 'var(--medium-gray)' }}>
+                Only save scores above threshold, output as .pkl file instead of .csv
+              </small>
+            </div>
+
+            {config.sparse_outputs_enabled && (
+              <div className="form-group" style={{ marginLeft: '20px' }}>
+                <label>Score Threshold <HelpIcon section="inference-sparse-threshold" /></label>
+                <input
+                  className="compact-input"
+                  type="number"
+                  min="-10"
+                  max="5"
+                  step="0.1"
+                  value={config.sparse_save_threshold}
+                  onChange={(e) => setConfig(prev => ({ ...prev, sparse_save_threshold: parseFloat(e.target.value) }))}
+                />
+                <small style={{ display: 'block', marginTop: '4px', color: 'var(--medium-gray)' }}>
+                  Logit scores below this threshold will be discarded (default: -3.0)
+                </small>
+              </div>
+            )}
+
+            {/* Subfolder Splitting */}
+            <div className="form-group full-width">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={config.split_by_subfolder}
+                  onChange={(e) => setConfig(prev => ({ ...prev, split_by_subfolder: e.target.checked }))}
+                  style={{ marginRight: '8px' }}
+                />
+                Separate inference by subfolders
+              </label>
+              <div style={{ fontSize: '0.8rem', color: 'var(--medium-gray)', marginTop: '4px' }}>
+                Create separate output files for each subfolder containing audio files
               </div>
             </div>
-          )}
-        </div>
 
+            {/* Python Environment */}
+            <div className="form-group full-width">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={config.use_custom_python_env}
+                  onChange={(e) => setConfig(prev => ({ ...prev, use_custom_python_env: e.target.checked }))}
+                  style={{ marginRight: '8px' }}
+                />
+                Use Custom Python Environment <HelpIcon section="inference-python-env" />
+              </label>
+              <div style={{ fontSize: '0.8rem', color: 'var(--medium-gray)', marginTop: '4px' }}>
+                Use a custom Python environment instead of the default dipper_pytorch_env
+              </div>
+              {config.use_custom_python_env && (
+                <div className="file-selection" style={{ marginTop: '8px', marginLeft: '24px' }}>
+                  <div className="file-selection-buttons">
+                    <button onClick={handleCustomPythonEnvSelection}>
+                      Select Python Environment Folder
+                    </button>
+                    {config.custom_python_env_path && (
+                      <button
+                        onClick={() => setConfig(prev => ({ ...prev, custom_python_env_path: '' }))}
+                        className="button-clear"
+                        title="Clear selected Python environment"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {config.custom_python_env_path && (
+                    <span className="selected-path" style={{ marginTop: '4px', display: 'block' }}>
+                      {config.custom_python_env_path}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Testing Mode */}
+            <div className="form-group full-width">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={config.testing_mode_enabled}
+                  onChange={(e) => setConfig(prev => ({ ...prev, testing_mode_enabled: e.target.checked }))}
+                  style={{ marginRight: '8px' }}
+                />
+                Testing Mode <HelpIcon section="inference-testing-mode" />
+              </label>
+              <div style={{ fontSize: '0.8rem', color: 'var(--medium-gray)', marginTop: '4px' }}>
+                Run inference on a small subset of files for quick testing
+              </div>
+              {config.testing_mode_enabled && (
+                <div className="form-group" style={{ marginTop: '8px', marginLeft: '24px' }}>
+                  <label>Subset Size</label>
+                  <input
+                    className="compact-input"
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={config.subset_size}
+                    onChange={(e) => setConfig(prev => ({ ...prev, subset_size: parseInt(e.target.value) }))}
+                  />
+                  <div style={{ fontSize: '0.8rem', color: 'var(--medium-gray)', marginTop: '4px' }}>
+                    Number of files to process (default: 10)
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Config Management and Task Launch Buttons */}
-      <div className="config-actions" style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+      <div className="config-actions inference-config-actions task-form-actions" style={{ marginBottom: '16px' }}>
         <div className="button-group" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>
           <button
             type="button"

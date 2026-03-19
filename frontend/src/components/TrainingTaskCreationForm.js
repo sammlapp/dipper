@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { basename } from 'pathe';
-import { FormControl, Select, MenuItem } from '@mui/material';
+import { FormControl, Select, MenuItem, Tabs, Tab, Box } from '@mui/material';
 import HelpIcon from './HelpIcon';
 import { selectCSVFiles, selectFolder, saveFile, selectJSONFiles, selectModelFiles } from '../utils/fileOperations';
 import { getBackendUrl } from '../utils/backendConfig';
@@ -54,6 +54,7 @@ const DEFAULT_VALUES = {
 
 function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
+  const [settingsTab, setSettingsTab] = useState(0);
   const [config, setConfig] = useState(DEFAULT_VALUES.config);
 
   // State for single class annotations - array of {file: '', class: ''}
@@ -328,6 +329,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
   const resetForm = () => {
     setTaskName(DEFAULT_VALUES.taskName);
+    setSettingsTab(0);
     setSingleClassAnnotations([...DEFAULT_VALUES.singleClassAnnotations]);
     setConfig({ ...DEFAULT_VALUES.config });
   };
@@ -351,8 +353,8 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         // Construct full hoplite_db_path for new databases
         const fullHopliteDbPath = config.mode === 'train_on_embeddings' && config.hoplite_db_path
           ? (config.use_existing_hoplite_db
-              ? config.hoplite_db_path
-              : `${config.hoplite_db_path}/${config.hoplite_db_name}`)
+            ? config.hoplite_db_path
+            : `${config.hoplite_db_path}/${config.hoplite_db_name}`)
           : '';
 
         const configData = {
@@ -489,735 +491,513 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
   };
 
   return (
-    <div className="task-creation-form">
+    <div className="task-creation-form training-task-form">
       <h3>Create Training Task</h3>
 
-      <div className="form-grid">
-        {/* Task Name */}
-        <div className="form-group full-width">
-          <label>Task Name (optional)</label>
-          <input
-            type="text"
-            value={taskName}
-            onChange={(e) => setTaskName(e.target.value)}
-            placeholder="Leave empty for auto-generated name"
-          />
-        </div>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Tabs value={settingsTab} onChange={(_event, newValue) => setSettingsTab(newValue)} variant="fullWidth">
+          <Tab label="Model Config" />
+          <Tab label="Data" />
+          <Tab label="Class List" />
+          <Tab label="Advanced" />
+        </Tabs>
+      </Box>
 
-        {/* Training Mode Selection */}
-        <div className="form-group full-width">
-          <label>Training Mode <HelpIcon section="training-mode" /></label>
-          <div className="segmented-control not-too-big">
-            <button
-              type="button"
-              className={`segment ${config.mode === 'train_on_audio' ? 'active' : ''}`}
-              onClick={() => {
-                setConfig(prev => ({
-                  ...prev,
-                  mode: 'train_on_audio'
-                }));
-              }}
-            >
-              Train on Audio
-            </button>
-            <button
-              type="button"
-              className={`segment ${config.mode === 'train_on_embeddings' ? 'active' : ''}`}
-              onClick={() => {
-                setConfig(prev => ({
-                  ...prev,
-                  mode: 'train_on_embeddings'
-                }));
-              }}
-            >
-              Train on Embeddings
-            </button>
-          </div>
-          <div className="help-text">
-            Train on Audio: Standard training approach. Train on Embeddings: Uses Hoplite database for faster training (feature extractor must be frozen)
-          </div>
-        </div>
-
-        {/* Hoplite Database Configuration (only for train_on_embeddings mode) */}
-        {config.mode === 'train_on_embeddings' && (
-          <div className="form-group full-width" style={{ marginLeft: '20px', paddingLeft: '16px', borderLeft: '2px solid var(--border)' }}>
-            <label>
+      <div className="task-settings-outline">
+        {settingsTab === 0 && (
+          <div className="form-grid training-tab-grid">
+            <div className="form-group full-width">
+              <label>Task Name (optional)</label>
               <input
-                type="checkbox"
-                checked={config.use_existing_hoplite_db}
-                onChange={(e) => setConfig(prev => ({
-                  ...prev,
-                  use_existing_hoplite_db: e.target.checked,
-                  hoplite_db_path: '' // Clear path when toggling
-                }))}
-                style={{ marginRight: '8px' }}
+                type="text"
+                value={taskName}
+                onChange={(e) => setTaskName(e.target.value)}
+                placeholder="Leave empty for auto-generated name"
               />
-              Use Existing Hoplite Embedding Database
-            </label>
-            <div className="help-text">
-              Load embeddings from an existing database or create a new one
             </div>
 
-            {config.use_existing_hoplite_db ? (
-              // Existing database: just select folder
-              <div className="file-selection" style={{ marginTop: '8px' }}>
-                <div className="file-selection-buttons">
-                  <button onClick={handleHopliteDbSelection}>
-                    Select Existing Hoplite DB Folder
-                  </button>
-                  {config.hoplite_db_path && (
-                    <button
-                      onClick={() => setConfig(prev => ({ ...prev, hoplite_db_path: '' }))}
-                      className="button-clear"
-                      title="Clear selected Hoplite database folder"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                {config.hoplite_db_path && (
-                  <span className="selected-path" style={{ marginTop: '4px', display: 'block' }}>
-                    {config.hoplite_db_path}
-                  </span>
-                )}
-                <div className="help-text" style={{ marginTop: '4px' }}>
-                  Select folder containing existing Hoplite database
-                </div>
+            <div className="form-group full-width">
+              <label>Training Mode <HelpIcon section="training-mode" /></label>
+              <div className="segmented-control not-too-big">
+                <button
+                  type="button"
+                  className={`segment ${config.mode === 'train_on_audio' ? 'active' : ''}`}
+                  onClick={() => setConfig(prev => ({ ...prev, mode: 'train_on_audio' }))}
+                >
+                  Train on Audio
+                </button>
+                <button
+                  type="button"
+                  className={`segment ${config.mode === 'train_on_embeddings' ? 'active' : ''}`}
+                  onClick={() => setConfig(prev => ({ ...prev, mode: 'train_on_embeddings' }))}
+                >
+                  Train on Embeddings
+                </button>
               </div>
-            ) : (
-              // New database: select parent folder + specify name
-              <div style={{ marginTop: '8px' }}>
-                <div className="form-group">
-                  <label>Database Name</label>
-                  <input
-                    type="text"
-                    value={config.hoplite_db_name}
-                    onChange={(e) => setConfig(prev => ({ ...prev, hoplite_db_name: e.target.value }))}
-                    placeholder="hoplite_embeddings"
-                    style={{ width: '300px' }}
-                  />
-                  <div className="help-text">
-                    Name of the new database folder to create
-                  </div>
-                </div>
+              <div className="help-text">
+                Train on Audio: Standard training approach. Train on Embeddings: Uses Hoplite database for faster training (feature extractor must be frozen)
+              </div>
+            </div>
 
+            <div className="form-group full-width">
+              <label>Model Source <HelpIcon section="training-model-source" /></label>
+              <div className="segmented-control not-too-big">
+                <button
+                  type="button"
+                  className={`segment ${config.model_source === 'bmz' ? 'active' : ''}`}
+                  onClick={() => setConfig(prev => ({ ...prev, model_source: 'bmz', model: 'HawkEars_Embedding' }))}
+                >
+                  Bioacoustics Model Zoo
+                </button>
+                <button
+                  type="button"
+                  className={`segment ${config.model_source === 'local_file' ? 'active' : ''}`}
+                  onClick={() => setConfig(prev => ({ ...prev, model_source: 'local_file', model: '' }))}
+                >
+                  Local Model File
+                </button>
+                <button
+                  type="button"
+                  className={`segment ${config.model_source === 'custom' ? 'active' : ''}`}
+                  onClick={() => setConfig(prev => ({ ...prev, model_source: 'custom', model: 'Custom Architecture' }))}
+                >
+                  Custom Architecture
+                </button>
+              </div>
+            </div>
+
+            {config.model_source === 'bmz' ? (
+              <div className="form-group">
+                <label>Base Model <HelpIcon section="training-model-selection" /></label>
+                <FormControl size="small" sx={{ mt: 0.5, minWidth: 320, maxWidth: '100%' }}>
+                  <Select
+                    value={config.model}
+                    onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
+                  >
+                    <MenuItem value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</MenuItem>
+                    <MenuItem value="BirdNET">BirdNET Global bird species classifier</MenuItem>
+                    <MenuItem value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</MenuItem>
+                    <MenuItem value="Perch">Perch Global bird species classifier </MenuItem>
+                  </Select>
+                </FormControl>
+              </div>
+            ) : config.model_source === 'local_file' ? (
+              <div className="form-group full-width">
+                <label>Local Model File <HelpIcon section="training-local-model" /></label>
                 <div className="file-selection">
                   <div className="file-selection-buttons">
-                    <button onClick={handleHopliteDbSelection}>
-                      Select Parent Folder
-                    </button>
-                    {config.hoplite_db_path && (
+                    <button onClick={handleModelFileSelection}>Select Model File</button>
+                    {config.model && (
                       <button
-                        onClick={() => setConfig(prev => ({ ...prev, hoplite_db_path: '' }))}
+                        onClick={() => setConfig(prev => ({ ...prev, model: '' }))}
                         className="button-clear"
-                        title="Clear selected parent folder"
+                        title="Clear selected model file"
                       >
                         Clear
                       </button>
                     )}
                   </div>
-                  {config.hoplite_db_path && (
-                    <div style={{ marginTop: '4px' }}>
-                      <div className="help-text" style={{ marginBottom: '4px' }}>
-                        Database will be created at:
-                      </div>
-                      <span className="selected-path" style={{ display: 'block' }}>
-                        {config.hoplite_db_path}/{config.hoplite_db_name}
-                      </span>
-                    </div>
-                  )}
-                  <div className="help-text" style={{ marginTop: '4px' }}>
-                    Select folder where new Hoplite database will be created
-                  </div>
+                  {config.model && <span className="selected-path">{basename(config.model)}</span>}
                 </div>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Model Source Selection */}
-        <div className="form-group full-width">
-          <label>Model Source <HelpIcon section="training-model-source" /></label>
-          <div className="segmented-control not-too-big">
-            <button
-              type="button"
-              className={`segment ${config.model_source === 'bmz' ? 'active' : ''}`}
-              onClick={() => {
-                setConfig(prev => ({
-                  ...prev,
-                  model_source: 'bmz',
-                  model: 'HawkEars_Embedding' // Reset to default BMZ model
-                }));
-              }}
-            >
-              Bioacoustics Model Zoo
-            </button>
-            <button
-              type="button"
-              className={`segment ${config.model_source === 'local_file' ? 'active' : ''}`}
-              onClick={() => {
-                setConfig(prev => ({
-                  ...prev,
-                  model_source: 'local_file',
-                  model: '' // Clear model path
-                }));
-              }}
-            >
-              Local Model File
-            </button>
-            <button
-              type="button"
-              className={`segment ${config.model_source === 'custom' ? 'active' : ''}`}
-              onClick={() => {
-                setConfig(prev => ({
-                  ...prev,
-                  model_source: 'custom',
-                  model: 'Custom Architecture'
-                }));
-              }}
-            >
-              Custom Architecture
-            </button>
-          </div>
-        </div>
-
-        {/* Conditional Model Selection */}
-        {config.model_source === 'bmz' ? (
-          <div className="form-group">
-            <label>Base Model <HelpIcon section="training-model-selection" /></label>
-            <FormControl size="small" fullWidth sx={{ mt: 0.5 }}>
-              <Select
-                value={config.model}
-                onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
-              >
-                <MenuItem value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</MenuItem>
-                {/* don't allow ensembled HawkEars <MenuItem value="HawkEars">HawkEars</MenuItem> */}
-                <MenuItem value="BirdNET">BirdNET Global bird species classifier</MenuItem>
-                {/* don't allow training low-band hawkears, weird architecture */}
-                <MenuItem value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</MenuItem>
-                {/* <MenuItem value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</MenuItem> */}
-                <MenuItem value="Perch">Perch Global bird species classifier </MenuItem>
-              </Select>
-            </FormControl>
-          </div>
-        ) : config.model_source === 'local_file' ? (
-          <div className="form-group full-width">
-            <label>Local Model File <HelpIcon section="training-local-model" /></label>
-            <div className="file-selection">
-              <div className="file-selection-buttons">
-                <button onClick={handleModelFileSelection}>
-                  Select Model File
-                </button>
-                {config.model && (
-                  <button
-                    onClick={() => setConfig(prev => ({ ...prev, model: '' }))}
-                    className="button-clear"
-                    title="Clear selected model file"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              {config.model && (
-                <span className="selected-path">
-                  {basename(config.model)}
-                </span>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* Custom architecture configuration */
-          <>
-            <div className="form-group">
-              <label>CNN Architecture <HelpIcon section="training-cnn-architecture" /></label>
-              <FormControl size="small" fullWidth sx={{ mt: 0.5 }}>
-                <Select
-                  value={config.cnn_architecture}
-                  onChange={(e) => setConfig(prev => ({ ...prev, cnn_architecture: e.target.value }))}
-                >
-                  <MenuItem value="resnet18">ResNet-18</MenuItem>
-                  <MenuItem value="resnet34">ResNet-34</MenuItem>
-                  <MenuItem value="resnet50">ResNet-50</MenuItem>
-                  <MenuItem value="efficientnet_b0">EfficientNet-B0</MenuItem>
-                  <MenuItem value="efficientnet_b1">EfficientNet-B1</MenuItem>
-                </Select>
-              </FormControl>
-            </div>
-
-            <div className="form-group">
-              <label>Clip Duration (sec) <HelpIcon section="training-clip-duration" /></label>
-              <input
-                type="number"
-                step="0.1"
-                value={config.preprocessing.clip_duration}
-                onChange={(e) => setConfig(prev => ({
-                  ...prev,
-                  preprocessing: { ...prev.preprocessing, clip_duration: parseFloat(e.target.value) }
-                }))}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Sample Rate (Hz) <HelpIcon section="training-sample-rate" /></label>
-              <input
-                type="number"
-                value={config.preprocessing.sample_rate}
-                onChange={(e) => setConfig(prev => ({
-                  ...prev,
-                  preprocessing: { ...prev.preprocessing, sample_rate: parseInt(e.target.value) }
-                }))}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Spectrogram Window (samples) <HelpIcon section="training-spec-window" /></label>
-              <input
-                type="number"
-                value={config.preprocessing.spec_window_samples}
-                onChange={(e) => setConfig(prev => ({
-                  ...prev,
-                  preprocessing: { ...prev.preprocessing, spec_window_samples: parseInt(e.target.value) }
-                }))}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Low Frequency (Hz) <HelpIcon section="training-low-freq" /></label>
-              <input
-                type="number"
-                value={config.preprocessing.low_freq}
-                onChange={(e) => setConfig(prev => ({
-                  ...prev,
-                  preprocessing: { ...prev.preprocessing, low_freq: parseInt(e.target.value) }
-                }))}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>High Frequency (Hz) <HelpIcon section="training-high-freq" /></label>
-              <input
-                type="number"
-                value={config.preprocessing.high_freq}
-                onChange={(e) => setConfig(prev => ({
-                  ...prev,
-                  preprocessing: { ...prev.preprocessing, high_freq: parseInt(e.target.value) }
-                }))}
-              />
-            </div>
-          </>
-        )}
-
-        {/* Fully Annotated Files */}
-        <div className="form-group full-width">
-          <label>Fully Annotated Files (optional) <HelpIcon section="training-fully-annotated" /></label>
-          <div className="file-selection">
-            <div className="file-selection-buttons">
-              <button onClick={handleFullyAnnotatedSelection}>
-                Select Fully Annotated CSV Files
-              </button>
-              {config.fully_annotated_files.length > 0 && (
-                <button
-                  onClick={() => setConfig(prev => ({ ...prev, fully_annotated_files: [] }))}
-                  className="button-clear"
-                  title="Clear selected files"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            {config.fully_annotated_files.length > 0 && (
-              <div className="selected-files">
-                <div className="file-count">{config.fully_annotated_files.length} files selected</div>
-                <div className="file-list">
-                  {config.fully_annotated_files.map((file, index) => (
-                    <div key={index} className="file-item">
-                      {basename(file)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="help-text">
-            CSV files with columns: file, start_time, end_time, and one column per class, or file, start_time, end_time, labels, complete
-          </div>
-        </div>
-
-        {/* Single Class Annotations */}
-        <div className="form-group full-width">
-          <label>Single Class Annotations (optional) <HelpIcon section="training-single-class" /></label>
-          <div className="file-selection">
-            <div className="file-selection-buttons">
-              <button onClick={handleSingleClassAnnotationSelection}>
-                Add Single Class Annotation Files
-              </button>
-              {singleClassAnnotations.length > 0 && (
-                <button
-                  onClick={() => {
-                    setSingleClassAnnotations([]);
-                    setConfig(prev => ({ ...prev, single_class_annotations: [] }));
-                  }}
-                  className="button-clear"
-                  title="Clear all single class annotations"
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
-            {singleClassAnnotations.length > 0 && (
-              <div className="single-class-annotations">
-                {singleClassAnnotations.map((item, index) => (
-                  <div key={index} className="annotation-item">
-                    <span className="file-name">{basename(item.file)}</span>
-                    <FormControl size="small" sx={{ minWidth: 150 }}>
-                      <Select
-                        value={item.class}
-                        onChange={(e) => updateSingleClassAnnotationClass(index, e.target.value)}
-                        displayEmpty
-                      >
-                        <MenuItem value="">Select class...</MenuItem>
-                        {getClassListArray().map(cls => (
-                          <MenuItem key={cls} value={cls}>{cls}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <button
-                      onClick={() => removeSingleClassAnnotation(index)}
-                      className="remove-button"
+            ) : (
+              <>
+                <div className="form-group">
+                  <label>CNN Architecture <HelpIcon section="training-cnn-architecture" /></label>
+                  <FormControl size="small" sx={{ mt: 0.5, minWidth: 220, maxWidth: '100%' }}>
+                    <Select
+                      value={config.cnn_architecture}
+                      onChange={(e) => setConfig(prev => ({ ...prev, cnn_architecture: e.target.value }))}
                     >
-                      Remove
+                      <MenuItem value="resnet18">ResNet-18</MenuItem>
+                      <MenuItem value="resnet34">ResNet-34</MenuItem>
+                      <MenuItem value="resnet50">ResNet-50</MenuItem>
+                      <MenuItem value="efficientnet_b0">EfficientNet-B0</MenuItem>
+                      <MenuItem value="efficientnet_b1">EfficientNet-B1</MenuItem>
+                    </Select>
+                  </FormControl>
+                </div>
+                <div className="form-group">
+                  <label>Clip Duration (sec) <HelpIcon section="training-clip-duration" /></label>
+                  <input className="compact-input" type="number" step="0.1" value={config.preprocessing.clip_duration} onChange={(e) => setConfig(prev => ({ ...prev, preprocessing: { ...prev.preprocessing, clip_duration: parseFloat(e.target.value) } }))} />
+                </div>
+                <div className="form-group">
+                  <label>Sample Rate (Hz) <HelpIcon section="training-sample-rate" /></label>
+                  <input className="compact-input" type="number" value={config.preprocessing.sample_rate} onChange={(e) => setConfig(prev => ({ ...prev, preprocessing: { ...prev.preprocessing, sample_rate: parseInt(e.target.value) } }))} />
+                </div>
+                <div className="form-group">
+                  <label>Spectrogram Window (samples) <HelpIcon section="training-spec-window" /></label>
+                  <input className="compact-input" type="number" value={config.preprocessing.spec_window_samples} onChange={(e) => setConfig(prev => ({ ...prev, preprocessing: { ...prev.preprocessing, spec_window_samples: parseInt(e.target.value) } }))} />
+                </div>
+                <div className="form-group">
+                  <label>Low Frequency (Hz) <HelpIcon section="training-low-freq" /></label>
+                  <input className="compact-input" type="number" value={config.preprocessing.low_freq} onChange={(e) => setConfig(prev => ({ ...prev, preprocessing: { ...prev.preprocessing, low_freq: parseInt(e.target.value) } }))} />
+                </div>
+                <div className="form-group">
+                  <label>High Frequency (Hz) <HelpIcon section="training-high-freq" /></label>
+                  <input className="compact-input" type="number" value={config.preprocessing.high_freq} onChange={(e) => setConfig(prev => ({ ...prev, preprocessing: { ...prev.preprocessing, high_freq: parseInt(e.target.value) } }))} />
+                </div>
+              </>
+            )}
+
+            <div className="form-group full-width">
+              <label>Model Save Location *</label>
+              <div className="file-selection">
+                <div className="file-selection-buttons">
+                  <button onClick={handleSaveLocationSelection}>Select Save Directory</button>
+                  {config.save_location && (
+                    <button
+                      onClick={() => setConfig(prev => ({ ...prev, save_location: '' }))}
+                      className="button-clear"
+                      title="Clear selected save location"
+                    >
+                      Clear
                     </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="help-text">
-            CSV files with columns: file, start_time, end_time, annotation (binary classification results)
-          </div>
-        </div>
-
-        {/* Class List */}
-        <div className="form-group full-width">
-          <label>Class List (comma or newline separated) <HelpIcon section="training-class-list" /></label>
-          <textarea
-            value={config.class_list}
-            onChange={handleClassListChange}
-            placeholder="Species A, Species B, Species C&#10;or one per line:&#10;Species A&#10;Species B&#10;Species C&#10;&#10;Auto-populated from first fully annotated file"
-            rows={4}
-            style={{ width: '100%', marginBottom: '8px' }}
-          />
-          {getClassListArray().length > 0 && (
-            <div className="class-preview">
-              <strong>Classes ({getClassListArray().length}):</strong> {getClassListArray().join(', ')}
-            </div>
-          )}
-          <div className="help-text">
-            Will be auto-populated from the first fully annotated file if left empty
-          </div>
-        </div>
-
-        {/* Background Samples */}
-        <div className="form-group full-width">
-          <label>Background Samples (optional)</label>
-          <div className="file-selection">
-            <div className="file-selection-buttons">
-              <button onClick={handleBackgroundSamplesSelection}>
-                Select Background Samples CSV
-              </button>
-              {config.background_samples_file && (
-                <button
-                  onClick={() => setConfig(prev => ({ ...prev, background_samples_file: '' }))}
-                  className="button-clear"
-                  title="Clear selected background samples file"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            {config.background_samples_file && (
-              <span className="selected-path">
-                {basename(config.background_samples_file)}
-              </span>
-            )}
-          </div>
-          <div className="help-text">
-            CSV file with background/negative samples
-          </div>
-        </div>
-
-        {/* Root Audio Folder */}
-        <div className="form-group full-width">
-          <label>Root Audio Folder (optional) <HelpIcon section="training-root-folder" /></label>
-          <div className="file-selection">
-            <div className="file-selection-buttons">
-              <button onClick={handleRootAudioFolderSelection}>
-                Select Root Audio Folder
-              </button>
-              {config.root_audio_folder && (
-                <button
-                  onClick={() => setConfig(prev => ({ ...prev, root_audio_folder: '' }))}
-                  className="button-clear"
-                  title="Clear selected root audio folder"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            {config.root_audio_folder && (
-              <span className="selected-path">
-                {config.root_audio_folder}
-              </span>
-            )}
-          </div>
-          <div className="help-text">
-            Base directory for resolving relative audio file paths in annotation CSVs
-          </div>
-        </div>
-
-        {/* Evaluation File */}
-        <div className="form-group full-width">
-          <label>Evaluation Task (optional)</label>
-          <div className="file-selection">
-            <div className="file-selection-buttons">
-              <button onClick={handleEvaluationFileSelection}>
-                Select Evaluation CSV
-              </button>
-              {config.evaluation_file && (
-                <button
-                  onClick={() => setConfig(prev => ({ ...prev, evaluation_file: '' }))}
-                  className="button-clear"
-                  title="Clear selected evaluation file"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            {config.evaluation_file && (
-              <span className="selected-path">
-                {basename(config.evaluation_file)}
-              </span>
-            )}
-          </div>
-          <div className="help-text">
-            Annotated CSV for model evaluation with same format as training data
-          </div>
-        </div>
-
-        {/* Save Location */}
-        <div className="form-group full-width">
-          <label>Model Save Location *</label>
-          <div className="file-selection">
-            <div className="file-selection-buttons">
-              <button onClick={handleSaveLocationSelection}>
-                Select Save Directory
-              </button>
-              {config.save_location && (
-                <button
-                  onClick={() => setConfig(prev => ({ ...prev, save_location: '' }))}
-                  className="button-clear"
-                  title="Clear selected save location"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            {config.save_location && (
-              <span className="selected-path">
-                {config.save_location}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Training Settings */}
-        <div className="form-group">
-          <label>Batch Size <HelpIcon section="training-batch-size" /></label>
-          <input
-            type="number"
-            min="1"
-            max="128"
-            value={config.batch_size}
-            onChange={(e) => setConfig(prev => ({ ...prev, batch_size: parseInt(e.target.value) }))}
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Workers <HelpIcon section="training-workers" /></label>
-          <input
-            type="number"
-            min="1"
-            max="16"
-            value={config.num_workers}
-            onChange={(e) => setConfig(prev => ({ ...prev, num_workers: parseInt(e.target.value) }))}
-          />
-        </div>
-
-        <div className="form-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={config.freeze_feature_extractor}
-              onChange={(e) => setConfig(prev => ({ ...prev, freeze_feature_extractor: e.target.checked }))}
-            />
-            Freeze Feature Extractor <HelpIcon section="training-freeze" />
-          </label>
-          <div className="help-text">
-            Keep pre-trained feature extractor frozen (recommended for small datasets)
-          </div>
-        </div>
-
-        {/* Conditional training parameters based on freeze setting */}
-        {config.freeze_feature_extractor ? (
-          <div className="form-group" style={{ marginLeft: '20px' }}>
-            <label>Augmentation Variants <HelpIcon section="training-augmentation-variants" /></label>
-            <input
-              type="number"
-              min="0"
-              max="20"
-              value={config.n_augmentation_variants}
-              onChange={(e) => setConfig(prev => ({ ...prev, n_augmentation_variants: parseInt(e.target.value) }))}
-            />
-            <div className="help-text">
-              Number of augmented versions per sample (default: 5)
-            </div>
-          </div>
-        ) : (
-          <div style={{ marginLeft: '20px' }}>
-            <div className="form-group">
-              <label>Feature Extractor Learning Rate <HelpIcon section="training-feature-extractor-lr" /></label>
-              <input
-                type="number"
-                min="0.000001"
-                max="0.01"
-                step="0.000001"
-                value={config.feature_extractor_lr}
-                onChange={(e) => setConfig(prev => ({ ...prev, feature_extractor_lr: parseFloat(e.target.value) }))}
-              />
-              <div className="help-text">
-                Learning rate for feature extractor (default: 0.00001)
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Classifier Learning Rate <HelpIcon section="training-classifier-lr" /></label>
-              <input
-                type="number"
-                min="0.0001"
-                max="0.1"
-                step="0.0001"
-                value={config.classifier_lr}
-                onChange={(e) => setConfig(prev => ({ ...prev, classifier_lr: parseFloat(e.target.value) }))}
-              />
-              <div className="help-text">
-                Learning rate for classifier head (default: 0.001)
+                  )}
+                </div>
+                {config.save_location && <span className="selected-path">{config.save_location}</span>}
               </div>
             </div>
           </div>
         )}
 
-        <div className="form-group full-width">
-          <label>
-            <input
-              type="checkbox"
-              checked={config.use_multi_layer_classifier}
-              onChange={(e) => setConfig(prev => ({ ...prev, use_multi_layer_classifier: e.target.checked }))}
-            />
-            Multi-layer Classifier <HelpIcon section="training-multi-layer" />
-          </label>
-          <div className="help-text">
-            Use a multi-layer classifier instead of a single linear layer
-          </div>
-          {config.use_multi_layer_classifier && (
-            <div className="form-group" style={{ marginTop: '8px', marginLeft: '24px' }}>
-              <label>Hidden Layer Sizes (comma-separated)</label>
-              <input
-                type="text"
-                value={config.classifier_hidden_layer_sizes_input}
-                onChange={(e) => setConfig(prev => ({ ...prev, classifier_hidden_layer_sizes_input: e.target.value }))}
-                placeholder="100,50,25"
-                style={{ width: '200px' }}
-              />
-              <div className="help-text">
-                Specify hidden layer sizes, e.g., "100,50" for two layers with 100 and 50 neurons
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Python Environment */}
-        <div className="form-group full-width">
-          <label>
-            <input
-              type="checkbox"
-              checked={config.use_custom_python_env}
-              onChange={(e) => setConfig(prev => ({ ...prev, use_custom_python_env: e.target.checked }))}
-              style={{ marginRight: '8px' }}
-            />
-            Use Custom Python Environment <HelpIcon section="training-python-env" />
-          </label>
-          <div className="help-text">
-            Use a custom Python environment instead of the default dipper_pytorch_env
-          </div>
-          {config.use_custom_python_env && (
-            <div className="file-selection" style={{ marginTop: '8px', marginLeft: '24px' }}>
-              <div className="file-selection-buttons">
-                <button onClick={handleCustomPythonEnvSelection}>
-                  Select Python Environment Folder
-                </button>
-                {config.custom_python_env_path && (
-                  <button
-                    onClick={() => setConfig(prev => ({ ...prev, custom_python_env_path: '' }))}
-                    className="button-clear"
-                    title="Clear selected Python environment"
-                  >
-                    Clear
-                  </button>
+        {settingsTab === 1 && (
+          <div className="form-grid training-tab-grid">
+            <div className="form-group full-width">
+              <label>Fully Annotated Files (optional) <HelpIcon section="training-fully-annotated" /></label>
+              <div className="file-selection">
+                <div className="file-selection-buttons">
+                  <button onClick={handleFullyAnnotatedSelection}>Select Fully Annotated CSV Files</button>
+                  {config.fully_annotated_files.length > 0 && (
+                    <button
+                      onClick={() => setConfig(prev => ({ ...prev, fully_annotated_files: [] }))}
+                      className="button-clear"
+                      title="Clear selected files"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {config.fully_annotated_files.length > 0 && (
+                  <div className="selected-files">
+                    <div className="file-count">{config.fully_annotated_files.length} files selected</div>
+                    <div className="file-list">
+                      {config.fully_annotated_files.map((file, index) => (
+                        <div key={index} className="file-item">{basename(file)}</div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
-              {config.custom_python_env_path && (
-                <span className="selected-path" style={{ marginTop: '4px', display: 'block' }}>
-                  {config.custom_python_env_path}
-                </span>
-              )}
             </div>
-          )}
-        </div>
 
-        {/* Testing Mode */}
-        <div className="form-group full-width">
-          <label>
-            <input
-              type="checkbox"
-              checked={config.testing_mode_enabled}
-              onChange={(e) => setConfig(prev => ({ ...prev, testing_mode_enabled: e.target.checked }))}
-              style={{ marginRight: '8px' }}
-            />
-            Testing Mode <HelpIcon section="training-testing-mode" />
-          </label>
-          <div className="help-text">
-            Train on a small subset of data for quick testing and validation
-          </div>
-          {config.testing_mode_enabled && (
-            <div className="form-group" style={{ marginTop: '8px', marginLeft: '24px' }}>
-              <label>Subset Size</label>
-              <input
-                type="number"
-                min="1"
-                max="10000"
-                value={config.subset_size}
-                onChange={(e) => setConfig(prev => ({ ...prev, subset_size: parseInt(e.target.value) }))}
-                style={{ width: '100px' }}
-              />
-              <div className="help-text">
-                Number of samples to use for training (default: 10)
+            <div className="form-group full-width">
+              <label>Single Class Annotations (optional) <HelpIcon section="training-single-class" /></label>
+              <div className="file-selection">
+                <div className="file-selection-buttons">
+                  <button onClick={handleSingleClassAnnotationSelection}>Add Single Class Annotation Files</button>
+                  {singleClassAnnotations.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setSingleClassAnnotations([]);
+                        setConfig(prev => ({ ...prev, single_class_annotations: [] }));
+                      }}
+                      className="button-clear"
+                      title="Clear all single class annotations"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+                {singleClassAnnotations.length > 0 && (
+                  <div className="single-class-annotations">
+                    {singleClassAnnotations.map((item, index) => (
+                      <div key={index} className="annotation-item">
+                        <span className="file-name">{basename(item.file)}</span>
+                        <FormControl size="small" sx={{ minWidth: 150 }}>
+                          <Select
+                            value={item.class}
+                            onChange={(e) => updateSingleClassAnnotationClass(index, e.target.value)}
+                            displayEmpty
+                          >
+                            <MenuItem value="">Select class...</MenuItem>
+                            {getClassListArray().map(cls => (
+                              <MenuItem key={cls} value={cls}>{cls}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <button onClick={() => removeSingleClassAnnotation(index)} className="remove-button">Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
+
+            <div className="form-group full-width">
+              <label>Background Samples (optional)</label>
+              <div className="file-selection">
+                <div className="file-selection-buttons">
+                  <button onClick={handleBackgroundSamplesSelection}>Select Background Samples CSV</button>
+                  {config.background_samples_file && (
+                    <button
+                      onClick={() => setConfig(prev => ({ ...prev, background_samples_file: '' }))}
+                      className="button-clear"
+                      title="Clear selected background samples file"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {config.background_samples_file && <span className="selected-path">{basename(config.background_samples_file)}</span>}
+              </div>
+            </div>
+
+            <div className="form-group full-width">
+              <label>Root Audio Folder (optional) <HelpIcon section="training-root-folder" /></label>
+              <div className="file-selection">
+                <div className="file-selection-buttons">
+                  <button onClick={handleRootAudioFolderSelection}>Select Root Audio Folder</button>
+                  {config.root_audio_folder && (
+                    <button
+                      onClick={() => setConfig(prev => ({ ...prev, root_audio_folder: '' }))}
+                      className="button-clear"
+                      title="Clear selected root audio folder"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {config.root_audio_folder && <span className="selected-path">{config.root_audio_folder}</span>}
+              </div>
+            </div>
+
+            <div className="form-group full-width">
+              <label>Evaluation Task (optional)</label>
+              <div className="file-selection">
+                <div className="file-selection-buttons">
+                  <button onClick={handleEvaluationFileSelection}>Select Evaluation CSV</button>
+                  {config.evaluation_file && (
+                    <button
+                      onClick={() => setConfig(prev => ({ ...prev, evaluation_file: '' }))}
+                      className="button-clear"
+                      title="Clear selected evaluation file"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {config.evaluation_file && <span className="selected-path">{basename(config.evaluation_file)}</span>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {settingsTab === 2 && (
+          <div className="form-grid training-tab-grid">
+            <div className="form-group full-width">
+              <label>Class List (comma or newline separated) <HelpIcon section="training-class-list" /></label>
+              <textarea
+                value={config.class_list}
+                onChange={handleClassListChange}
+                placeholder="Species A, Species B, Species C&#10;or one per line:&#10;Species A&#10;Species B&#10;Species C&#10;&#10;Auto-populated from first fully annotated file"
+                rows={10}
+                style={{ width: '100%', marginBottom: '8px' }}
+              />
+              {getClassListArray().length > 0 && (
+                <div className="class-preview">
+                  <strong>Classes ({getClassListArray().length}):</strong> {getClassListArray().join(', ')}
+                </div>
+              )}
+              <div className="help-text">
+                Will be auto-populated from the first fully annotated file if left empty
+              </div>
+            </div>
+          </div>
+        )}
+
+        {settingsTab === 3 && (
+          <div className="form-grid training-tab-grid">
+            {config.mode === 'train_on_embeddings' && (
+              <div className="form-group full-width" style={{ marginLeft: '20px', paddingLeft: '16px', borderLeft: '2px solid var(--border)' }}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={config.use_existing_hoplite_db}
+                    onChange={(e) => setConfig(prev => ({ ...prev, use_existing_hoplite_db: e.target.checked, hoplite_db_path: '' }))}
+                    style={{ marginRight: '8px' }}
+                  />
+                  Use Existing Hoplite Embedding Database
+                </label>
+                <div className="help-text">Load embeddings from an existing database or create a new one</div>
+
+                {config.use_existing_hoplite_db ? (
+                  <div className="file-selection" style={{ marginTop: '8px' }}>
+                    <div className="file-selection-buttons">
+                      <button onClick={handleHopliteDbSelection}>Select Existing Hoplite DB Folder</button>
+                      {config.hoplite_db_path && (
+                        <button
+                          onClick={() => setConfig(prev => ({ ...prev, hoplite_db_path: '' }))}
+                          className="button-clear"
+                          title="Clear selected Hoplite database folder"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    {config.hoplite_db_path && <span className="selected-path" style={{ marginTop: '4px', display: 'block' }}>{config.hoplite_db_path}</span>}
+                  </div>
+                ) : (
+                  <div style={{ marginTop: '8px' }}>
+                    <div className="form-group">
+                      <label>Database Name</label>
+                      <input
+                        type="text"
+                        value={config.hoplite_db_name}
+                        onChange={(e) => setConfig(prev => ({ ...prev, hoplite_db_name: e.target.value }))}
+                        placeholder="hoplite_embeddings"
+                        style={{ width: '300px' }}
+                      />
+                    </div>
+                    <div className="file-selection">
+                      <div className="file-selection-buttons">
+                        <button onClick={handleHopliteDbSelection}>Select Parent Folder</button>
+                        {config.hoplite_db_path && (
+                          <button
+                            onClick={() => setConfig(prev => ({ ...prev, hoplite_db_path: '' }))}
+                            className="button-clear"
+                            title="Clear selected parent folder"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      {config.hoplite_db_path && (
+                        <span className="selected-path" style={{ display: 'block' }}>
+                          {config.hoplite_db_path}/{config.hoplite_db_name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="form-group">
+              <label>Batch Size <HelpIcon section="training-batch-size" /></label>
+              <input className="compact-input" type="number" min="1" max="128" value={config.batch_size} onChange={(e) => setConfig(prev => ({ ...prev, batch_size: parseInt(e.target.value) }))} />
+            </div>
+
+            <div className="form-group">
+              <label>Workers <HelpIcon section="training-workers" /></label>
+              <input className="compact-input" type="number" min="1" max="16" value={config.num_workers} onChange={(e) => setConfig(prev => ({ ...prev, num_workers: parseInt(e.target.value) }))} />
+            </div>
+
+            <div className="form-group full-width">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={config.freeze_feature_extractor}
+                  onChange={(e) => setConfig(prev => ({ ...prev, freeze_feature_extractor: e.target.checked }))}
+                />
+                Freeze Feature Extractor <HelpIcon section="training-freeze" />
+              </label>
+              <div className="help-text">Keep pre-trained feature extractor frozen (recommended for small datasets)</div>
+            </div>
+
+            {config.freeze_feature_extractor ? (
+              <div className="form-group" style={{ marginLeft: '20px' }}>
+                <label>Augmentation Variants <HelpIcon section="training-augmentation-variants" /></label>
+                <input className="compact-input" type="number" min="0" max="20" value={config.n_augmentation_variants} onChange={(e) => setConfig(prev => ({ ...prev, n_augmentation_variants: parseInt(e.target.value) }))} />
+              </div>
+            ) : (
+              <div style={{ marginLeft: '20px' }}>
+                <div className="form-group">
+                  <label>Feature Extractor Learning Rate <HelpIcon section="training-feature-extractor-lr" /></label>
+                  <input className="compact-input" type="number" min="0.000001" max="0.01" step="0.000001" value={config.feature_extractor_lr} onChange={(e) => setConfig(prev => ({ ...prev, feature_extractor_lr: parseFloat(e.target.value) }))} />
+                </div>
+                <div className="form-group">
+                  <label>Classifier Learning Rate <HelpIcon section="training-classifier-lr" /></label>
+                  <input className="compact-input" type="number" min="0.0001" max="0.1" step="0.0001" value={config.classifier_lr} onChange={(e) => setConfig(prev => ({ ...prev, classifier_lr: parseFloat(e.target.value) }))} />
+                </div>
+              </div>
+            )}
+
+            <div className="form-group full-width">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={config.use_multi_layer_classifier}
+                  onChange={(e) => setConfig(prev => ({ ...prev, use_multi_layer_classifier: e.target.checked }))}
+                />
+                Multi-layer Classifier <HelpIcon section="training-multi-layer" />
+              </label>
+              {config.use_multi_layer_classifier && (
+                <div className="form-group" style={{ marginTop: '8px', marginLeft: '24px' }}>
+                  <label>Hidden Layer Sizes (comma-separated)</label>
+                  <input
+                    type="text"
+                    value={config.classifier_hidden_layer_sizes_input}
+                    onChange={(e) => setConfig(prev => ({ ...prev, classifier_hidden_layer_sizes_input: e.target.value }))}
+                    placeholder="100,50,25"
+                    style={{ width: '200px' }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="form-group full-width">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={config.use_custom_python_env}
+                  onChange={(e) => setConfig(prev => ({ ...prev, use_custom_python_env: e.target.checked }))}
+                  style={{ marginRight: '8px' }}
+                />
+                Use Custom Python Environment <HelpIcon section="training-python-env" />
+              </label>
+              {config.use_custom_python_env && (
+                <div className="file-selection" style={{ marginTop: '8px', marginLeft: '24px' }}>
+                  <div className="file-selection-buttons">
+                    <button onClick={handleCustomPythonEnvSelection}>Select Python Environment Folder</button>
+                    {config.custom_python_env_path && (
+                      <button
+                        onClick={() => setConfig(prev => ({ ...prev, custom_python_env_path: '' }))}
+                        className="button-clear"
+                        title="Clear selected Python environment"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {config.custom_python_env_path && <span className="selected-path" style={{ marginTop: '4px', display: 'block' }}>{config.custom_python_env_path}</span>}
+                </div>
+              )}
+            </div>
+
+            <div className="form-group full-width">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={config.testing_mode_enabled}
+                  onChange={(e) => setConfig(prev => ({ ...prev, testing_mode_enabled: e.target.checked }))}
+                  style={{ marginRight: '8px' }}
+                />
+                Testing Mode <HelpIcon section="training-testing-mode" />
+              </label>
+              {config.testing_mode_enabled && (
+                <div className="form-group" style={{ marginTop: '8px', marginLeft: '24px' }}>
+                  <label>Subset Size</label>
+                  <input className="compact-input" type="number" min="1" max="10000" value={config.subset_size} onChange={(e) => setConfig(prev => ({ ...prev, subset_size: parseInt(e.target.value) }))} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Config Management and Task Launch Buttons */}
-      <div className="config-actions" style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+      <div className="config-actions task-form-actions" style={{ marginBottom: '16px' }}>
         <div className="button-group" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>
           <button
             type="button"
