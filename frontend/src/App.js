@@ -30,6 +30,7 @@ import ExtractionTaskCreationForm from './components/ExtractionTaskCreationForm'
 import TaskMonitor from './components/TaskMonitor';
 import taskManager from './utils/TaskManager';
 import { useBackendUrl } from './hooks/useBackendUrl';
+import { useDarkMode } from './hooks/useDarkMode';
 
 const drawerWidth = 240;
 
@@ -92,6 +93,7 @@ function App() {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const [hoverOpen, setHoverOpen] = useState(false);
+  useDarkMode(); // applies body.dark-mode class from persisted preference
 
   // Check if running in review-only mode
   const isReviewOnly = process.env.REACT_APP_REVIEW_ONLY === 'true';
@@ -332,7 +334,7 @@ function App() {
         </div>
 
         <div style={{ display: activeTab === 'review' ? 'block' : 'none' }}>
-          <ReviewTab drawerOpen={isDrawerOpen} />
+          <ReviewTab drawerOpen={isDrawerOpen} isActive={activeTab === 'review'} />
         </div>
 
         <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }}>

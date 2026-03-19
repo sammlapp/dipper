@@ -10,10 +10,14 @@ import {
   FormGroup,
   Button,
   Alert,
-  Divider
+  Divider,
+  Switch
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import RestoreIcon from '@mui/icons-material/Restore';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import { useDarkMode } from '../hooks/useDarkMode';
 
 /**
  * Settings Tab - Global application configuration
@@ -26,6 +30,7 @@ function SettingsTab() {
   const [maxConcurrentTasks, setMaxConcurrentTasks] = useState(1);
   const [exemptExtractionTasks, setExemptExtractionTasks] = useState(false);
   const [saveMessage, setSaveMessage] = useState(null);
+  const { darkMode, set: setDarkMode } = useDarkMode();
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -154,6 +159,33 @@ function SettingsTab() {
               Reset to Defaults
             </Button>
           </Box>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Appearance
+          </Typography>
+          <Divider sx={{ my: 2 }} />
+          <FormGroup>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={darkMode}
+                  onChange={(e) => setDarkMode(e.target.checked)}
+                  icon={<LightModeIcon fontSize="small" />}
+                  checkedIcon={<DarkModeIcon fontSize="small" />}
+                />
+              }
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {darkMode ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />}
+                  <Typography variant="body2">{darkMode ? 'Dark Mode' : 'Light Mode'}</Typography>
+                </Box>
+              }
+            />
+          </FormGroup>
         </CardContent>
       </Card>
 

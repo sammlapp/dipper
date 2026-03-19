@@ -13,9 +13,207 @@
   --border: #d1d5db;
   --shadow: rgba(57, 87, 86, 0.1);
   --primary-color: #5287f0;
-  --yes: #82c176;
-  --uncertain: #ecc76b;
-  --no: #bb5858;
+  --yes: rgb(145, 180, 135);
+  --uncertain: rgb(237, 223, 177);
+  --no: rgb(207, 122, 107);
+  --unlabeled: rgb(223, 223, 223);
+
+  /* Semantic theme tokens (light defaults) */
+  --bg: var(--light-bg);
+  --bg-surface: #f3f3f3;
+  --bg-elevated: #ffffff;
+  --text-primary: var(--dark);
+  --text-secondary: var(--medium-gray);
+  --border-color: var(--border);
+  --toolbar-bg: #f8f9fa;
+  --toolbar-border: #e0e0e0;
+  --toolbar-btn-hover: #e8eaed;
+  --toolbar-btn-active-bg: rgba(82, 135, 240, 0.12);
+  --panel-bg: #ffffff;
+  --panel-shadow: rgba(57, 87, 86, 0.12);
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
+  --dropdown-bg: #ffffff;
+  --dropdown-border: #d1d5db;
+
+  /* Task monitor state colors */
+  --task-running-border: #2196f3;
+  --task-running-bg: #f8fbff;
+  --task-completed-border: #4caf50;
+  --task-completed-bg: transparent;
+  --task-failed-border: #f44336;
+  --task-failed-bg: #fff8f8;
+  --task-cancelled-border: #ff9800;
+  --task-cancelled-bg: #fff9f0;
+  --task-queued-border: #9c27b0;
+  --task-queued-bg: #faf8ff;
+
+  /* Active clip glow color */
+  --active-clip-glow: rgba(9, 98, 171, 1);
+  --multi-select-glow: rgba(139, 92, 246, 1);
+  --multi-select-active-glow: rgba(109, 40, 217, 1);
+
+  --classlabel-bg: #70ad73;
+  --classlabel-hover-bg: #3a683b;
+
+}
+
+/* Dark mode overrides */
+body.dark-mode {
+  --light-bg: #1a1d27;
+  --dark: #cdd6e8;
+  --dark-accent: #8ba4cc;
+  --medium-accent: #8b7355;
+  --white: #1a1d27;
+  --light-gray: #222636;
+  --medium-gray: #8892a4;
+  --border: #2e3348;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --yes: #6d9165;
+  --uncertain: #cda540;
+  --no: #904d4d;
+  --unlabeled: #3a3f55;
+
+  --bg: #0f1117;
+  --bg-surface: #1a1d27;
+  --bg-elevated: #222636;
+  --text-primary: #cdd6e8;
+  --text-secondary: #8892a4;
+  --border-color: #2e3348;
+  --toolbar-bg: #1a1d27;
+  --toolbar-border: #2e3348;
+  --toolbar-btn-hover: #2a2f45;
+  --toolbar-btn-active-bg: rgba(107, 149, 205, 0.18);
+  --panel-bg: #1a1d27;
+  --panel-shadow: rgba(0, 0, 0, 0.4);
+  --input-bg: #222636;
+  --input-border: #2e3348;
+  --dropdown-bg: #222636;
+  --dropdown-border: #3a4060;
+  --task-running-border: #64b5f6;
+  --task-running-bg: rgba(33, 150, 243, 0.14);
+  --task-completed-border: #66bb6a;
+  --task-completed-bg: rgba(76, 175, 80, 0.14);
+  --task-failed-border: #ef5350;
+  --task-failed-bg: rgba(244, 67, 54, 0.14);
+  --task-cancelled-border: #ffb74d;
+  --task-cancelled-bg: rgba(255, 152, 0, 0.14);
+  --task-queued-border: #ba68c8;
+  --task-queued-bg: rgba(156, 39, 176, 0.14);
+  --active-clip-glow: rgb(81, 121, 154);
+  --multi-select-glow: rgb(106, 80, 167);
+  --multi-select-active-glow: rgb(151, 107, 221);
+
+
+  --classlabel-bg: #4a5e83;
+  --classlabel-hover-bg: #6379a3;
+}
+
+/* Dark mode: MUI component overrides */
+body.dark-mode .MuiPaper-root,
+body.dark-mode .MuiMenu-paper,
+body.dark-mode .MuiPopover-paper {
+  background-color: var(--dropdown-bg) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--dropdown-border) !important;
+}
+
+body.dark-mode .MuiMenuItem-root {
+  color: var(--text-primary) !important;
+}
+
+body.dark-mode .MuiMenuItem-root:hover,
+body.dark-mode .MuiMenuItem-root.Mui-selected {
+  background-color: var(--toolbar-btn-hover) !important;
+}
+
+body.dark-mode .MuiSelect-select,
+body.dark-mode .MuiInputBase-root,
+body.dark-mode .MuiOutlinedInput-root {
+  background-color: var(--input-bg) !important;
+  color: var(--text-primary) !important;
+}
+
+body.dark-mode .MuiOutlinedInput-notchedOutline {
+  border-color: var(--input-border) !important;
+}
+
+body.dark-mode .MuiInputLabel-root {
+  color: var(--text-secondary) !important;
+}
+
+body.dark-mode .MuiDrawer-paper {
+  background-color: var(--bg-surface) !important;
+  border-right-color: var(--border-color) !important;
+}
+
+body.dark-mode .MuiListItemButton-root:hover {
+  background-color: var(--toolbar-btn-hover) !important;
+}
+
+body.dark-mode .MuiListItemButton-root.Mui-selected {
+  background-color: var(--toolbar-btn-active-bg) !important;
+}
+
+body.dark-mode .MuiListItemIcon-root,
+body.dark-mode .MuiListItemText-root {
+  color: var(--text-primary) !important;
+}
+
+body.dark-mode .MuiTypography-root {
+  color: var(--text-primary) !important;
+}
+
+body.dark-mode .MuiTypography-colorTextSecondary,
+body.dark-mode .MuiTypography-root[class*="secondary"] {
+  color: var(--text-secondary) !important;
+}
+
+body.dark-mode .MuiCard-root {
+  background-color: var(--bg-surface) !important;
+  border-color: var(--border-color) !important;
+}
+
+body.dark-mode .MuiDivider-root {
+  border-color: var(--border-color) !important;
+}
+
+body.dark-mode .MuiSwitch-track {
+  background-color: var(--text-secondary) !important;
+}
+
+body.dark-mode .MuiCheckbox-root {
+  color: var(--text-secondary) !important;
+}
+
+body.dark-mode .MuiCheckbox-root.Mui-checked {
+  color: var(--dark-accent) !important;
+}
+
+body.dark-mode .MuiSlider-root {
+  color: var(--dark-accent) !important;
+}
+
+body.dark-mode .MuiSlider-rail {
+  background-color: var(--border-color) !important;
+}
+
+/* Dark mode: MUI Tabs (Inference create/resume) */
+body.dark-mode .MuiTab-root {
+  color: var(--text-secondary) !important;
+  opacity: 1 !important;
+}
+
+body.dark-mode .MuiTab-root:hover {
+  color: var(--text-primary) !important;
+}
+
+body.dark-mode .MuiTab-root.Mui-selected {
+  color: var(--dark-accent) !important;
+}
+
+body.dark-mode .MuiTabs-indicator {
+  background-color: var(--dark-accent) !important;
 }
 
 * {
@@ -42,10 +240,11 @@
 body {
   margin: 0;
   font-family: 'Rokkitt', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  background-color: var(--light-bg);
-  color: var(--dark);
+  background-color: var(--bg);
+  color: var(--text-primary);
   line-height: 1.5;
   font-size: 14px;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Global font family for all elements */
@@ -838,14 +1037,14 @@ button:disabled {
 }
 
 .primary-button {
-  background: linear-gradient(135deg, var(--dark-accent) 0%, var(--dark) 100%);
+  /* background: linear-gradient(135deg, var(--dark-accent) 0%, var(--dark) 100%); */
   color: var(--white);
   border-color: var(--dark-accent);
   font-weight: 200;
 }
 
 .primary-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--dark) 0%, var(--dark-accent) 100%);
+  /* background: linear-gradient(135deg, var(--dark) 0%, var(--dark-accent) 100%); */
   border-color: var(--dark);
   color: var(--white);
 }
@@ -1329,7 +1528,7 @@ button:disabled {
 .placeholder-content {
   text-align: center;
   padding: 3rem 2rem;
-  background: linear-gradient(135deg, var(--light-bg) 0%, var(--light-gray) 100%);
+  background: linear-gradient(135deg, var(--bg) 0%, var(--bg-surface) 100%);
   border-radius: 12px;
   border: 2px dashed var(--medium-accent);
 }
@@ -2271,17 +2470,17 @@ button:disabled {
 
 /* Active clip styling - thicker border */
 .annotation-card.active-clip {
-  box-shadow: 0 0 15px 5px rgba(9, 98, 171, 1);
+  box-shadow: 0 0 15px 5px var(--active-clip-glow);
 }
 
 /* Multi-select: all selected clips get purple glow */
 .annotation-card.selected-clip {
-  box-shadow: 0 0 15px 5px rgba(139, 92, 246, 1);
+  box-shadow: 0 0 15px 5px var(--multi-select-glow);
 }
 
 /* Multi-select: primary active clip gets brighter purple */
 .annotation-card.active-clip-multi {
-  box-shadow: 0 0 18px 7px rgba(109, 40, 217, 1);
+  box-shadow: 0 0 18px 7px var(--multi-select-active-glow);
 }
 
 /* Cursor changes to crosshair when shift/ctrl/cmd held to indicate multi-select */
@@ -3776,9 +3975,9 @@ button:disabled {
   flex-wrap: wrap;
   /* Allow toolbar items to wrap to next line when window is narrow */
   padding: 0.5rem 1.5rem;
-  background-color: var(--white);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--toolbar-bg);
+  border-bottom: 1px solid var(--toolbar-border);
+  box-shadow: 0 2px 4px var(--panel-shadow);
   gap: 0.5rem 1rem;
   /* vertical gap 0.5rem, horizontal gap 1rem for wrapped items */
   box-sizing: border-box;
@@ -4475,9 +4674,9 @@ button:disabled {
   align-items: center;
   justify-content: center;
   padding: 0.5rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
-  background-color: var(--white);
+  background-color: var(--bg-elevated);
   color: var(--dark-accent);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -4487,7 +4686,7 @@ button:disabled {
 }
 
 .toolbar-btn:hover:not(:disabled) {
-  background-color: var(--light-gray);
+  background-color: var(--toolbar-btn-hover);
   border-color: var(--dark-accent);
 }
 
@@ -4498,7 +4697,7 @@ button:disabled {
 
 .toolbar-btn.active {
   background-color: var(--dark-accent);
-  color: var(--white);
+  color: var(--bg-elevated);
   border-color: var(--dark-accent);
 }
 
@@ -5052,27 +5251,28 @@ button:disabled {
 }
 
 .task-card.running {
-  border-left: 4px solid #2196f3;
-  background: #f8fbff;
+  border-left: 4px solid var(--task-running-border);
+  background: var(--task-running-bg);
 }
 
 .task-card.completed {
-  border-left: 4px solid #4caf50;
+  border-left: 4px solid var(--task-completed-border);
+  background: var(--task-completed-bg);
 }
 
 .task-card.failed {
-  border-left: 4px solid #f44336;
-  background: #fff8f8;
+  border-left: 4px solid var(--task-failed-border);
+  background: var(--task-failed-bg);
 }
 
 .task-card.cancelled {
-  border-left: 4px solid #ff9800;
-  background: #fff9f0;
+  border-left: 4px solid var(--task-cancelled-border);
+  background: var(--task-cancelled-bg);
 }
 
 .task-card.queued {
-  border-left: 4px solid #9c27b0;
-  background: #faf8ff;
+  border-left: 4px solid var(--task-queued-border);
+  background: var(--task-queued-bg);
 }
 
 .task-header {
@@ -5360,18 +5560,20 @@ button:disabled {
 
 /* Help Tab Styles */
 .help-code-block {
-  background: var(--light-gray);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   padding: 10px;
   margin: 10px 0;
   border-radius: 4px;
   font-family: 'Courier New', monospace;
   font-size: 0.85rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-color);
   overflow-x: auto;
 }
 
 .help-info-box {
-  background: var(--light-gray);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   padding: 10px;
   margin: 10px 0;
   border-radius: 4px;
@@ -5748,4 +5950,204 @@ button:disabled {
 
 .jump-incomplete-btn .material-symbols-outlined {
   font-size: 18px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Dark Mode Overrides
+   Applied when body has .dark-mode class
+   ═══════════════════════════════════════════════════════ */
+
+body.dark-mode {
+  background-color: var(--bg);
+  color: var(--text-primary);
+}
+
+/* Panels and surfaces */
+body.dark-mode .settings-panel,
+body.dark-mode .review-tab-layout,
+body.dark-mode .left-tray,
+body.dark-mode .left-tray-content,
+body.dark-mode .annotation-settings-tray,
+body.dark-mode .filter-panel,
+body.dark-mode .classifier-guided-panel,
+body.dark-mode .score-histogram-panel,
+body.dark-mode .shortcuts-help-modal,
+body.dark-mode .shortcuts-help-content,
+body.dark-mode .modal-content,
+body.dark-mode .context-menu,
+body.dark-mode .multi-select-bar,
+body.dark-mode .floating-multiclass-bar {
+  background-color: var(--panel-bg);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+/* Cards */
+body.dark-mode .annotation-card {
+  background-color: var(--bg-surface);
+  border-color: var(--border-color);
+}
+
+body.dark-mode .annotation-card:hover {
+  border-color: var(--dark-accent);
+}
+
+body.dark-mode .annotation-card.active-clip {
+  border-color: var(--primary-color);
+  background-color: var(--bg-elevated);
+}
+
+body.dark-mode .annotation-card.selected-clip {
+  background-color: rgba(107, 149, 205, 0.1);
+}
+
+/* Focus view */
+body.dark-mode .focus-view,
+body.dark-mode .focus-view-inner,
+body.dark-mode .focus-view-redesigned,
+body.dark-mode .focus-view-container {
+  background-color: var(--bg);
+  color: var(--text-primary);
+}
+
+/* Inputs and form elements */
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+  border-color: var(--input-border);
+}
+
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: var(--text-secondary);
+}
+
+body.dark-mode .settings-grid input,
+body.dark-mode .settings-grid select {
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+  border-color: var(--input-border);
+}
+
+/* Text and labels */
+body.dark-mode label,
+body.dark-mode .settings-label,
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4 {
+  color: var(--text-primary);
+}
+
+body.dark-mode .section-title,
+body.dark-mode .label-text,
+body.dark-mode .setting-label {
+  color: var(--text-primary);
+}
+
+body.dark-mode .help-text,
+body.dark-mode .caption,
+body.dark-mode small {
+  color: var(--text-secondary);
+}
+
+/* Dividers and borders */
+body.dark-mode hr,
+body.dark-mode .divider,
+body.dark-mode .section-divider,
+body.dark-mode .shortcuts-help-header,
+body.dark-mode .toolbar-bulk-controls {
+  border-color: var(--border-color);
+}
+
+/* Buttons */
+body.dark-mode button:not(.toolbar-btn):not(.annotation-btn):not(.segment):not([class*="yes"]):not([class*="no"]):not([class*="uncertain"]):not([class*="MuiButton"]) {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+/* Segmented controls: preserve clear selected vs unselected states in dark mode */
+body.dark-mode .segmented-control {
+  border-color: var(--border-color);
+}
+
+body.dark-mode .segment {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+body.dark-mode .segment:hover {
+  background-color: var(--toolbar-btn-hover);
+}
+
+body.dark-mode .segment.active {
+  background-color: var(--dark-accent);
+  color: var(--bg);
+  border-color: var(--dark-accent);
+}
+
+body.dark-mode .segment.active:hover {
+  background-color: var(--dark-accent);
+}
+
+/* Annotation buttons stay colored — only update their borders */
+body.dark-mode .annotation-btn {
+  border-color: var(--border-color);
+}
+
+/* Dialogs / overlays */
+body.dark-mode .modal-overlay {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+body.dark-mode .modal-content {
+  background-color: var(--panel-bg);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-mode .modal-content h3 {
+  color: var(--text-primary);
+}
+
+body.dark-mode .modal-content p {
+  color: var(--text-secondary);
+}
+
+/* Status bar */
+body.dark-mode .status-bar,
+body.dark-mode .status-idle,
+body.dark-mode .status-running {
+  background-color: var(--bg-surface);
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+/* Page counter / nav elements */
+body.dark-mode .page-counter,
+body.dark-mode .bin-label,
+body.dark-mode .clip-count {
+  color: var(--text-secondary);
+}
+
+/* Scrollbars in dark mode */
+body.dark-mode ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body.dark-mode ::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
 }

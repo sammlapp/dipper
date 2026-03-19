@@ -2,9 +2,14 @@ import React, { useState, useMemo } from 'react';
 import { Modal, Box, FormControl, Select, MenuItem, IconButton } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 
+const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(`--${name}`).trim();
+
 const NUM_BINS = 30;
 
 function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) {
+  const panelBg = cssVar('panel-bg');
+  const textColor = cssVar('text-primary');
+  const borderColor = cssVar('border-color');
   const [selectedScoreColumn, setSelectedScoreColumn] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
   const [showGrey, setShowGrey] = useState(true);
@@ -169,7 +174,7 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
           transform: 'translate(-50%, -50%)',
           width: '80%',
           maxWidth: 900,
-          bgcolor: 'background.paper',
+          bgcolor: panelBg,
           boxShadow: 24,
           p: 3,
           borderRadius: 1,
@@ -177,12 +182,12 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
           overflow: 'auto'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif' }}>Score Histogram</h3>
+            <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', color: textColor }}>Score Histogram</h3>
             <IconButton onClick={onClose}>
               <CloseIcon />
             </IconButton>
           </div>
-          <p>No valid numeric data available for histogram.</p>
+          <p style={{ color: textColor }}>No valid numeric data available for histogram.</p>
         </Box>
       </Modal>
     );
@@ -206,7 +211,7 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
         transform: 'translate(-50%, -50%)',
         width: '80%',
         maxWidth: 900,
-        bgcolor: 'background.paper',
+        bgcolor: panelBg,
         boxShadow: 24,
         p: 3,
         borderRadius: 1,
@@ -214,7 +219,7 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
         overflow: 'auto'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif' }}>Score Histogram</h3>
+          <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', color: textColor }}>Score Histogram</h3>
           <IconButton onClick={onClose}>
             <CloseIcon />
           </IconButton>
@@ -223,26 +228,30 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
         {/* Controls */}
         <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
-            <label style={{ marginBottom: '5px', fontSize: '0.9rem' }}>Score Column</label>
+            <label style={{ marginBottom: '5px', fontSize: '0.9rem', color: textColor }}>Score Column</label>
             <Select
               value={selectedScoreColumn}
               onChange={(e) => setSelectedScoreColumn(e.target.value)}
+              sx={{ backgroundColor: panelBg, color: textColor, '.MuiOutlinedInput-notchedOutline': { borderColor }, '.MuiSvgIcon-root': { color: textColor } }}
+              MenuProps={{ PaperProps: { sx: { backgroundColor: panelBg, color: textColor } } }}
             >
               {numericColumns.map(col => (
-                <MenuItem key={col} value={col}>{col}</MenuItem>
+                <MenuItem key={col} value={col} sx={{ '&:hover': { backgroundColor: cssVar('toolbar-btn-hover') } }}>{col}</MenuItem>
               ))}
             </Select>
           </FormControl>
 
           {reviewMode === 'multiclass' && (
             <FormControl size="small" sx={{ minWidth: 200 }}>
-              <label style={{ marginBottom: '5px', fontSize: '0.9rem' }}>Class</label>
+              <label style={{ marginBottom: '5px', fontSize: '0.9rem', color: textColor }}>Class</label>
               <Select
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
+                sx={{ backgroundColor: panelBg, color: textColor, '.MuiOutlinedInput-notchedOutline': { borderColor }, '.MuiSvgIcon-root': { color: textColor } }}
+                MenuProps={{ PaperProps: { sx: { backgroundColor: panelBg, color: textColor } } }}
               >
                 {availableClasses.map(cls => (
-                  <MenuItem key={cls} value={cls}>{cls}</MenuItem>
+                  <MenuItem key={cls} value={cls} sx={{ '&:hover': { backgroundColor: cssVar('toolbar-btn-hover') } }}>{cls}</MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -250,7 +259,7 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
         </div>
 
         {/* Legend with checkboxes */}
-        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', fontSize: '0.9rem', flexWrap: 'wrap', color: textColor }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
             <input
               type="checkbox"
@@ -296,13 +305,13 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
         </div>
 
         {/* Histogram SVG */}
-        <svg width={width} height={height} style={{ border: '1px solid #e5e7eb', borderRadius: '4px' }}>
+        <svg width={width} height={height} style={{ border: `1px solid ${borderColor}`, borderRadius: '4px', backgroundColor: panelBg }}>
           <g transform={`translate(${margin.left}, ${margin.top})`}>
             {/* Y-axis */}
-            <line x1={0} y1={0} x2={0} y2={chartHeight} stroke="#374151" strokeWidth={2} />
+            <line x1={0} y1={0} x2={0} y2={chartHeight} stroke={textColor} strokeWidth={2} />
 
             {/* X-axis */}
-            <line x1={0} y1={chartHeight} x2={chartWidth} y2={chartHeight} stroke="#374151" strokeWidth={2} />
+            <line x1={0} y1={chartHeight} x2={chartWidth} y2={chartHeight} stroke={textColor} strokeWidth={2} />
 
             {/* Y-axis ticks and labels */}
             {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => {
@@ -310,8 +319,8 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
               const count = Math.round(frac * maxCount);
               return (
                 <g key={i}>
-                  <line x1={-5} y1={y} x2={0} y2={y} stroke="#374151" strokeWidth={1} />
-                  <text x={-10} y={y + 4} textAnchor="end" fontSize={12} fill="#374151">
+                  <line x1={-5} y1={y} x2={0} y2={y} stroke={textColor} strokeWidth={1} />
+                  <text x={-10} y={y + 4} textAnchor="end" fontSize={12} fill={textColor}>
                     {count}
                   </text>
                 </g>
@@ -324,7 +333,7 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
               y={chartHeight / 2}
               textAnchor="middle"
               fontSize={14}
-              fill="#374151"
+              fill={textColor}
               transform={`rotate(-90, -40, ${chartHeight / 2})`}
             >
               Count
@@ -336,8 +345,8 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
               const value = (minScore + frac * (maxScore - minScore)).toFixed(2);
               return (
                 <g key={i}>
-                  <line x1={x} y1={chartHeight} x2={x} y2={chartHeight + 5} stroke="#374151" strokeWidth={1} />
-                  <text x={x} y={chartHeight + 20} textAnchor="middle" fontSize={12} fill="#374151">
+                  <line x1={x} y1={chartHeight} x2={x} y2={chartHeight + 5} stroke={textColor} strokeWidth={1} />
+                  <text x={x} y={chartHeight + 20} textAnchor="middle" fontSize={12} fill={textColor}>
                     {value}
                   </text>
                 </g>
@@ -350,7 +359,7 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
               y={chartHeight + 45}
               textAnchor="middle"
               fontSize={14}
-              fill="#374151"
+              fill={textColor}
             >
               {selectedScoreColumn}
             </text>

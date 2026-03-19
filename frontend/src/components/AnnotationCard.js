@@ -4,6 +4,8 @@ import Select from 'react-select';
 import BoundingBoxOverlay from './BoundingBoxOverlay';
 import SpectrogramContextMenu from './SpectrogramContextMenu';
 
+const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(`--${name}`).trim();
+
 const AnnotationCard = memo(function AnnotationCard({
   clipData,
   reviewMode = 'binary', // 'binary' or 'multiclass'
@@ -175,11 +177,17 @@ const AnnotationCard = memo(function AnnotationCard({
 
   const annotationValue = getAnnotationValue();
 
+  // Read annotation status colors from CSS variables (dark-mode-aware)
+  const colorYes = cssVar('yes');
+  const colorNo = cssVar('no');
+  const colorUncertain = cssVar('uncertain');
+  const colorUnlabeled = cssVar('unlabeled');
+
   // Annotation status options for multi-class mode
   const annotationStatusOptions = [
-    { value: 'complete', label: 'Complete', symbol: 'check_circle', color: 'rgb(145, 180, 135)' },
-    { value: 'uncertain', label: 'Uncertain', symbol: 'help', color: 'rgb(237, 223, 177)' },
-    { value: 'unreviewed', label: 'Unreviewed', symbol: 'radio_button_unchecked', color: 'rgb(223, 223, 223)' }
+    { value: 'complete', label: 'Complete', symbol: 'check_circle', color: colorYes },
+    { value: 'uncertain', label: 'Uncertain', symbol: 'help', color: colorUncertain },
+    { value: 'unreviewed', label: 'Unreviewed', symbol: 'radio_button_unchecked', color: colorUnlabeled }
   ];
 
 
@@ -195,10 +203,10 @@ const AnnotationCard = memo(function AnnotationCard({
 
   // Binary review options with semantic colors
   const binaryOptions = [
-    { value: 'yes', label: 'Yes', symbol: 'check_circle', color: 'rgb(145, 180, 135)' },
-    { value: 'no', label: 'No', symbol: 'cancel', color: 'rgb(207, 122, 107)' },
-    { value: 'uncertain', label: 'Uncertain', symbol: 'question_mark', color: 'rgb(237, 223, 177)' },
-    { value: 'unlabeled', label: 'Reset', symbol: 'restart_alt', color: 'rgb(223, 223, 223)' }
+    { value: 'yes', label: 'Yes', symbol: 'check_circle', color: colorYes },
+    { value: 'no', label: 'No', symbol: 'cancel', color: colorNo },
+    { value: 'uncertain', label: 'Uncertain', symbol: 'question_mark', color: colorUncertain },
+    { value: 'unlabeled', label: 'Reset', symbol: 'restart_alt', color: colorUnlabeled }
   ];
 
   // Multi-class options for react-select
@@ -213,10 +221,12 @@ const AnnotationCard = memo(function AnnotationCard({
 
   // Get card styling based on annotation
   const getCardStyle = () => {
+    const unannotatedColor = getComputedStyle(document.body)
+      .getPropertyValue('--border-color').trim() || '#d1d5db';
     if (reviewMode === 'binary') {
       const option = binaryOptions.find(opt => opt.value === annotationValue);
       return {
-        borderColor: option?.color || '#d1d5db',
+        borderColor: option?.color || unannotatedColor,
         borderWidth: '3px',
         borderStyle: 'solid'
       };
@@ -224,7 +234,7 @@ const AnnotationCard = memo(function AnnotationCard({
       // Multi-class: border color based on annotation status
       const statusOption = annotationStatusOptions.find(opt => opt.value === annotation_status);
       return {
-        borderColor: statusOption?.color || '#6b7280',
+        borderColor: statusOption?.color || unannotatedColor,
         borderWidth: '3px',
         borderStyle: 'solid'
       };
@@ -443,15 +453,51 @@ const AnnotationCard = memo(function AnnotationCard({
       );
     } else {
       // Multi-class
+      const bg = cssVar('bg-elevated') || cssVar('panel-bg');
+      const textPrimary = cssVar('text-primary');
+      const borderColor = cssVar('border-color');
+      const inputBg = cssVar('input-bg');
       const customStyles = {
         control: (provided) => ({
           ...provided,
           minHeight: '38px',
-          fontSize: '0.9rem'
+          fontSize: '0.9rem',
+          backgroundColor: inputBg,
+          borderColor,
+          '&:hover': { borderColor },
+          boxShadow: 'none',
+        }),
+        menu: (provided) => ({
+          ...provided,
+          backgroundColor: bg,
+          border: `1px solid ${borderColor}`,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }),
+        menuList: (provided) => ({
+          ...provided,
+          backgroundColor: bg,
+        }),
+        option: (provided, state) => ({
+          ...provided,
+          backgroundColor: state.isFocused ? cssVar('toolbar-btn-hover') : bg,
+          color: textPrimary,
+          cursor: 'pointer',
+        }),
+        input: (provided) => ({
+          ...provided,
+          color: textPrimary,
+        }),
+        placeholder: (provided) => ({
+          ...provided,
+          color: cssVar('text-secondary'),
+        }),
+        singleValue: (provided) => ({
+          ...provided,
+          color: textPrimary,
         }),
         multiValue: (provided) => ({
           ...provided,
-          backgroundColor: '#70ad73',
+          backgroundColor: cssVar('classlabel-bg'),
           borderRadius: '4px',
         }),
         multiValueLabel: (provided) => ({
@@ -463,7 +509,7 @@ const AnnotationCard = memo(function AnnotationCard({
           ...provided,
           color: 'white',
           '&:hover': {
-            backgroundColor: '#3a683b',
+            backgroundColor: cssVar('classlabel-hover-bg'),
             color: 'white',
           }
         })

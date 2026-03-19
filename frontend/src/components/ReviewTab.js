@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ReactSelect from 'react-select';
+
+const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(`--${name}`).trim();
 import { Drawer, IconButton, Modal, Box, Typography, FormControl, Select, MenuItem } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import AnnotationCard from './AnnotationCard';
@@ -18,6 +20,7 @@ import {
 } from '../utils/stratificationUtils';
 import { selectCSVFiles, selectFolder, selectJSONFiles, saveFile, writeFile, readFile } from '../utils/fileOperations';
 import { isLocalMode } from '../utils/mode';
+import { useDarkMode } from '../hooks/useDarkMode';
 import { useBackendUrl } from '../hooks/useBackendUrl';
 import { dirname, basename } from 'pathe';
 
@@ -69,8 +72,8 @@ function LoadDialog({ open, headers, onConfirm, onCancel }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center'
     }}>
       <div style={{
-        background: 'var(--background, #fff)',
-        border: '1px solid var(--border, #d1d5db)',
+        background: 'var(--panel-bg)',
+        border: '1px solid var(--border-color)',
         borderRadius: '10px',
         padding: '28px 32px',
         minWidth: '380px',
@@ -92,7 +95,7 @@ function LoadDialog({ open, headers, onConfirm, onCancel }) {
             <label key={opt.value} style={{
               display: 'flex', alignItems: 'flex-start', gap: '10px',
               padding: '10px 12px',
-              border: `2px solid ${mode === opt.value ? 'var(--dark-accent, #4f5d75)' : 'var(--border, #d1d5db)'}`,
+              border: `2px solid ${mode === opt.value ? 'var(--dark-accent)' : 'var(--border-color)'}`,
               borderRadius: '6px',
               cursor: 'pointer',
               background: mode === opt.value ? 'rgba(79,93,117,0.07)' : 'transparent'
@@ -118,24 +121,21 @@ function LoadDialog({ open, headers, onConfirm, onCancel }) {
             <label style={{ fontSize: '0.88rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
               Annotation column:
             </label>
-            <select
-              value={annotationColumn}
-              onChange={e => setAnnotationColumn(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '7px 10px',
-                border: '1px solid var(--border, #d1d5db)',
-                borderRadius: '5px',
-                fontSize: '0.88rem',
-                background: 'var(--background, #fff)',
-                color: 'var(--text, #1a1a2e)',
-                fontFamily: 'inherit'
+            <ReactSelect
+              value={{ value: annotationColumn, label: annotationColumn + (!headers.includes(annotationColumn) ? ' (new)' : '') }}
+              onChange={opt => setAnnotationColumn(opt.value)}
+              options={binaryColumnOptions.map(col => ({ value: col, label: col + (!headers.includes(col) ? ' (new)' : '') }))}
+              menuPortalTarget={document.body}
+              menuPosition="fixed"
+              styles={{
+                control: (p) => ({ ...p, backgroundColor: cssVar('input-bg'), borderColor: cssVar('border-color'), fontSize: '0.88rem', '&:hover': { borderColor: cssVar('border-color') }, boxShadow: 'none' }),
+                menu: (p) => ({ ...p, backgroundColor: cssVar('panel-bg'), border: `1px solid ${cssVar('border-color')}` }),
+                menuList: (p) => ({ ...p, backgroundColor: cssVar('panel-bg') }),
+                option: (p, s) => ({ ...p, backgroundColor: s.isFocused ? cssVar('toolbar-btn-hover') : cssVar('panel-bg'), color: cssVar('text-primary'), cursor: 'pointer' }),
+                singleValue: (p) => ({ ...p, color: cssVar('text-primary') }),
+                input: (p) => ({ ...p, color: cssVar('text-primary') }),
               }}
-            >
-              {binaryColumnOptions.map(col => (
-                <option key={col} value={col}>{col}{!headers.includes(col) ? ' (new)' : ''}</option>
-              ))}
-            </select>
+            />
             {!headers.includes(annotationColumn) && (
               <p style={{ fontSize: '0.8rem', color: 'var(--dark-accent, #4f5d75)', margin: '5px 0 0' }}>
                 Column "{annotationColumn}" will be created with empty values.
@@ -154,8 +154,8 @@ function LoadDialog({ open, headers, onConfirm, onCancel }) {
           <button
             onClick={onCancel}
             style={{
-              padding: '8px 18px', borderRadius: '5px', border: '1px solid var(--border, #d1d5db)',
-              background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9rem'
+              padding: '8px 18px', borderRadius: '5px', border: '1px solid var(--border-color)',
+              background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9rem'
             }}
           >
             Cancel
@@ -271,8 +271,10 @@ function MultiSelectBar({ selectedCount, availableClasses, selectedClipIndices, 
   );
 }
 
-function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
+function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }) {
   const backendUrl = useBackendUrl();
+  const { darkMode, toggle: toggleDarkMode } = useDarkMode();
+
   const [selectedFile, setSelectedFile] = useState('');
   const [annotationData, setAnnotationData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -289,7 +291,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     resize_images: true,
     image_width: 400,
     image_height: 200,
-    focus_mode_autoplay: true,
+    focus_mode_autoplay: false,
     focus_size: 'medium',
     keyboard_shortcuts_enabled: true,
     manual_classes: '',
@@ -782,6 +784,29 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
 
   // Track when data actually changes (new file loaded) to trigger spectrogram reload
   const [currentDataVersion, setCurrentDataVersion] = useState(0);
+
+  // Sync spectrogram colormap with dark/light mode
+  useEffect(() => {
+    const lightDefault = 'greys_r';
+    const darkDefault = 'magma';
+    setSettings(prev => {
+      const current = prev.spectrogram_colormap;
+      const isAtOppositeDefault = darkMode
+        ? current === lightDefault
+        : current === darkDefault;
+      if (!isAtOppositeDefault) return prev; // user chose a custom colormap — don't override
+      const next = darkMode ? darkDefault : lightDefault;
+      // Also update visualization_settings in localStorage so the clip loader picks it up
+      try {
+        const saved = localStorage.getItem('visualization_settings');
+        const vs = saved ? JSON.parse(saved) : {};
+        localStorage.setItem('visualization_settings', JSON.stringify({ ...vs, spectrogram_colormap: next }));
+      } catch {}
+      return { ...prev, spectrogram_colormap: next };
+    });
+    // Trigger spectrogram reload
+    setCurrentDataVersion(v => v + 1);
+  }, [darkMode]);
 
   // Load spectrograms when page/bin changes, new data loaded, settings change, filtering changes, or mode changes
   useEffect(() => {
@@ -2036,6 +2061,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
   // Keyboard shortcuts for both grid and focus view
   useEffect(() => {
     if (!settings.keyboard_shortcuts_enabled) return;
+    if (!isActive) return;
 
     const handleKeyDown = (event) => {
       // Check if user is typing in a text field
@@ -2238,7 +2264,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange, handleActiveClipAnnotation, handleActiveClipNavigation, handleJumpToNextIncompleteBin, classifierGuidedMode.enabled, stratifiedBins.length, currentBinIndex, selectedClipIndices, activeClipIndexOnPage]);
+  }, [settings, isFocusMode, currentPage, totalPages, handleBulkAnnotation, handleSettingsChange, handleActiveClipAnnotation, handleActiveClipNavigation, handleJumpToNextIncompleteBin, classifierGuidedMode.enabled, stratifiedBins.length, currentBinIndex, selectedClipIndices, activeClipIndexOnPage, isActive]);
 
   // Track modifier keys held (shift/ctrl/cmd) for cursor change and multi-select
   useEffect(() => {
@@ -2951,8 +2977,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
           transform: 'translate(-50%, -50%)',
           width: { xs: '90%', sm: 600 },
           maxHeight: '80vh',
-          bgcolor: 'background.paper',
-          border: '1px solid var(--border)',
+          bgcolor: cssVar('panel-bg'),
+          border: `1px solid ${cssVar('border-color')}`,
           borderRadius: '8px',
           boxShadow: 24,
           overflow: 'auto',
@@ -3027,6 +3053,25 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
                   <div className="shortcut-item">
                     <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd>
                     <span>Toggle comments visibility</span>
+                  </div>
+                  <div className="shortcuts-subsection">
+                    <h4>Multi-clip Selection</h4>
+                    <div className="shortcut-item">
+                      <kbd>Click</kbd>
+                      <span>Select clip (clears previous selection)</span>
+                    </div>
+                    <div className="shortcut-item">
+                      <kbd>Ctrl/Cmd</kbd> + <kbd>Click</kbd>
+                      <span>Add/remove clip from selection</span>
+                    </div>
+                    <div className="shortcut-item">
+                      <kbd>Shift</kbd> + <kbd>Click</kbd>
+                      <span>Select range of clips</span>
+                    </div>
+                    <div className="shortcut-item">
+                      <kbd>Esc</kbd>
+                      <span>Clear multi-selection</span>
+                    </div>
                   </div>
                   {settings.review_mode === 'binary' && (
                     <>
@@ -3795,6 +3840,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false }) {
               title="Keyboard Shortcuts"
             >
               <span className="material-symbols-outlined">keyboard</span>
+            </button>
+
+            {/* Dark / Light Mode Toggle */}
+            <button
+              onClick={toggleDarkMode}
+              className="toolbar-btn"
+              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              <span className="material-symbols-outlined">
+                {darkMode ? 'light_mode' : 'dark_mode'}
+              </span>
             </button>
 
             {/* Settings Button */}

@@ -85,6 +85,12 @@ additional features: bandpass range; clip duration; audio stretch factor;
 save best model predictions and labels for validation set in output dir
 save publication-ready metrics summary and visualization as html in output dir
 
+These elements are still "light" when in "dark" mode:
+multiclass-select (both the bar where items are displayed, and the options list need to adapt to dark mode)
+score histogram panel
+
+also, the select menu for Annotation column in Open Annotation CSV panel is an ugly native system menu, use a nicer select component.
+
 ## known bugs
 
 Lauren [McNeil Lab]: out of memory error! always happens after annotating 10% of a large dataset. decrease cache size somewhere? make configurable? 

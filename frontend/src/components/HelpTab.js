@@ -618,7 +618,10 @@ function HelpTab() {
             <li key={section.id}>
               <button
                 className={`nav-link ${activeSection === section.id ? 'active' : ''}`}
-                onClick={() => setActiveSection(section.id)}
+                onClick={() => {
+                  setActiveSection(section.id);
+                  document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
               >
                 {section.title}
               </button>
@@ -636,28 +639,30 @@ function HelpTab() {
         ))}
       </div>
 
-      <style jsx>{`
+      <style>{`
         .help-tab {
           padding: 20px;
           max-width: 900px;
           margin: 0 auto;
           line-height: 1.6;
+          color: var(--text-primary);
         }
-        
+
         .help-tab code {
-          background: #e8f4f8;
+          background: var(--bg-surface);
+          color: var(--text-primary);
           padding: 2px 4px;
           border-radius: 3px;
           font-family: 'Courier New', monospace;
           font-size: 0.9em;
         }
-        
+
         .help-tab ul li {
           margin-bottom: 6px;
         }
-        
+
         .help-tab em {
-          color: #0066cc;
+          color: var(--primary-color);
           font-style: normal;
           font-weight: 500;
         }
@@ -666,19 +671,24 @@ function HelpTab() {
           text-align: center;
           margin-bottom: 30px;
           padding-bottom: 20px;
-          border-bottom: 2px solid var(--border, #ddd);
+          border-bottom: 2px solid var(--border-color);
         }
 
         .help-header h2 {
-          color: var(--primary, #333);
+          color: var(--text-primary);
           margin-bottom: 10px;
         }
 
         .help-navigation {
-          background: var(--background-secondary, #f8f9fa);
+          background: var(--bg-surface);
           padding: 15px;
           border-radius: 8px;
           margin-bottom: 30px;
+        }
+
+        .help-navigation h3 {
+          color: var(--text-primary);
+          margin: 0 0 8px;
         }
 
         .help-navigation ul {
@@ -691,8 +701,9 @@ function HelpTab() {
         }
 
         .nav-link {
-          background: var(--background, white);
-          border: 1px solid var(--border, #ddd);
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-color);
+          color: var(--text-primary);
           padding: 8px 16px;
           border-radius: 4px;
           cursor: pointer;
@@ -700,40 +711,40 @@ function HelpTab() {
         }
 
         .nav-link:hover {
-          background: var(--primary-light, #e3f2fd);
-          border-color: var(--primary, #1976d2);
+          background: var(--toolbar-btn-hover);
+          border-color: var(--primary-color);
         }
 
         .nav-link.active {
-          background: var(--primary, #1976d2);
+          background: var(--primary-color);
           color: white;
-          border-color: var(--primary, #1976d2);
+          border-color: var(--primary-color);
         }
 
         .help-section {
           margin-bottom: 40px;
           padding: 20px;
-          border: 1px solid var(--border, #ddd);
+          border: 1px solid var(--border-color);
           border-radius: 8px;
-          background: var(--background, white);
+          background: var(--bg-elevated);
         }
 
         .help-section h2 {
-          color: var(--primary, #333);
+          color: var(--text-primary);
           margin-top: 0;
           margin-bottom: 20px;
           padding-bottom: 10px;
-          border-bottom: 1px solid var(--border, #ddd);
+          border-bottom: 1px solid var(--border-color);
         }
 
         .help-section h3 {
-          color: var(--primary, #333);
+          color: var(--text-primary);
           margin-top: 25px;
           margin-bottom: 15px;
         }
 
-        .help-section h4 {
-          color: var(--text-secondary, #555);
+        .help-section h4, .help-section h5 {
+          color: var(--text-secondary);
           margin-top: 20px;
           margin-bottom: 10px;
         }
@@ -752,7 +763,7 @@ function HelpTab() {
         }
 
         .help-section strong {
-          color: var(--primary, #333);
+          color: var(--text-primary);
         }
 
         .help-content div[id] {
@@ -767,8 +778,8 @@ function HelpTab() {
         }
 
         .help-highlight {
-          background-color: var(--primary-light, #e3f2fd) !important;
-          border: 2px solid var(--primary, #1976d2) !important;
+          background-color: var(--toolbar-btn-active-bg) !important;
+          border: 2px solid var(--primary-color) !important;
           animation: helpPulse 0.5s ease-in-out;
         }
 
