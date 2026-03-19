@@ -79,7 +79,7 @@ function LoadDialog({ open, headers, onConfirm, onCancel }) {
         minWidth: '380px',
         maxWidth: '480px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-        fontFamily: 'Rokkitt, sans-serif'
+        fontFamily: 'var(--app-font)'
       }}>
         <h3 style={{ margin: '0 0 6px', fontSize: '1.1rem' }}>Open Annotation CSV</h3>
         <p style={{ margin: '0 0 18px', fontSize: '0.85rem', color: 'var(--text-muted, #6b7280)' }}>
@@ -214,7 +214,7 @@ function MultiSelectBar({ selectedCount, availableClasses, selectedClipIndices, 
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
-        fontFamily: 'Rokkitt, sans-serif',
+        fontFamily: 'var(--app-font)',
       }}
     >
       <span style={{ fontSize: '0.82rem', color: 'rgba(139,92,246,1)', fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -801,7 +801,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
         const vs = JSON.parse(saved);
         currentColormap = vs.spectrogram_colormap || lightDefault;
       }
-    } catch {}
+    } catch { }
 
     // Only switch if currently at the opposite mode's default (don't override user's custom choice)
     if (currentColormap !== oppositeDefault) return;
@@ -811,7 +811,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       const saved = localStorage.getItem('visualization_settings');
       const vs = saved ? JSON.parse(saved) : {};
       localStorage.setItem('visualization_settings', JSON.stringify({ ...vs, spectrogram_colormap: targetColormap }));
-    } catch {}
+    } catch { }
 
     // Update settings state so ReviewSettings UI reflects the change
     setSettings(prev => ({ ...prev, spectrogram_colormap: targetColormap }));
@@ -2791,7 +2791,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
             width: 400,
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
-            fontFamily: 'Rokkitt, sans-serif',
+            fontFamily: 'var(--app-font)',
             marginLeft: `calc(${theme.spacing(8)} + 1px)`, // Account for navigation drawer
             [theme.breakpoints.up('sm')]: {
               marginLeft: `calc(${theme.spacing(8)} + 1px)`
@@ -2800,7 +2800,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
         })}
       >
         <div className="drawer-header">
-          <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
+          <h3 style={{ margin: 0, fontFamily: 'var(--app-font)', fontSize: '1.1rem', fontWeight: 600 }}>
             Load Annotation Task
           </h3>
           <IconButton
@@ -2924,12 +2924,12 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
             width: 500,
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
-            fontFamily: 'Rokkitt, sans-serif',
+            fontFamily: 'var(--app-font)',
           },
         }}
       >
         <div className="drawer-header">
-          <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
+          <h3 style={{ margin: 0, fontFamily: 'var(--app-font)', fontSize: '1.1rem', fontWeight: 600 }}>
             Review Settings
           </h3>
           <IconButton
@@ -2994,11 +2994,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
           borderRadius: '8px',
           boxShadow: 24,
           overflow: 'auto',
-          fontFamily: 'Rokkitt, sans-serif'
+          fontFamily: 'var(--app-font)'
         }}>
           <div className="shortcuts-help-modal">
             <div className="shortcuts-help-header">
-              <Typography id="shortcuts-help-title" variant="h6" component="h2" sx={{ fontFamily: 'Rokkitt, sans-serif', fontWeight: 600 }}>
+              <Typography id="shortcuts-help-title" variant="h6" component="h2" sx={{ fontFamily: 'var(--app-font)', fontWeight: 600 }}>
                 Keyboard Shortcuts
               </Typography>
               <IconButton
@@ -3202,12 +3202,12 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
             width: 400,
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
-            fontFamily: 'Rokkitt, sans-serif',
+            fontFamily: 'var(--app-font)',
           },
         }}
       >
         <div className="drawer-header">
-          <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
+          <h3 style={{ margin: 0, fontFamily: 'var(--app-font)', fontSize: '1.1rem', fontWeight: 600 }}>
             Filter Clips
           </h3>
           <IconButton
@@ -3528,12 +3528,12 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
             width: 450,
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
-            fontFamily: 'Rokkitt, sans-serif',
+            fontFamily: 'var(--app-font)',
           },
         }}
       >
         <div className="drawer-header">
-          <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
+          <h3 style={{ margin: 0, fontFamily: 'var(--app-font)', fontSize: '1.1rem', fontWeight: 600 }}>
             Classifier-Guided Listening
           </h3>
           <IconButton
@@ -4065,7 +4065,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                         padding: '8px 16px',
                         cursor: 'pointer',
                         fontSize: '0.9rem',
-                        fontFamily: 'Rokkitt, sans-serif',
+                        fontFamily: 'var(--app-font)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',

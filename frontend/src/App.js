@@ -19,7 +19,7 @@ import RuleIcon from '@mui/icons-material/Rule';
 import HelpIcon from '@mui/icons-material/Help';
 import ColorizeIcon from '@mui/icons-material/Colorize';
 import SettingsIcon from '@mui/icons-material/Settings';
-import ListAltIcon from '@mui/icons-material/ListAlt';
+import ListAltIcon from '@mui/icons-material/PlaylistPlay'
 import './App.css';
 import ExploreTab from './components/ExploreTab';
 import ReviewTab from './components/ReviewTab';
@@ -203,9 +203,9 @@ function App() {
         onMouseEnter={handleDrawerHover}
         onMouseLeave={handleDrawerLeave}
         sx={{
-          fontFamily: 'Rokkitt, sans-serif',
+          fontFamily: 'var(--app-font)',
           '& .MuiDrawer-paper': {
-            fontFamily: 'Rokkitt, sans-serif'
+            fontFamily: 'var(--app-font)'
           }
         }}
       >
@@ -292,7 +292,10 @@ function App() {
         flexGrow: 1,
         p: 3,
         marginLeft: isDrawerOpen ? 0 : 0, // Remove any margin conflicts
-        width: '100%' // Ensure full width
+        width: '100%', // Ensure full width
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh'
       }}>
         {/* Keep all tabs mounted to preserve state - only hide/show with CSS */}
         <div className="tab-content" style={{ display: activeTab === 'inference' ? 'block' : 'none' }}>
@@ -316,7 +319,7 @@ function App() {
           />
         </div>
 
-        <div style={{ display: activeTab === 'tasks' ? 'block' : 'none', padding: '24px' }}>
+        <div style={{ display: activeTab === 'tasks' ? 'flex' : 'none', flexDirection: 'column', flex: 1, padding: '24px', minHeight: 0 }}>
           <TaskMonitor taskManager={taskManager} />
         </div>
 

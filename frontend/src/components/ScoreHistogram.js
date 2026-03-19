@@ -182,7 +182,7 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
           overflow: 'auto'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', color: textColor }}>Score Histogram</h3>
+            <h3 style={{ margin: 0, fontFamily: 'var(--app-font)', color: textColor }}>Score Histogram</h3>
             <IconButton onClick={onClose}>
               <CloseIcon />
             </IconButton>
@@ -219,7 +219,7 @@ function ScoreHistogram({ open, onClose, clips, reviewMode, annotationColumn }) 
         overflow: 'auto'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3 style={{ margin: 0, fontFamily: 'Rokkitt, sans-serif', color: textColor }}>Score Histogram</h3>
+          <h3 style={{ margin: 0, fontFamily: 'var(--app-font)', color: textColor }}>Score Histogram</h3>
           <IconButton onClick={onClose}>
             <CloseIcon />
           </IconButton>

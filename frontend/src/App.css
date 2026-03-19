@@ -1,7 +1,8 @@
-/* Modern Bioacoustics GUI Theme with Rokkitt Font */
+/* Modern Bioacoustics GUI Theme with Inter Font */
 
 /* Color Palette */
 :root {
+  --app-font: 'Inter', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
   --light-bg: #ffffff;
   --dark: #395756;
   --dark-accent: #4f5d75;
@@ -69,9 +70,9 @@ body.dark-mode {
   --medium-gray: #8892a4;
   --border: #2e3348;
   --shadow: rgba(0, 0, 0, 0.3);
-  --yes: #6d9165;
-  --uncertain: #cda540;
-  --no: #904d4d;
+  --yes: #586e54;
+  --uncertain: #877448;
+  --no: #744848;
   --unlabeled: #3a3f55;
 
   --bg: #0f1117;
@@ -239,11 +240,11 @@ body.dark-mode .MuiTabs-indicator {
 
 body {
   margin: 0;
-  font-family: 'Rokkitt', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family: var(--app-font);
   background-color: var(--bg);
   color: var(--text-primary);
   line-height: 1.5;
-  font-size: 14px;
+  font-size: .85rem;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -251,7 +252,7 @@ body {
 *,
 *::before,
 *::after {
-  font-family: 'Rokkitt', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family: var(--app-font);
 }
 
 /* Override MUI component fonts to match app theme */
@@ -263,7 +264,7 @@ body {
 .MuiButton-root,
 .MuiTab-root,
 .MuiListItemText-root {
-  font-family: 'Rokkitt', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
+  font-family: var(--app-font) !important;
   font-size: 0.85rem !important;
 }
 
@@ -280,7 +281,17 @@ body {
 
 /* MUI Paper (dropdown menu) styling */
 .MuiPaper-root.MuiMenu-paper {
-  font-family: 'Rokkitt', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
+  font-family: var(--app-font) !important;
+}
+
+/* Force consistent app typography over legacy per-component font declarations */
+#root,
+#root *:not(.material-symbols-outlined):not(.material-icons):not(code):not(pre):not(kbd):not(.error-details):not(.time-info):not(.audio-time):not(.audio-time-new):not(.audio-time-compact),
+button,
+input,
+select,
+textarea {
+  font-family: var(--app-font) !important;
 }
 
 /* Make text elements more compact */
@@ -332,7 +343,7 @@ small {
   border-bottom: 3px solid transparent;
   transition: all 0.2s ease;
   position: relative;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .tab-button:hover {
@@ -907,7 +918,7 @@ small {
   color: var(--dark);
   font-size: 1.1rem;
   font-weight: 200;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 /* Messages */
@@ -982,7 +993,7 @@ select {
   border: 1px solid var(--border);
   border-radius: 4px;
   font-size: 0.85rem;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   background-color: var(--white);
   transition: all 0.2s ease;
 }
@@ -1013,7 +1024,7 @@ button {
   color: var(--dark);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 button:hover:not(:disabled) {
@@ -1930,7 +1941,7 @@ button:disabled {
   margin: 0 0 0.5rem 0;
   font-size: 0.95rem;
   color: var(--dark);
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-weight: 200;
 }
 
@@ -1950,7 +1961,7 @@ button:disabled {
   gap: 0.2rem;
   font-size: 0.8rem;
   font-weight: 200;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .spectrogram-settings select,
@@ -1962,7 +1973,7 @@ button:disabled {
   font-size: 0.8rem;
   width: 100%;
   box-sizing: border-box;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .defaults-button {
@@ -2006,7 +2017,7 @@ button:disabled {
   color: var(--dark);
   font-size: 1.3rem;
   font-weight: 200;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .settings-toggle-button {
@@ -2049,7 +2060,7 @@ button:disabled {
   font-weight: 200;
   color: var(--dark);
   margin-bottom: 0.4rem;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-size: 0.85rem;
 }
 
@@ -2065,7 +2076,7 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 4px;
   font-size: 0.8rem;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .select-folder-button {
@@ -2077,7 +2088,7 @@ button:disabled {
   cursor: pointer;
   font-size: 0.8rem;
   transition: background-color 0.2s ease;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .select-folder-button:hover {
@@ -2092,7 +2103,7 @@ button:disabled {
 .path-help-text small {
   font-size: 0.75rem;
   line-height: 1.3;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 /* Improved dB Range Slider Styling */
@@ -2176,7 +2187,7 @@ button:disabled {
   cursor: pointer;
   font-size: 0.8rem;
   transition: all 0.2s ease;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .pagination-button:hover:not(:disabled) {
@@ -2196,7 +2207,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .page-selector {
@@ -2209,7 +2220,7 @@ button:disabled {
   cursor: pointer;
   min-width: 50px;
   text-align: center;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .page-selector:focus {
@@ -3163,7 +3174,7 @@ button:disabled {
   color: var(--dark-accent);
   border-radius: 4px;
   cursor: pointer;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-size: 0.85rem;
   font-weight: 200;
   transition: all 0.2s ease;
@@ -3467,7 +3478,7 @@ button:disabled {
   background: transparent;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-size: 0.9rem;
   font-weight: 200;
   display: flex;
@@ -3510,7 +3521,7 @@ button:disabled {
   border-radius: 6px;
   background-color: transparent;
   cursor: pointer;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-weight: 200;
   transition: all 0.2s ease;
   min-width: 50px;
@@ -3555,7 +3566,7 @@ button:disabled {
   padding: 0.75rem;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-size: 0.85rem;
   background-color: var(--white);
   color: var(--dark);
@@ -3681,7 +3692,7 @@ button:disabled {
   color: var(--dark-accent);
   border-radius: 6px;
   cursor: pointer;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-size: 0.85rem;
   font-weight: 200;
   transition: all 0.2s ease;
@@ -3757,7 +3768,7 @@ button:disabled {
   border-radius: 6px;
   background-color: transparent;
   cursor: pointer;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-weight: 200;
   transition: all 0.2s ease;
   font-size: 0.85rem;
@@ -3928,7 +3939,7 @@ button:disabled {
   font-weight: 200;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .load-csv-button:hover:not(:disabled) {
@@ -4112,7 +4123,7 @@ button:disabled {
   padding: 0.5rem;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-size: 0.9rem;
   resize: vertical;
   min-height: 44px;
@@ -4127,7 +4138,7 @@ button:disabled {
 
 /* Keyboard Shortcuts Help Modal */
 .shortcuts-help-modal {
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .shortcuts-help-header {
@@ -4230,7 +4241,7 @@ button:disabled {
   height: 100vh;
   width: 100%;
   overflow: hidden;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .focus-main-area {
@@ -4513,7 +4524,7 @@ button:disabled {
   gap: 0.25rem;
   min-width: fit-content;
   white-space: nowrap;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .focus-binary-btn:hover {
@@ -4581,7 +4592,7 @@ button:disabled {
   padding: 0.5rem;
   border: 1px solid var(--border);
   border-radius: 6px;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-size: 0.85rem;
   resize: vertical;
   min-height: 60px;
@@ -4680,7 +4691,7 @@ button:disabled {
   color: var(--dark-accent);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   min-width: 36px;
   height: 36px;
 }
@@ -4763,7 +4774,7 @@ button:disabled {
   font-size: 0.85rem;
   font-weight: 200;
   color: var(--dark-accent);
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .bulk-annotation-buttons {
@@ -4775,7 +4786,7 @@ button:disabled {
   padding: 0.4rem 0.8rem;
   border-radius: 4px;
   cursor: pointer;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-size: 0.8rem;
   font-weight: 200;
   transition: all 0.2s ease;
@@ -4805,7 +4816,7 @@ button:disabled {
   color: var(--dark);
   font-size: 1rem;
   font-weight: 200;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
 }
 
 .tray-section p {
@@ -4841,7 +4852,7 @@ button:disabled {
   padding: 0.5rem;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-size: 0.85rem;
   background-color: var(--white);
   color: var(--dark);
@@ -4885,7 +4896,7 @@ button:disabled {
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 4px;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-size: 0.85rem;
   font-weight: 200;
   cursor: pointer;
@@ -5052,7 +5063,7 @@ button:disabled {
 
 .top-banner {
   background-color: #395756;
-  font-family: 'Rokkit', sans-serif;
+  font-family: var(--app-font);
 }
 
 /* Modal Dialog Styles */
@@ -5134,7 +5145,7 @@ button:disabled {
   padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
-  font-family: 'Rokkitt', sans-serif;
+  font-family: var(--app-font);
   font-size: 0.85rem;
   transition: background-color 0.2s ease;
 }
@@ -5283,13 +5294,22 @@ button:disabled {
 
 /* Task Monitor */
 .task-monitor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
 }
 
 .current-task,
-.queue-preview,
-.all-tasks {
+.queue-preview {
   margin-bottom: 24px;
+}
+
+.all-tasks {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .current-task h4,
@@ -5499,8 +5519,9 @@ button:disabled {
 }
 
 .task-list {
-  max-height: 400px;
+  flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
 /* Status Bar */
@@ -5768,6 +5789,10 @@ button:disabled {
   width: 16px;
   height: 16px;
   cursor: pointer;
+}
+
+.help-text {
+  font-size: .85rem;
 }
 
 .classifier-guided-panel .help-text {

@@ -192,7 +192,7 @@ function ClassifierGuidedPanel({
               </div>
             )}
           </div>
-          
+
           <div className="panel-section">
             <h4>Clip Sorting</h4>
             <div className="sort-options">
@@ -273,7 +273,7 @@ function ClassifierGuidedPanel({
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '0.9rem',
-                fontFamily: 'Rokkitt, sans-serif',
+                fontFamily: 'var(--app-font)',
                 fontWeight: 500
               }}
             >
@@ -309,7 +309,7 @@ function ClassifierGuidedPanel({
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '0.9rem',
-                fontFamily: 'Rokkitt, sans-serif',
+                fontFamily: 'var(--app-font)',
                 fontWeight: 500
               }}
             >
@@ -326,7 +326,7 @@ function ClassifierGuidedPanel({
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '0.9rem',
-                fontFamily: 'Rokkitt, sans-serif',
+                fontFamily: 'var(--app-font)',
                 fontWeight: 500
               }}
             >

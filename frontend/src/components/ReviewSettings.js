@@ -297,76 +297,76 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     <div className="review-settings-content">
       {/* Annotation Column (binary mode only) */}
       {settings.review_mode === 'binary' && (
-      <div className="settings-section">
-        <h4>Annotation Column</h4>
-        {csvColumns && csvColumns.length > 0 && (
-          <div className="input-group" style={{ marginTop: '15px' }}>
-            <label htmlFor="annotation_column">Column to use for binary annotations:</label>
-            <FormControl size="small" fullWidth sx={{ mt: 1 }}>
-              <Select
-                id="annotation_column"
-                value={settings.annotation_column || 'annotation'}
-                onChange={(e) => handleSettingChange('annotation_column', e.target.value)}
-              >
-                {csvColumns.map(col => (
-                  <MenuItem key={col} value={col}>{col}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <small className="help-text" style={{ display: 'block', marginTop: '5px' }}>
-              Select which CSV column contains the binary annotation values (yes/no/uncertain).
-            </small>
-            {onCreateColumn && (
-              <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                <input
-                  type="text"
-                  value={newColumnName}
-                  onChange={(e) => setNewColumnName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newColumnName.trim()) {
-                      onCreateColumn(newColumnName.trim());
-                      setNewColumnName('');
-                    }
-                  }}
-                  placeholder="New column name..."
-                  style={{
-                    flex: 1,
-                    padding: '6px 8px',
-                    fontSize: '0.85rem',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    background: 'var(--background)',
-                    color: 'var(--text)',
-                    fontFamily: 'inherit'
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    if (newColumnName.trim()) {
-                      onCreateColumn(newColumnName.trim());
-                      setNewColumnName('');
-                    }
-                  }}
-                  disabled={!newColumnName.trim()}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '0.85rem',
-                    backgroundColor: newColumnName.trim() ? 'var(--dark-accent)' : 'var(--border)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: newColumnName.trim() ? 'pointer' : 'not-allowed',
-                    fontFamily: 'inherit',
-                    whiteSpace: 'nowrap'
-                  }}
+        <div className="settings-section">
+          <h4>Annotation Column</h4>
+          {csvColumns && csvColumns.length > 0 && (
+            <div className="input-group" style={{ marginTop: '15px' }}>
+              <label htmlFor="annotation_column">Column to use for binary annotations:</label>
+              <FormControl size="small" fullWidth sx={{ mt: 1 }}>
+                <Select
+                  id="annotation_column"
+                  value={settings.annotation_column || 'annotation'}
+                  onChange={(e) => handleSettingChange('annotation_column', e.target.value)}
                 >
-                  + Add Column
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                  {csvColumns.map(col => (
+                    <MenuItem key={col} value={col}>{col}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <small className="help-text" style={{ display: 'block', marginTop: '5px' }}>
+                Select which CSV column contains the binary annotation values (yes/no/uncertain).
+              </small>
+              {onCreateColumn && (
+                <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                  <input
+                    type="text"
+                    value={newColumnName}
+                    onChange={(e) => setNewColumnName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newColumnName.trim()) {
+                        onCreateColumn(newColumnName.trim());
+                        setNewColumnName('');
+                      }
+                    }}
+                    placeholder="New column name..."
+                    style={{
+                      flex: 1,
+                      padding: '6px 8px',
+                      fontSize: '0.85rem',
+                      border: '1px solid var(--border)',
+                      borderRadius: '4px',
+                      background: 'var(--background)',
+                      color: 'var(--text)',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (newColumnName.trim()) {
+                        onCreateColumn(newColumnName.trim());
+                        setNewColumnName('');
+                      }
+                    }}
+                    disabled={!newColumnName.trim()}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '0.85rem',
+                      backgroundColor: newColumnName.trim() ? 'var(--dark-accent)' : 'var(--border)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: newColumnName.trim() ? 'pointer' : 'not-allowed',
+                      fontFamily: 'inherit',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    + Add Column
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Multi-class settings */}
@@ -404,7 +404,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
                   borderRadius: '6px',
                   cursor: 'pointer',
                   fontSize: '0.85rem',
-                  fontFamily: 'Rokkitt, sans-serif'
+                  fontFamily: 'var(--app-font)'
                 }}
               >
                 Change Visible Classes
@@ -424,7 +424,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
                   borderRadius: '6px',
                   cursor: 'pointer',
                   fontSize: '0.85rem',
-                  fontFamily: 'Rokkitt, sans-serif'
+                  fontFamily: 'var(--app-font)'
                 }}
               >
                 Change Classes + Subset Labels
@@ -828,7 +828,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '0.85rem',
-                fontFamily: 'Rokkitt, sans-serif'
+                fontFamily: 'var(--app-font)'
               }}
             >
               💾 Save Config
@@ -845,7 +845,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '0.85rem',
-                fontFamily: 'Rokkitt, sans-serif'
+                fontFamily: 'var(--app-font)'
               }}
             >
               📂 Load Config

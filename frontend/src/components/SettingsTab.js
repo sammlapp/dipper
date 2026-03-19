@@ -124,6 +124,11 @@ function SettingsTab() {
               helperText="Number of inference/training/extraction tasks that can run at the same time (1-64)"
               fullWidth
               variant="outlined"
+              sx={{
+                '& .MuiFormHelperText-root': {
+                  color: 'var(--text-secondary)'
+                }
+              }}
             />
           </Box>
 

@@ -50,7 +50,7 @@ function SpectrogramContextMenu({ x, y, onClose, filePath, audioRootPath, audioB
     boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
     padding: '4px 0',
     minWidth: '210px',
-    fontFamily: 'Rokkitt, sans-serif',
+    fontFamily: 'var(--app-font)',
     fontSize: '0.88rem',
   };
 
