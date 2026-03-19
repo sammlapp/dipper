@@ -38,10 +38,20 @@ from scripts import clip_extraction
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Google Drive file IDs for PyTorch environment (OS-specific)
-MACOS_PYTORCH_ENV_FILE_ID = "1rsJjnCWjkiMDPimwg11QKsI-tOS7To8O"
-LINUX_PYTORCH_ENV_FILE_ID = "1pBt5wTYRCi5U4PjflJEdCS5VDgEZwVMJ"
-WINDOWS_PYTORCH_ENV_FILE_ID = "PLACEHOLDER"  # TODO: Add Windows environment file ID
+# GitHub repository for ML environment releases (owner/repo)
+GITHUB_REPO = "sammlapp/dipper"
+
+# Hugging Face dataset repo for large environments that exceed GitHub's 2GB asset limit
+HF_REPO = "sammlapp/dipper-envs"
+
+# Per-platform download config.
+# source "github": fetched from the latest conda-env-* GitHub release asset
+# source "hf":     fetched directly from Hugging Face (no size limit)
+PYTORCH_ENV_ASSET = {
+    "Darwin":  {"source": "github", "name": "dipper_pytorch_env-macos-arm64.tar.gz"},
+    "Windows": {"source": "github", "name": "dipper_pytorch_env-windows-x64.tar.gz"},
+    "Linux":   {"source": "hf",     "name": "dipper_pytorch_env-linux-x64.tar.gz"},
+}
 
 
 def is_process_alive(pid):
@@ -239,49 +249,99 @@ def get_default_env_cache_dir():
     return platformdirs.user_cache_dir("Dipper", "BioacousticsApp")
 
 
-def download_environment_from_gdrive():
-    """Download PyTorch environment from Google Drive to cache directory"""
+def _download_url_to_file(url, archive_path):
+    """Download a URL to archive_path atomically via a .part temp file."""
+    import urllib.request
+
+    tmp_path = archive_path + ".part"
+
+    def _report(block_count, block_size, total_size):
+        if total_size > 0 and block_count % 500 == 0:
+            downloaded = block_count * block_size
+            pct = min(100, downloaded * 100 // total_size)
+            logger.info(
+                f"  Download progress: {pct}% ({downloaded // (1024*1024)} MB / {total_size // (1024*1024)} MB)"
+            )
+
     try:
-        import gdown
-
-        # Detect operating system and select appropriate file ID
-        system = platform.system()
-        if system == "Darwin":  # macOS
-            file_id = MACOS_PYTORCH_ENV_FILE_ID
-            os_name = "macOS"
-        elif system == "Linux":
-            file_id = LINUX_PYTORCH_ENV_FILE_ID
-            os_name = "Linux"
-        elif system == "Windows":
-            file_id = WINDOWS_PYTORCH_ENV_FILE_ID
-            os_name = "Windows"
-        else:
-            error_msg = f"Unsupported operating system: {system}"
-            logger.error(error_msg)
-            return {"status": "error", "error": error_msg}
-
-        # Check if file ID is placeholder
-        if file_id == "PLACEHOLDER":
-            error_msg = f"PyTorch environment download not yet available for {os_name}. Please use a custom Python environment or contact support."
-            logger.error(error_msg)
-            return {"status": "error", "error": error_msg}
-
-        archive_path = get_default_env_archive_path()
-        logger.info(
-            f"Downloading PyTorch environment for {os_name} to {archive_path}..."
-        )
-        os.makedirs(os.path.dirname(archive_path), exist_ok=True)
-
-        # Download using gdown with file ID
-        url = f"https://drive.google.com/uc?id={file_id}"
-        gdown.download(url, archive_path, quiet=False)
-
-        logger.info(f"Download complete: {archive_path}")
-        return {"status": "success", "archive_path": archive_path}
-
+        req = urllib.request.Request(url, headers={"User-Agent": "Dipper-App"})
+        urllib.request.urlretrieve(req.full_url, tmp_path, reporthook=_report)
+        os.replace(tmp_path, archive_path)
     except Exception as e:
-        logger.error(f"Error downloading environment: {e}")
-        return {"status": "error", "error": str(e)}
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
+
+
+def download_environment():
+    """Download the PyTorch environment archive for this platform.
+
+    Routing:
+      macOS / Windows → latest conda-env-* GitHub release asset
+      Linux           → Hugging Face dataset repo (no 2GB size limit)
+    """
+    import json as _json
+    import urllib.request
+
+    system = platform.system()
+    platform_config = PYTORCH_ENV_ASSET.get(system)
+    if platform_config is None:
+        msg = f"Unsupported operating system: {system}"
+        logger.error(msg)
+        return {"status": "error", "error": msg}
+
+    asset_name = platform_config["name"]
+    source = platform_config["source"]
+    archive_path = get_default_env_archive_path()
+    os.makedirs(os.path.dirname(archive_path), exist_ok=True)
+
+    if source == "hf":
+        # Direct download from Hugging Face — URL is stable and predictable
+        url = f"https://huggingface.co/datasets/{HF_REPO}/resolve/main/{asset_name}"
+        logger.info(f"Downloading {asset_name} from Hugging Face to {archive_path}...")
+        try:
+            _download_url_to_file(url, archive_path)
+        except Exception as e:
+            return {"status": "error", "error": f"Hugging Face download failed: {e}"}
+
+    elif source == "github":
+        # Discover the latest conda-env-* release via GitHub API
+        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
+        logger.info(f"Fetching releases list from {api_url}")
+        try:
+            req = urllib.request.Request(api_url, headers={"User-Agent": "Dipper-App"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                releases = _json.loads(resp.read().decode())
+        except Exception as e:
+            return {"status": "error", "error": f"Failed to fetch GitHub releases: {e}"}
+
+        env_releases = [r for r in releases if r.get("tag_name", "").startswith("conda-env-")]
+        if not env_releases:
+            return {"status": "error", "error": "No conda-env releases found on GitHub."}
+        latest = env_releases[0]  # newest-first
+
+        asset_url = next(
+            (a["browser_download_url"] for a in latest.get("assets", []) if a["name"] == asset_name),
+            None,
+        )
+        if asset_url is None:
+            available = [a["name"] for a in latest.get("assets", [])]
+            return {
+                "status": "error",
+                "error": f"Asset '{asset_name}' not found in release '{latest['tag_name']}'. Available: {available}",
+            }
+
+        logger.info(f"Downloading {asset_name} from {latest['tag_name']} to {archive_path}...")
+        try:
+            _download_url_to_file(asset_url, archive_path)
+        except Exception as e:
+            return {"status": "error", "error": f"GitHub download failed: {e}"}
+
+    else:
+        return {"status": "error", "error": f"Unknown download source '{source}'"}
+
+    logger.info(f"Download complete: {archive_path}")
+    return {"status": "success", "archive_path": archive_path}
 
 
 def check_environment(env_path):
@@ -412,9 +472,9 @@ def setup_environment(env_dir=None):
         if os.path.exists(archive_path):
             logger.info(f"Using cached archive: {archive_path}")
         else:
-            # Download from Google Drive
-            logger.info("Archive not found in cache, downloading from Google Drive...")
-            download_result = download_environment_from_gdrive()
+            # Download from GitHub releases or Hugging Face depending on platform
+            logger.info("Archive not found in cache, downloading...")
+            download_result = download_environment()
 
             if download_result["status"] == "success":
                 logger.info(f"Downloaded archive to: {archive_path}")
@@ -1520,7 +1580,9 @@ class LightweightServer:
                         except:
                             return []
                     else:
-                        return [label.strip() for label in x.split(",") if label.strip()]
+                        return [
+                            label.strip() for label in x.split(",") if label.strip()
+                        ]
                 return []
 
             if mode == "binary":
@@ -1528,13 +1590,22 @@ class LightweightServer:
                 col = annotation_column or "annotation"
                 if col not in df.columns:
                     df[col] = ""
-                df[col] = df[col].fillna("").astype(str).str.strip().str.lower().replace("nan", "")
+                df[col] = (
+                    df[col]
+                    .fillna("")
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                    .replace("nan", "")
+                )
 
                 standard_cols = ["file", "start_time"]
                 if "end_time" in df.columns:
                     standard_cols.append("end_time")
                 standard_cols.extend([col, "comments"])
-                extra_cols = [c for c in df.columns if c not in standard_cols and c != "id"]
+                extra_cols = [
+                    c for c in df.columns if c not in standard_cols and c != "id"
+                ]
                 df = df[standard_cols + extra_cols + ["id"]]
 
             elif mode == "multiclass":
@@ -1554,13 +1625,17 @@ class LightweightServer:
                 if "annotation_status" not in df.columns:
                     df["annotation_status"] = "unreviewed"
                 else:
-                    df["annotation_status"] = df["annotation_status"].fillna("unreviewed")
+                    df["annotation_status"] = df["annotation_status"].fillna(
+                        "unreviewed"
+                    )
 
                 standard_cols = ["file", "start_time"]
                 if "end_time" in df.columns:
                     standard_cols.append("end_time")
                 standard_cols.extend(["labels", "annotation_status", "comments"])
-                extra_cols = [c for c in df.columns if c not in standard_cols and c != "id"]
+                extra_cols = [
+                    c for c in df.columns if c not in standard_cols and c != "id"
+                ]
                 df = df[standard_cols + extra_cols + ["id"]]
 
                 df["labels"] = df["labels"].apply(
@@ -1583,7 +1658,11 @@ class LightweightServer:
                 if "end_time" in df.columns:
                     standard_cols.append("end_time")
                 standard_cols.extend(["labels", "annotation_status", "comments"])
-                extra_cols = [c for c in df.columns if c not in standard_cols and c not in classes and c != "id"]
+                extra_cols = [
+                    c
+                    for c in df.columns
+                    if c not in standard_cols and c not in classes and c != "id"
+                ]
                 df = df[standard_cols + extra_cols + ["id"]]
 
             # Convert to JSON

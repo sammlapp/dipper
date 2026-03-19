@@ -232,7 +232,7 @@ jobs:
             artifacts/dipper-full-*/*.dmg
             artifacts/dipper-full-*/*.exe
             artifacts/dipper-full-*/*.AppImage
-          draft: true
+          draft: false
           prerelease: contains(github.ref, 'alpha') || contains(github.ref, 'beta')
           body: |
             ## Dipper Full App Release

@@ -228,7 +228,7 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.exe
             artifacts/**/*.AppImage
-          draft: true
+          draft: false
           prerelease: contains(github.ref, 'alpha') || contains(github.ref, 'beta')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

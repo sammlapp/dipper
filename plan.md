@@ -13,6 +13,8 @@ take a close look at this codebase, especially documentation markdowns such as r
 
 # Incomplete items / TODO /feature request
 
+Linux ML environment is 5Gb and GitHub blocks its addition to a release!
+
 - support  stereo audio
 
 - when pasting a path to navigate to in server mode file browser and hitting Enter/Return: if its a file path instead of a folder, navigate to the folder and activate that file as the 'selected' file

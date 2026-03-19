@@ -72,6 +72,27 @@ jobs:
           path: environments/${{ matrix.asset_name }}
           retention-days: 90
 
+      - name: Upload Linux env to Hugging Face
+        if: matrix.platform == 'linux-x64'
+        shell: bash -el {0}
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          pip install huggingface_hub
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi()
+          api.upload_file(
+              path_or_fileobj="environments/dipper_pytorch_env-linux-x64.tar.gz",
+              path_in_repo="dipper_pytorch_env-linux-x64.tar.gz",
+              repo_id="sammlapp/dipper-envs",
+              repo_type="dataset",
+              token=os.environ["HF_TOKEN"],
+          )
+          print("Upload to Hugging Face complete")
+          EOF
+
   create-release:
     name: Create Conda Environment Release
     needs: build-conda-pack
@@ -108,7 +129,10 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: "ML Environment - ${{ steps.tag.outputs.tag }}"
-          files: artifacts/**/*.tar.gz
+          # Linux is hosted on Hugging Face (>2GB), only include macOS + Windows here
+          files: |
+            artifacts/conda-env-macos-arm64/*.tar.gz
+            artifacts/conda-env-windows-x64/*.tar.gz
           draft: false
           prerelease: false
           make_latest: false
@@ -118,23 +142,23 @@ jobs:
             Pre-built conda-pack environments for running ML tasks in Dipper.
             The app downloads the appropriate file automatically on first use.
 
-            ### Asset naming
-            | File | Platform |
-            |------|----------|
-            | `dipper_pytorch_env-macos-arm64.tar.gz` | macOS Apple Silicon |
-            | `dipper_pytorch_env-windows-x64.tar.gz` | Windows x64 |
-            | `dipper_pytorch_env-linux-x64.tar.gz` | Linux x64 |
+            ### Downloads
+            | Platform | Location |
+            |----------|----------|
+            | macOS Apple Silicon | GitHub release asset below |
+            | Windows x64 | GitHub release asset below |
+            | Linux x64 | [Hugging Face](https://huggingface.co/datasets/sammlapp/dipper-envs) (CUDA-enabled, ~5GB) |
 
             ### Manual installation
             Download the archive for your platform and place it at:
-            - **macOS/Linux:** `~/Library/Caches/Dipper/archives/dipper_pytorch_env.tar.gz`
+            - **macOS:** `~/Library/Caches/Dipper/archives/dipper_pytorch_env.tar.gz`
             - **Windows:** `%LOCALAPPDATA%\BioacousticsApp\Dipper\Cache\archives\dipper_pytorch_env.tar.gz`
+            - **Linux:** `~/.cache/Dipper/archives/dipper_pytorch_env.tar.gz`
 
             Then launch Dipper and run any ML task — it will extract automatically.
 
             ### Contents
-            - Python 3.11, PyTorch, OpenSoundscape, Bioacoustics Model Zoo
-            - All training and inference dependencies
+            - Python 3.11, PyTorch (CUDA on Linux), OpenSoundscape, Bioacoustics Model Zoo
 
             Built: ${{ steps.tag.outputs.tag }}
         env:

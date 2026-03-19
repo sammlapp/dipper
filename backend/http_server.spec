@@ -37,7 +37,6 @@ a = Analysis(
         'PIL',
         'scipy.signal',
         'matplotlib.pyplot',
-        'gdown',
         # Add script modules as hidden imports
         'scan_folder',
         'get_sample_detections',
