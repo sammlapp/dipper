@@ -2,6 +2,11 @@ name: Build Conda-Pack Environment
 
 on:
   workflow_dispatch:
+    inputs:
+      tag_suffix:
+        description: 'Optional tag suffix (e.g. "rc1"). Leave blank to use timestamp.'
+        required: false
+        default: ''
 
 jobs:
   build-conda-pack:
@@ -14,12 +19,15 @@ jobs:
           - platform: macos-arm64
             os: macos-latest
             artifact_name: conda-env-macos-arm64
-          - platform: windows
+            asset_name: dipper_pytorch_env-macos-arm64.tar.gz
+          - platform: windows-x64
             os: windows-latest
             artifact_name: conda-env-windows-x64
-          - platform: linux
+            asset_name: dipper_pytorch_env-windows-x64.tar.gz
+          - platform: linux-x64
             os: ubuntu-latest
             artifact_name: conda-env-linux-x64
+            asset_name: dipper_pytorch_env-linux-x64.tar.gz
 
     steps:
       - name: Checkout code
@@ -51,21 +59,27 @@ jobs:
             exit 1
           fi
 
+      - name: Rename archive with platform suffix
+        shell: bash
+        run: |
+          mv environments/dipper_pytorch_env.tar.gz environments/${{ matrix.asset_name }}
+          ls -lh environments/${{ matrix.asset_name }}
+
       - name: Upload conda-pack artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: |
-            environments/dipper_pytorch_env.tar.gz
-            environments/extract_and_test_env.sh
-            environments/test_environment.py
-          retention-days: 90  # Keep for 90 days since these are manually built
+          path: environments/${{ matrix.asset_name }}
+          retention-days: 90
 
   create-release:
     name: Create Conda Environment Release
     needs: build-conda-pack
     runs-on: ubuntu-latest
-    if: always()  # Run even if some platforms failed
+    # Only run if at least one build succeeded
+    if: always() && contains(needs.build-conda-pack.result, 'success')
+    permissions:
+      contents: write
 
     steps:
       - name: Download all artifacts
@@ -76,45 +90,52 @@ jobs:
       - name: Display artifact structure
         run: |
           echo "Downloaded artifacts:"
-          ls -R artifacts/
+          find artifacts/ -type f
 
-      - name: Create timestamp for release
-        id: timestamp
-        run: echo "date=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+      - name: Create release tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag_suffix }}" ]; then
+            TAG="conda-env-$(date +'%Y%m%d')-${{ github.event.inputs.tag_suffix }}"
+          else
+            TAG="conda-env-$(date +'%Y%m%d-%H%M%S')"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Release tag: ${TAG}"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: conda-env-${{ steps.timestamp.outputs.date }}
-          name: "ML Environment Build - ${{ steps.timestamp.outputs.date }}"
-          files: |
-            artifacts/**/*.tar.gz
-            artifacts/**/*.sh
-            artifacts/**/*.py
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "ML Environment - ${{ steps.tag.outputs.tag }}"
+          files: artifacts/**/*.tar.gz
           draft: false
           prerelease: false
+          make_latest: false
           body: |
-            ## Conda-Pack ML Environment
+            ## Dipper ML Environment (conda-pack)
 
-            This release contains pre-built ML environments for Dipper.
+            Pre-built conda-pack environments for running ML tasks in Dipper.
+            The app downloads the appropriate file automatically on first use.
 
-            ### Platforms Included
-            Check the assets below for your platform:
-            - `conda-env-macos-arm64` - macOS Apple Silicon
-            - `conda-env-windows-x64` - Windows
-            - `conda-env-linux-x64` - Linux
+            ### Asset naming
+            | File | Platform |
+            |------|----------|
+            | `dipper_pytorch_env-macos-arm64.tar.gz` | macOS Apple Silicon |
+            | `dipper_pytorch_env-windows-x64.tar.gz` | Windows x64 |
+            | `dipper_pytorch_env-linux-x64.tar.gz` | Linux x64 |
 
-            ### Installation
-            1. Download the `dipper_pytorch_env.tar.gz` for your platform
-            2. Extract using the provided `extract_and_test_env.sh` script
-            3. Test using the provided `test_environment.py` script
+            ### Manual installation
+            Download the archive for your platform and place it at:
+            - **macOS/Linux:** `~/Library/Caches/Dipper/archives/dipper_pytorch_env.tar.gz`
+            - **Windows:** `%LOCALAPPDATA%\BioacousticsApp\Dipper\Cache\archives\dipper_pytorch_env.tar.gz`
+
+            Then launch Dipper and run any ML task — it will extract automatically.
 
             ### Contents
-            - PyTorch + dependencies
-            - OpenSoundscape
-            - Bioacoustics model zoo
-            - All ML training dependencies
+            - Python 3.11, PyTorch, OpenSoundscape, Bioacoustics Model Zoo
+            - All training and inference dependencies
 
-            Built on: ${{ steps.timestamp.outputs.date }}
+            Built: ${{ steps.tag.outputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
