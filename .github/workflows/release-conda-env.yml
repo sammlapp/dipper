@@ -1,0 +1,139 @@
+name: Release Conda-Pack Environment
+
+# Use this when build-conda-env.yml succeeded but the release/upload step failed,
+# or when you want to re-release artifacts from a previous build run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Run ID of the build-conda-env.yml workflow that produced the artifacts'
+        required: true
+      tag_suffix:
+        description: 'Optional tag suffix (e.g. "rc1"). Leave blank to use timestamp.'
+        required: false
+        default: ''
+      upload_linux_hf:
+        description: 'Upload Linux artifact to Hugging Face?'
+        type: boolean
+        default: true
+      create_github_release:
+        description: 'Create GitHub release for macOS + Windows?'
+        type: boolean
+        default: true
+
+jobs:
+  release:
+    name: Release Conda Environment Artifacts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: conda-env-macos-arm64
+          run-id: ${{ github.event.inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifacts/conda-env-macos-arm64/
+        continue-on-error: true
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: conda-env-windows-x64
+          run-id: ${{ github.event.inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifacts/conda-env-windows-x64/
+        continue-on-error: true
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: conda-env-linux-x64
+          run-id: ${{ github.event.inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifacts/conda-env-linux-x64/
+        continue-on-error: true
+
+      - name: Show downloaded artifacts
+        run: find artifacts/ -type f | sort
+
+      - name: Upload Linux env to Hugging Face
+        if: github.event.inputs.upload_linux_hf == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          pip install huggingface_hub
+          python - <<'EOF'
+          import os, sys
+          from huggingface_hub import HfApi
+
+          src = "artifacts/conda-env-linux-x64/dipper_pytorch_env-linux-x64.tar.gz"
+          if not os.path.exists(src):
+              print(f"[ERROR] Linux artifact not found at {src}")
+              sys.exit(1)
+
+          api = HfApi()
+          api.upload_file(
+              path_or_fileobj=src,
+              path_in_repo="dipper_pytorch_env-linux-x64.tar.gz",
+              repo_id="sammlapp/dipper-envs",
+              repo_type="dataset",
+              token=os.environ["HF_TOKEN"],
+          )
+          print("Upload to Hugging Face complete")
+          EOF
+
+      - name: Create release tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag_suffix }}" ]; then
+            TAG="conda-env-$(date +'%Y%m%d')-${{ github.event.inputs.tag_suffix }}"
+          else
+            TAG="conda-env-$(date +'%Y%m%d-%H%M%S')"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Release tag: ${TAG}"
+
+      - name: Create GitHub Release
+        if: github.event.inputs.create_github_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "ML Environment - ${{ steps.tag.outputs.tag }}"
+          files: |
+            artifacts/conda-env-macos-arm64/*.tar.gz
+            artifacts/conda-env-windows-x64/*.tar.gz
+          draft: false
+          prerelease: false
+          make_latest: false
+          body: |
+            ## Dipper ML Environment (conda-pack)
+
+            Pre-built conda-pack environments for running ML tasks in Dipper.
+            The app downloads the appropriate file automatically on first use.
+
+            ### Downloads
+            | Platform | Location |
+            |----------|----------|
+            | macOS Apple Silicon | GitHub release asset below |
+            | Windows x64 | GitHub release asset below |
+            | Linux x64 | [Hugging Face](https://huggingface.co/datasets/sammlapp/dipper-envs) (CUDA-enabled, ~5GB) |
+
+            ### Manual installation
+            Download the archive for your platform and place it at:
+            - **macOS:** `~/Library/Caches/Dipper/archives/dipper_pytorch_env.tar.gz`
+            - **Windows:** `%LOCALAPPDATA%\BioacousticsApp\Dipper\Cache\archives\dipper_pytorch_env.tar.gz`
+            - **Linux:** `~/.cache/Dipper/archives/dipper_pytorch_env.tar.gz`
+
+            Then launch Dipper and run any ML task — it will extract automatically.
+
+            ### Contents
+            - Python 3.11, PyTorch (CUDA on Linux), OpenSoundscape, Bioacoustics Model Zoo
+
+            Built from run: ${{ github.event.inputs.run_id }}
+            Released: ${{ steps.tag.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
