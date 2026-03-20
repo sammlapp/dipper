@@ -13,6 +13,9 @@ dependencies:
     - pyyaml>=6.0
     - h5py>=3.0.0
     - psutil>=5.8.0
+    # v82 removed pkg_resources required by tf
+    # see https://github.com/pypa/setuptools/issues/5174
+    - setuptools<82.0.0 
 
     # HTTP and networking
     - aiohttp>=3.8.0
@@ -24,7 +27,7 @@ dependencies:
     
     # optional BMZ dependencies for extended model support
     - timm>=1.0.0 # for HawkEars
-    - torchaudio # for HawkEars
+    - torchaudio # for HawkEarsc
     - ai-edge-litert # for BirdNET (.tflite)
     - transformers # for BirdSET
     - tensorflow>=2.20.0 # for Perch and Perch v2
