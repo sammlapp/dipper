@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { styled, useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
+import Slide from '@mui/material/Slide';
 import MuiDrawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -105,6 +108,38 @@ function App() {
   const [taskHistory, setTaskHistory] = useState([]);
   const backendUrl = useBackendUrl();
 
+  // ML environment state
+  // envStatus: 'unknown' | 'ready' | 'missing' | 'installing'
+  const [envStatus, setEnvStatus] = useState('unknown');
+  const [envInstallState, setEnvInstallState] = useState(null); // {stage, message, error}
+  const [showEnvDialog, setShowEnvDialog] = useState(false);
+  const envPollRef = React.useRef(null);
+
+  // Toast notifications
+  const [toasts, setToasts] = useState([]); // [{id, message, severity, open}]
+  const taskStatusesRef = useRef({}); // taskId -> last known status
+  const toastTimersRef = useRef({}); // taskId -> pending setTimeout id
+
+  const showToast = (message, severity) => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, message, severity, open: true }]);
+  };
+
+  const closeToast = (id) => {
+    setToasts(prev => prev.map(t => t.id === id ? { ...t, open: false } : t));
+  };
+
+  // Queue a debounced toast for a task — cancels any pending toast for the same task
+  const queueToast = (taskId, message, severity) => {
+    if (toastTimersRef.current[taskId]) {
+      clearTimeout(toastTimersRef.current[taskId]);
+    }
+    toastTimersRef.current[taskId] = setTimeout(() => {
+      delete toastTimersRef.current[taskId];
+      showToast(message, severity);
+    }, 80);
+  };
+
   const tabs = [
     { id: 'inference', name: 'Inference', icon: <PlayArrowIcon /> },
     { id: 'training', name: 'Training', icon: <SchoolIcon /> },
@@ -138,7 +173,7 @@ function App() {
 
   // Set up task manager listeners
   useEffect(() => {
-    const unsubscribe = taskManager.addListener(() => {
+    const unsubscribe = taskManager.addListener((event, data) => {
       // Always update task history first
       setTaskHistory(taskManager.getAllTasks());
 
@@ -146,6 +181,22 @@ function App() {
       const queueInfo = taskManager.getQueueInfo();
       setRunningTasks(queueInfo.runningTasks || []);
       setCurrentTask(queueInfo.currentTask);
+
+      // Toast notifications on status transitions (skip created/queued — only meaningful transitions)
+      if (event === 'taskCreated' && data) {
+        taskStatusesRef.current[data.id] = data.status;
+      } else if (event === 'taskUpdated' && data) {
+        const prevStatus = taskStatusesRef.current[data.id];
+        const newStatus = data.status;
+        if (prevStatus !== newStatus) {
+          taskStatusesRef.current[data.id] = newStatus;
+          const label = `${data.name} (${data.type})`;
+          if (newStatus === 'running') queueToast(data.id, `${label} started`, 'info');
+          else if (newStatus === 'completed') queueToast(data.id, `${label} completed`, 'success');
+          else if (newStatus === 'failed') queueToast(data.id, `${label} failed`, 'error');
+          else if (newStatus === 'cancelled') queueToast(data.id, `${label} canceled`, 'warning');
+        }
+      }
     });
 
     // Handle tab change events from help icons
@@ -156,7 +207,10 @@ function App() {
     };
 
     // Initial load
-    setTaskHistory(taskManager.getAllTasks());
+    const allTasks = taskManager.getAllTasks();
+    setTaskHistory(allTasks);
+    // Seed taskStatusesRef so existing tasks don't fire spurious toasts on mount
+    allTasks.forEach(t => { taskStatusesRef.current[t.id] = t.status; });
     const queueInfo = taskManager.getQueueInfo();
     setRunningTasks(queueInfo.runningTasks || []);
     setCurrentTask(queueInfo.currentTask);
@@ -167,8 +221,53 @@ function App() {
     return () => {
       unsubscribe();
       window.removeEventListener('changeTab', handleTabChange);
+      // Clear any pending toast timers
+      Object.values(toastTimersRef.current).forEach(clearTimeout);
+      toastTimersRef.current = {};
+      // Reset status tracking so re-mount doesn't fire stale toasts
+      taskStatusesRef.current = {};
     };
   }, []);
+
+  // ML environment: check on launch, then show dialog if missing
+  useEffect(() => {
+    if (isReviewOnly || !backendUrl) return;
+    fetch(`${backendUrl}/env/check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ env_path: null }) })
+      .then(r => r.json())
+      .then(result => {
+        if (result.status === 'ready') {
+          setEnvStatus('ready');
+        } else {
+          setEnvStatus('missing');
+          setShowEnvDialog(true);
+        }
+      })
+      .catch(() => {}); // backend not yet up — silently ignore
+  }, [backendUrl, isReviewOnly]);
+
+  const startEnvInstall = () => {
+    setShowEnvDialog(false);
+    setEnvStatus('installing');
+    setEnvInstallState({ stage: 'downloading', message: 'Starting download...', error: null });
+    fetch(`${backendUrl}/env/install`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .catch(() => {});
+    // Poll for status
+    envPollRef.current = setInterval(() => {
+      fetch(`${backendUrl}/env/install/status`)
+        .then(r => r.json())
+        .then(state => {
+          setEnvInstallState(state);
+          if (state.stage === 'ready') {
+            setEnvStatus('ready');
+            clearInterval(envPollRef.current);
+          } else if (state.stage === 'error') {
+            setEnvStatus('missing');
+            clearInterval(envPollRef.current);
+          }
+        })
+        .catch(() => {});
+    }, 2000);
+  };
 
   // Task handlers
   const handleTaskCreate = (taskConfig, taskName) => {
@@ -297,6 +396,30 @@ function App() {
         flexDirection: 'column',
         minHeight: '100vh'
       }}>
+        {/* ML environment install dialog */}
+        {showEnvDialog && (
+          <div className="env-dialog-overlay">
+            <div className="env-dialog">
+              <h3>ML Environment Not Installed</h3>
+              <p>
+                The ML backend (conda-pack environment) is required for inference, training, and extraction.
+                It will be downloaded and installed automatically (~700 MB on macOS/Windows, ~5 GB on Linux).
+              </p>
+              <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+                You can also install it later by running any ML task, or skip and use the Review / Explore tabs now.
+              </p>
+              <div className="env-dialog-actions">
+                <button className="env-dialog-btn primary" onClick={startEnvInstall}>
+                  Download &amp; Install Now
+                </button>
+                <button className="env-dialog-btn secondary" onClick={() => setShowEnvDialog(false)}>
+                  Skip for Now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Keep all tabs mounted to preserve state - only hide/show with CSS */}
         <div className="tab-content" style={{ display: activeTab === 'inference' ? 'block' : 'none' }}>
           <TaskCreationForm
@@ -351,7 +474,15 @@ function App() {
             duration: theme.transitions.duration.leavingScreen,
           })
         }}>
-          {runningTasks.length > 0 ? (
+          {envStatus === 'installing' ? (
+            <div className="status-running status-env-install">
+              <span className="status-icon">{envInstallState?.stage === 'extracting' ? '📦' : '⬇️'}</span>
+              <span>{envInstallState?.message || 'Installing ML environment...'}</span>
+              {envInstallState?.error && (
+                <span className="status-env-error"> — Error: {envInstallState.error}</span>
+              )}
+            </div>
+          ) : runningTasks.length > 0 ? (
             <div className="status-running" onClick={() => setActiveTab('tasks')} style={{ cursor: 'pointer' }}>
               <span className="status-icon">🔄</span>
               {runningTasks.length === 1 ? (
@@ -360,10 +491,13 @@ function App() {
                   <span className="status-progress">{runningTasks[0].progress}</span>
                 </>
               ) : (
-                <>
-                  <span>Running {runningTasks.length} tasks: {runningTasks.map(t => t.name).join(', ').substring(0, 80)}...</span>
-                </>
+                <span>Running {runningTasks.length} tasks: {runningTasks.map(t => t.name).join(', ').substring(0, 80)}...</span>
               )}
+            </div>
+          ) : envStatus === 'missing' ? (
+            <div className="status-running" style={{ cursor: 'pointer' }} onClick={() => setShowEnvDialog(true)}>
+              <span className="status-icon">⚠️</span>
+              <span>ML environment not installed — click to install</span>
             </div>
           ) : (
             <div className="status-idle" onClick={() => setActiveTab('tasks')} style={{ cursor: 'pointer' }}>
@@ -381,6 +515,33 @@ function App() {
           )}
         </div>
       </Box>
+
+      {/* Toast notifications */}
+      {toasts.map((toast, index) => (
+        <Snackbar
+          key={toast.id}
+          open={toast.open}
+          autoHideDuration={4000}
+          onClose={() => closeToast(toast.id)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          style={{ top: 16 + index * 56 }}
+          TransitionComponent={(props) => <Slide {...props} direction="left" />}
+          TransitionProps={{ timeout: { enter: 250, exit: 200 } }}
+        >
+          <Alert
+            onClose={() => closeToast(toast.id)}
+            severity={toast.severity === 'secondary' ? 'info' : toast.severity}
+            sx={{
+              width: 280,
+              fontSize: '0.8rem',
+              py: 0.5,
+              ...(toast.severity === 'secondary' && { backgroundColor: '#7b1fa2', color: '#fff', '& .MuiAlert-icon': { color: '#fff' } }),
+            }}
+          >
+            {toast.message}
+          </Alert>
+        </Snackbar>
+      ))}
     </Box >
   );
 }

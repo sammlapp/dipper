@@ -1001,7 +1001,6 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
             onClick={() => handleSubmit(true)}
             disabled={(fileCount === 0) || !config.output_dir}
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-
           >
             Create and Run Task
           </button>

@@ -539,6 +539,71 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
               </div>
             </div>
 
+            {config.mode === 'train_on_embeddings' && (
+              <div className="form-group full-width" style={{ marginLeft: '20px', paddingLeft: '16px', borderLeft: '2px solid var(--border)' }}>
+                <label>
+                  <Checkbox
+                    size="small"
+                    checked={config.use_existing_hoplite_db}
+                    onChange={(e) => setConfig(prev => ({ ...prev, use_existing_hoplite_db: e.target.checked, hoplite_db_path: '' }))}
+                    sx={{ p: 0.25, mr: 0.5 }}
+                  />
+                  Use Existing Hoplite Embedding Database
+                </label>
+                <div className="help-text">Load embeddings from an existing database or create a new one</div>
+
+                {config.use_existing_hoplite_db ? (
+                  <div className="file-selection" style={{ marginTop: '8px' }}>
+                    <div className="file-selection-buttons">
+                      <button onClick={handleHopliteDbSelection}>Select Existing Hoplite DB Folder</button>
+                      {config.hoplite_db_path && (
+                        <button
+                          onClick={() => setConfig(prev => ({ ...prev, hoplite_db_path: '' }))}
+                          className="button-clear"
+                          title="Clear selected Hoplite database folder"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    {config.hoplite_db_path && <span className="selected-path" style={{ marginTop: '4px', display: 'block' }}>{config.hoplite_db_path}</span>}
+                  </div>
+                ) : (
+                  <div style={{ marginTop: '8px' }}>
+                    <div className="form-group">
+                      <label>Database Name</label>
+                      <input
+                        type="text"
+                        value={config.hoplite_db_name}
+                        onChange={(e) => setConfig(prev => ({ ...prev, hoplite_db_name: e.target.value }))}
+                        placeholder="hoplite_embeddings"
+                        style={{ width: '300px' }}
+                      />
+                    </div>
+                    <div className="file-selection">
+                      <div className="file-selection-buttons">
+                        <button onClick={handleHopliteDbSelection}>Select Parent Folder</button>
+                        {config.hoplite_db_path && (
+                          <button
+                            onClick={() => setConfig(prev => ({ ...prev, hoplite_db_path: '' }))}
+                            className="button-clear"
+                            title="Clear selected parent folder"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      {config.hoplite_db_path && (
+                        <span className="selected-path" style={{ display: 'block' }}>
+                          {config.hoplite_db_path}/{config.hoplite_db_name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="form-group full-width">
               <label>Model Source <HelpIcon section="training-model-source" /></label>
               <div className="segmented-control not-too-big">
@@ -818,71 +883,6 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
 
         {settingsTab === 3 && (
           <div className="form-grid training-tab-grid">
-            {config.mode === 'train_on_embeddings' && (
-              <div className="form-group full-width" style={{ marginLeft: '20px', paddingLeft: '16px', borderLeft: '2px solid var(--border)' }}>
-                <label>
-                  <Checkbox
-                    size="small"
-                    checked={config.use_existing_hoplite_db}
-                    onChange={(e) => setConfig(prev => ({ ...prev, use_existing_hoplite_db: e.target.checked, hoplite_db_path: '' }))}
-                    sx={{ p: 0.25, mr: 0.5 }}
-                  />
-                  Use Existing Hoplite Embedding Database
-                </label>
-                <div className="help-text">Load embeddings from an existing database or create a new one</div>
-
-                {config.use_existing_hoplite_db ? (
-                  <div className="file-selection" style={{ marginTop: '8px' }}>
-                    <div className="file-selection-buttons">
-                      <button onClick={handleHopliteDbSelection}>Select Existing Hoplite DB Folder</button>
-                      {config.hoplite_db_path && (
-                        <button
-                          onClick={() => setConfig(prev => ({ ...prev, hoplite_db_path: '' }))}
-                          className="button-clear"
-                          title="Clear selected Hoplite database folder"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    {config.hoplite_db_path && <span className="selected-path" style={{ marginTop: '4px', display: 'block' }}>{config.hoplite_db_path}</span>}
-                  </div>
-                ) : (
-                  <div style={{ marginTop: '8px' }}>
-                    <div className="form-group">
-                      <label>Database Name</label>
-                      <input
-                        type="text"
-                        value={config.hoplite_db_name}
-                        onChange={(e) => setConfig(prev => ({ ...prev, hoplite_db_name: e.target.value }))}
-                        placeholder="hoplite_embeddings"
-                        style={{ width: '300px' }}
-                      />
-                    </div>
-                    <div className="file-selection">
-                      <div className="file-selection-buttons">
-                        <button onClick={handleHopliteDbSelection}>Select Parent Folder</button>
-                        {config.hoplite_db_path && (
-                          <button
-                            onClick={() => setConfig(prev => ({ ...prev, hoplite_db_path: '' }))}
-                            className="button-clear"
-                            title="Clear selected parent folder"
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
-                      {config.hoplite_db_path && (
-                        <span className="selected-path" style={{ display: 'block' }}>
-                          {config.hoplite_db_path}/{config.hoplite_db_name}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
             <div className="form-group">
               <label>Batch Size <HelpIcon section="training-batch-size" /></label>
               <input className="compact-input" type="number" min="1" max="128" value={config.batch_size} onChange={(e) => setConfig(prev => ({ ...prev, batch_size: parseInt(e.target.value) }))} />

@@ -12,8 +12,21 @@ take a close look at this codebase, especially documentation markdowns such as r
 - server mode: user clones github repo, runs install script, edits config file, launches server that can be accessed on web browser via port forwarding
 
 # Incomplete items / TODO /feature request
+test download and use of ML env from HF/GitHub release 
 
-Linux ML environment is 5Gb and GitHub blocks its addition to a release!
+"collections": create and browse clip collections (folders of clips that can be browsed as a group) from Collections tab. When creating new collection, choose where to store it (default is in app cache dir, but can be a folder anywhere) and whether to copy audio clips or just store references. Creates a folder and csv of file path, start/end time, notes. Right click on a clip in review or explore tab to add it to a collection.
+
+custom classifiers during inference
+
+create look-up table for default batch size and num_workers arguments based on system specs and model
+
+
+embedding to hoplite as an option during inference
+
+test the various permutations of training
+
+During model training, create an html page (live updates) with progress bar + run time & eta, some example labels,  loss vs training step, and performance metrics on training and validation sets
+The html page is stored in the job folder. A button on the task panel in the task queue renders this html in a pop-up window. 
 
 - support  stereo audio
 
@@ -31,7 +44,14 @@ WandB integration: need to allow user to provide API key and configure group nam
 
 test downloading/using default conda-pack env on linux! (updated conda pack env; need to rerun github runner and re-upload to onedrive)
 
-Task status updates: "toast" notifications appear regardless of which tab you are viewing; go away after a few seconds, or user can dismiss 
+
+
+
+[requested] Task manager status message updates:
+When downloading/extracting the python environment, this should be the message in the task's message field (currently just has generic message)
+for training tasks: similar to inference tasks, status updates during training should be posted to .status file in the job output folder and read by the task manager to show the user a useful message about the current status/progress of training. Currently always just says "training task is still running"
+
+[requested, implemented but somewhat buggy] Task status updates: "toast" notifications appear regardless of which tab you are viewing; disappear after a few seconds, or user can dismiss 
 https://mui.com/material-ui/react-snackbar/
 Colors match coloring of tasks in task pane for running (started)/queued/canceled/failed/pending/completed
 - [task name] started (<task type>) (blue)
@@ -41,9 +61,13 @@ Colors match coloring of tasks in task pane for running (started)/queued/cancele
 - [task name] failed (task type) (red)
 - [task name] canceled (task type) (yellow)
 
-Task manager status updates for training tasks: similar to inference tasks, status updates during training should be posted to .status file in the job output folder and read by the task manager to show the user a useful message about the current status/progress of training. Currently always just says training task is still running
 
 Regional/date bird species list filtering using ebird meta-model. 
+
+Settings panel, implement buttons for: 
+"check ML backend environment health"
+"remove and re-install python environment"
+
 
 ### User feature requests
 

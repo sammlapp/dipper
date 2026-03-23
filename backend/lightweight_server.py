@@ -48,9 +48,9 @@ HF_REPO = "sammlapp/dipper-envs"
 # source "github": fetched from the latest conda-env-* GitHub release asset
 # source "hf":     fetched directly from Hugging Face (no size limit)
 PYTORCH_ENV_ASSET = {
-    "Darwin":  {"source": "github", "name": "dipper_pytorch_env-macos-arm64.tar.gz"},
+    "Darwin": {"source": "github", "name": "dipper_pytorch_env-macos-arm64.tar.gz"},
     "Windows": {"source": "github", "name": "dipper_pytorch_env-windows-x64.tar.gz"},
-    "Linux":   {"source": "hf",     "name": "dipper_pytorch_env-linux-x64.tar.gz"},
+    "Linux": {"source": "hf", "name": "dipper_pytorch_env-linux-x64.tar.gz"},
 }
 
 
@@ -315,13 +315,22 @@ def download_environment():
         except Exception as e:
             return {"status": "error", "error": f"Failed to fetch GitHub releases: {e}"}
 
-        env_releases = [r for r in releases if r.get("tag_name", "").startswith("conda-env-")]
+        env_releases = [
+            r for r in releases if r.get("tag_name", "").startswith("conda-env-")
+        ]
         if not env_releases:
-            return {"status": "error", "error": "No conda-env releases found on GitHub."}
+            return {
+                "status": "error",
+                "error": "No conda-env releases found on GitHub.",
+            }
         latest = env_releases[0]  # newest-first
 
         asset_url = next(
-            (a["browser_download_url"] for a in latest.get("assets", []) if a["name"] == asset_name),
+            (
+                a["browser_download_url"]
+                for a in latest.get("assets", [])
+                if a["name"] == asset_name
+            ),
             None,
         )
         if asset_url is None:
@@ -331,7 +340,9 @@ def download_environment():
                 "error": f"Asset '{asset_name}' not found in release '{latest['tag_name']}'. Available: {available}",
             }
 
-        logger.info(f"Downloading {asset_name} from {latest['tag_name']} to {archive_path}...")
+        logger.info(
+            f"Downloading {asset_name} from {latest['tag_name']} to {archive_path}..."
+        )
         try:
             _download_url_to_file(asset_url, archive_path)
         except Exception as e:
@@ -386,6 +397,22 @@ def extract_environment(archive_path, extract_dir):
         with tarfile.open(archive_path, "r:gz") as tar:
             tar.extractall(path=extract_dir)
 
+        # Run conda-unpack to rewrite hardcoded build-prefix paths in binaries/libraries.
+        # conda-pack bakes the builder's prefix into RPATHs; conda-unpack fixes them to
+        # the actual extraction path so shared libraries resolve correctly.
+        conda_unpack = os.path.join(extract_dir, "bin", "conda-unpack")
+        if os.name == "nt":
+            conda_unpack = os.path.join(extract_dir, "Scripts", "conda-unpack.exe")
+        if os.path.exists(conda_unpack):
+            logger.info("Running conda-unpack to fix library paths...")
+            result = subprocess.run([conda_unpack], capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.warning(f"conda-unpack exited with code {result.returncode}: {result.stderr}")
+            else:
+                logger.info("conda-unpack complete")
+        else:
+            logger.warning(f"conda-unpack not found at {conda_unpack} — skipping prefix rewrite")
+
         # Check if extraction was successful
         env_check = check_environment(extract_dir)
         if env_check["status"] in ["ready", "missing"]:
@@ -414,7 +441,7 @@ def resolve_path(path_str, base_dir=None):
 
 
 def setup_environment(env_dir=None):
-    """Set up environment - extract if needed, check if ready
+    """Set up environment - download & extract if needed, check if ready
 
     Args:
         env_dir: Environment directory if using a custom Python environment
@@ -1308,6 +1335,8 @@ class LightweightServer:
         self.running_jobs = (
             {}
         )  # Track running inference jobs: {job_id: {process, task, status, result}}
+        # Background env install state: idle | downloading | extracting | ready | error
+        self._env_install_state = {"stage": "idle", "message": "", "error": None}
         self.setup_routes()
         self.setup_cors()
 
@@ -1367,6 +1396,8 @@ class LightweightServer:
         self.app.router.add_post("/config/validate", self.validate_config)
         self.app.router.add_post("/env/check", self.check_env)
         self.app.router.add_post("/env/setup", self.setup_env)
+        self.app.router.add_post("/env/install", self.install_env)
+        self.app.router.add_get("/env/install/status", self.install_env_status)
         self.app.router.add_post("/inference/run", self.run_inference)
         self.app.router.add_get("/inference/status/{job_id}", self.get_inference_status)
         self.app.router.add_post("/inference/cancel/{job_id}", self.cancel_inference)
@@ -1905,6 +1936,64 @@ class LightweightServer:
         except Exception as e:
             logger.error(f"Error setting up environment: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def install_env(self, request):
+        """Start a background download+extract of the ML environment.
+
+        Non-blocking: returns immediately with {"status": "started"} or
+        {"status": "already_running"} if an install is already in progress.
+        Poll /env/install/status for progress.
+        """
+        state = self._env_install_state
+        if state["stage"] in ("downloading", "extracting"):
+            return web.json_response({"status": "already_running", "state": state})
+
+        # Check if already ready
+        env_check = check_environment(get_default_env_path())
+        if env_check["status"] == "ready":
+            self._env_install_state = {"stage": "ready", "message": "Environment already ready", "error": None}
+            return web.json_response({"status": "already_ready", "state": self._env_install_state})
+
+        def _run():
+            try:
+                archive_path = get_default_env_archive_path()
+                if not os.path.exists(archive_path):
+                    self._env_install_state = {"stage": "downloading", "message": "Downloading ML environment...", "error": None}
+                    logger.info("Starting background environment download...")
+                    result = download_environment()
+                    if result["status"] != "success":
+                        self._env_install_state = {"stage": "error", "message": result.get("error", "Download failed"), "error": result.get("error")}
+                        return
+                else:
+                    logger.info("Archive already cached, skipping download")
+
+                env_dir = get_default_env_path()
+                self._env_install_state = {"stage": "extracting", "message": "Extracting ML environment (this may take a few minutes)...", "error": None}
+                logger.info("Starting background environment extraction...")
+                extract_result = extract_environment(archive_path, env_dir)
+                if extract_result["status"] != "success":
+                    self._env_install_state = {"stage": "error", "message": extract_result.get("error", "Extraction failed"), "error": extract_result.get("error")}
+                    return
+
+                final = check_environment(env_dir)
+                if final["status"] == "ready":
+                    self._env_install_state = {"stage": "ready", "message": "ML environment ready", "error": None}
+                    logger.info("Background environment install complete")
+                else:
+                    self._env_install_state = {"stage": "error", "message": final.get("error", "Environment not valid after extraction"), "error": final.get("error")}
+
+            except Exception as e:
+                logger.error(f"Background env install failed: {e}")
+                self._env_install_state = {"stage": "error", "message": str(e), "error": str(e)}
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+        self._env_install_state = {"stage": "downloading", "message": "Starting download...", "error": None}
+        return web.json_response({"status": "started", "state": self._env_install_state})
+
+    async def install_env_status(self, request):
+        """Return current state of background env install."""
+        return web.json_response(self._env_install_state)
 
     # Process Management Routes
     async def run_inference(self, request):

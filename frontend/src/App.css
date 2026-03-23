@@ -5642,6 +5642,80 @@ body.dark-mode .multiclass-select .select__indicator-separator {
   color: var(--medium-accent);
 }
 
+.status-env-install {
+  flex: 1;
+}
+
+.status-env-error {
+  color: #f87171;
+}
+
+/* ML Environment install dialog */
+.env-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.env-dialog {
+  background: var(--bg-elevated, #fff);
+  color: var(--text-primary, #111);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 10px;
+  padding: 28px 32px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+.env-dialog h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+}
+
+.env-dialog p {
+  margin: 0 0 10px 0;
+  line-height: 1.5;
+}
+
+.env-dialog-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.env-dialog-btn {
+  padding: 8px 18px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.env-dialog-btn.primary {
+  background: var(--primary-color, #2563eb);
+  color: #fff;
+}
+
+.env-dialog-btn.primary:hover {
+  opacity: 0.9;
+}
+
+.env-dialog-btn.secondary {
+  background: var(--bg-surface, #f3f4f6);
+  color: var(--text-primary, #111);
+  border: 1px solid var(--border-color, #ddd);
+}
+
+.env-dialog-btn.secondary:hover {
+  background: var(--toolbar-btn-hover, #e5e7eb);
+}
+
 /* Adjust main content to account for status bar */
 .main-content {
   padding-bottom: 50px;

@@ -285,6 +285,27 @@ class TaskManager {
     }
   }
 
+  // Polls /env/install/status and updates task progress while env is being set up.
+  // Returns a stop function. Call stop() once the run endpoint has responded.
+  startEnvProgressPolling(taskId, backendUrl) {
+    let active = true;
+    const poll = async () => {
+      while (active) {
+        try {
+          const r = await fetch(`${backendUrl}/env/install/status`);
+          const state = await r.json();
+          if (active && state && state.stage && state.stage !== 'idle' && state.stage !== 'ready') {
+            this.updateTask(taskId, { progress: state.message || 'Setting up ML environment...' });
+          }
+        } catch (_) { /* ignore */ }
+        if (!active) break;
+        await new Promise(res => setTimeout(res, 1500));
+      }
+    };
+    poll();
+    return () => { active = false; };
+  }
+
   async runInference(task) {
     const config = task.config;
     const backendUrl = await getBackendUrl();
@@ -379,21 +400,20 @@ class TaskManager {
       }
       // If envPath is null, backend will use default cache directory and auto-download if needed
 
-      // Update progress
-      this.updateTask(task.id, { progress: 'Running inference...' });
+      // Poll env install status while waiting for the run endpoint (env setup can take minutes)
+      const stopEnvPoll = this.startEnvProgressPolling(task.id, backendUrl);
 
       // Start inference via HTTP API (now returns immediately with job ID)
-      const inferenceResponse = await fetch(`${backendUrl}/inference/run`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          config_path: tempConfigPath,
-          env_path: envPath,
-          job_id: processId
-        })
-      });
+      let inferenceResponse;
+      try {
+        inferenceResponse = await fetch(`${backendUrl}/inference/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ config_path: tempConfigPath, env_path: envPath, job_id: processId })
+        });
+      } finally {
+        stopEnvPoll();
+      }
 
       const startResult = await inferenceResponse.json();
 
@@ -602,21 +622,20 @@ class TaskManager {
       }
       // If envPath is null, backend will use default cache directory and auto-download if needed
 
-      // Update progress
-      this.updateTask(task.id, { progress: 'Starting training...' });
+      // Poll env install status while waiting for the run endpoint (env setup can take minutes)
+      const stopEnvPoll = this.startEnvProgressPolling(task.id, backendUrl);
 
       // Start training via HTTP API (returns immediately with job ID)
-      const trainingResponse = await fetch(`${backendUrl}/training/run`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          config_path: tempConfigPath,
-          env_path: envPath,
-          job_id: processId
-        })
-      });
+      let trainingResponse;
+      try {
+        trainingResponse = await fetch(`${backendUrl}/training/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ config_path: tempConfigPath, env_path: envPath, job_id: processId })
+        });
+      } finally {
+        stopEnvPoll();
+      }
 
       const startResult = await trainingResponse.json();
 
@@ -798,21 +817,20 @@ class TaskManager {
       }
       // If envPath is null, backend will use default cache directory and auto-download if needed
 
-      // Update progress
-      this.updateTask(task.id, { progress: 'Creating annotation task...' });
+      // Poll env install status while waiting for the run endpoint (env setup can take minutes)
+      const stopEnvPoll = this.startEnvProgressPolling(task.id, backendUrl);
 
       // Start annotation via HTTP API (returns immediately with job ID)
-      const extractionResponse = await fetch(`${backendUrl}/extraction/run`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          config_path: tempConfigPath,
-          env_path: envPath,
-          job_id: processId
-        })
-      });
+      let extractionResponse;
+      try {
+        extractionResponse = await fetch(`${backendUrl}/extraction/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ config_path: tempConfigPath, env_path: envPath, job_id: processId })
+        });
+      } finally {
+        stopEnvPoll();
+      }
 
       const startResult = await extractionResponse.json();
 
