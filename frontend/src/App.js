@@ -1,9 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { styled, useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
-import Snackbar from '@mui/material/Snackbar';
-import Alert from '@mui/material/Alert';
-import Slide from '@mui/material/Slide';
 import MuiDrawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -117,31 +114,6 @@ function App() {
   const [showEnvDialog, setShowEnvDialog] = useState(false);
   const envPollRef = React.useRef(null);
 
-  // Toast notifications
-  const [toasts, setToasts] = useState([]); // [{id, message, severity, open}]
-  const taskStatusesRef = useRef({}); // taskId -> last known status
-  const toastTimersRef = useRef({}); // taskId -> pending setTimeout id
-
-  const showToast = (message, severity) => {
-    const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { id, message, severity, open: true }]);
-  };
-
-  const closeToast = (id) => {
-    setToasts(prev => prev.map(t => t.id === id ? { ...t, open: false } : t));
-  };
-
-  // Queue a debounced toast for a task — cancels any pending toast for the same task
-  const queueToast = (taskId, message, severity) => {
-    if (toastTimersRef.current[taskId]) {
-      clearTimeout(toastTimersRef.current[taskId]);
-    }
-    toastTimersRef.current[taskId] = setTimeout(() => {
-      delete toastTimersRef.current[taskId];
-      showToast(message, severity);
-    }, 80);
-  };
-
   const tabs = [
     { id: 'inference', name: 'Inference', icon: <PlayArrowIcon /> },
     { id: 'training', name: 'Training', icon: <SchoolIcon /> },
@@ -177,32 +149,12 @@ function App() {
   // Set up task manager listeners
   useEffect(() => {
     const unsubscribe = taskManager.addListener((event, data) => {
-      // Always update task history first
       setTaskHistory(taskManager.getAllTasks());
-
-      // Update running tasks and current task based on queue info
       const queueInfo = taskManager.getQueueInfo();
       setRunningTasks(queueInfo.runningTasks || []);
       setCurrentTask(queueInfo.currentTask);
-
-      // Toast notifications on status transitions (skip created/queued — only meaningful transitions)
-      if (event === 'taskCreated' && data) {
-        taskStatusesRef.current[data.id] = data.status;
-      } else if (event === 'taskUpdated' && data) {
-        const prevStatus = taskStatusesRef.current[data.id];
-        const newStatus = data.status;
-        if (prevStatus !== newStatus) {
-          taskStatusesRef.current[data.id] = newStatus;
-          const label = `${data.name} (${data.type})`;
-          if (newStatus === 'running') queueToast(data.id, `${label} started`, 'info');
-          else if (newStatus === 'completed') queueToast(data.id, `${label} completed`, 'success');
-          else if (newStatus === 'failed') queueToast(data.id, `${label} failed`, 'error');
-          else if (newStatus === 'cancelled') queueToast(data.id, `${label} canceled`, 'warning');
-        }
-      }
     });
 
-    // Handle tab change events from help icons
     const handleTabChange = (event) => {
       if (event.detail && event.detail.tabId) {
         setActiveTab(event.detail.tabId);
@@ -212,23 +164,15 @@ function App() {
     // Initial load
     const allTasks = taskManager.getAllTasks();
     setTaskHistory(allTasks);
-    // Seed taskStatusesRef so existing tasks don't fire spurious toasts on mount
-    allTasks.forEach(t => { taskStatusesRef.current[t.id] = t.status; });
     const queueInfo = taskManager.getQueueInfo();
     setRunningTasks(queueInfo.runningTasks || []);
     setCurrentTask(queueInfo.currentTask);
 
-    // Add tab change listener
     window.addEventListener('changeTab', handleTabChange);
 
     return () => {
       unsubscribe();
       window.removeEventListener('changeTab', handleTabChange);
-      // Clear any pending toast timers
-      Object.values(toastTimersRef.current).forEach(clearTimeout);
-      toastTimersRef.current = {};
-      // Reset status tracking so re-mount doesn't fire stale toasts
-      taskStatusesRef.current = {};
     };
   }, []);
 
@@ -245,7 +189,7 @@ function App() {
           setShowEnvDialog(true);
         }
       })
-      .catch(() => {}); // backend not yet up — silently ignore
+      .catch(() => { }); // backend not yet up — silently ignore
   }, [backendUrl, isReviewOnly]);
 
   const startEnvInstall = () => {
@@ -253,7 +197,7 @@ function App() {
     setEnvStatus('installing');
     setEnvInstallState({ stage: 'downloading', message: 'Starting download...', error: null });
     fetch(`${backendUrl}/env/install`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-      .catch(() => {});
+      .catch(() => { });
     // Poll for status
     envPollRef.current = setInterval(() => {
       fetch(`${backendUrl}/env/install/status`)
@@ -268,7 +212,7 @@ function App() {
             clearInterval(envPollRef.current);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 2000);
   };
 
@@ -523,32 +467,6 @@ function App() {
         </div>
       </Box>
 
-      {/* Toast notifications */}
-      {toasts.map((toast, index) => (
-        <Snackbar
-          key={toast.id}
-          open={toast.open}
-          autoHideDuration={4000}
-          onClose={() => closeToast(toast.id)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-          style={{ top: 16 + index * 56 }}
-          TransitionComponent={(props) => <Slide {...props} direction="left" />}
-          TransitionProps={{ timeout: { enter: 250, exit: 200 } }}
-        >
-          <Alert
-            onClose={() => closeToast(toast.id)}
-            severity={toast.severity === 'secondary' ? 'info' : toast.severity}
-            sx={{
-              width: 280,
-              fontSize: '0.8rem',
-              py: 0.5,
-              ...(toast.severity === 'secondary' && { backgroundColor: '#7b1fa2', color: '#fff', '& .MuiAlert-icon': { color: '#fff' } }),
-            }}
-          >
-            {toast.message}
-          </Alert>
-        </Snackbar>
-      ))}
     </Box >
   );
 }

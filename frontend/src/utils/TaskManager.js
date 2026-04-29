@@ -232,7 +232,6 @@ class TaskManager {
     if (!task) return;
 
     try {
-      // Update task to running status with appropriate start message
       const startMessage = task.type === TASK_TYPE.TRAINING ? 'Starting training...' : 'Starting inference...';
       this.updateTask(taskId, {
         status: TASK_STATUS.RUNNING,
@@ -989,18 +988,16 @@ class TaskManager {
     // Remove from queue
     this.queue = this.queue.filter(id => id !== taskId);
 
-    // Update task status
-    this.updateTask(taskId, {
-      status: TASK_STATUS.CANCELLED,
-      completed: Date.now(),
-      progress: 'Cancelled by user'
-    });
-
-    // If this was the current task, process next
-    if (this.runningTasks.has(taskId)) {
-      this.runningTasks.delete(taskId);
-      setTimeout(() => this.processQueue(), 100);
+    if (!this.runningTasks.has(taskId)) {
+      // Not running — update status immediately (no poll loop will do it)
+      this.updateTask(taskId, {
+        status: TASK_STATUS.CANCELLED,
+        completed: Date.now(),
+        progress: 'Cancelled by user'
+      });
     }
+    // If running, the poll loop will detect cancellation from the backend
+    // and executeTask will set the final CANCELLED status — no duplicate needed here.
 
     return true;
   }
