@@ -123,6 +123,103 @@ function HelpTab() {
           <p><strong>Create Task:</strong> Creates a task but does not start it. Can be started from the task queue.</p>
           <p><strong>Create and Run:</strong> Immediately starts processing with the current configuration.</p>
           <p>Tasks are queued and processed sequentially. You can monitor progress, cancel running tasks, and retry failed tasks in the task queue.</p>
+
+          <h3 id="ribbit-overview">RIBBIT — Pulse Rate Detector</h3>
+          <p>
+            RIBBIT (Repeat-Interval Based Bioacoustic Identification Tool) detects species with periodic, pulsed
+            vocalizations — frogs, toads, insects, and other animals that call with a regular rhythm. It works by
+            measuring how much energy fluctuates at a target pulse rate within a user-defined frequency band.
+            See: <em>Lapp et al. 2021, Conservation Biology</em>.
+          </p>
+          <p>
+            Unlike neural network models, RIBBIT requires no training data. You configure it by describing your
+            target species' call rather than by showing examples. The output is a score per analysis window —
+            higher scores indicate stronger periodic energy at the target pulse rate.
+          </p>
+
+          <h4 id="ribbit-class-name">Output Class Name</h4>
+          <p>The name used for the score column in the output CSV. Use the species name (e.g. <code>Great Plains Toad</code>). This is also what appears in the Review tab when loading results.</p>
+
+          <h4 id="ribbit-signal-band">Signal Band</h4>
+          <p>The frequency range (Hz) where the target vocalization has its strongest energy. Choose a narrow band centered on the dominant call frequency — the narrower the band, the less chance of including noise from other species.</p>
+          <p><em>Example:</em> For Great Plains Toad (~2000–2500 Hz), set <code>[2000, 2500]</code>. Check a spectrogram of a known recording to identify the best range.</p>
+
+          <h4 id="ribbit-pulse-rate">Pulse Rate Range</h4>
+          <p>The expected range of pulses per second (repetition rate) for the target species. RIBBIT scores each window based on how much energy fluctuates within this rate range.</p>
+          <p><em>How to measure:</em> Open a known recording in a spectrogram viewer and count pulses over a few seconds. Vary the range slightly to account for temperature or individual variation.</p>
+          <p><em>Example:</em> Great Plains Toad at ~15 pulses/sec → set <code>[10, 20]</code> to allow some variation.</p>
+
+          <h4 id="ribbit-clip-duration">Clip Duration</h4>
+          <p>Length of each analysis window in seconds. Each window is analyzed independently and receives its own score.</p>
+          <ul>
+            <li>Should be roughly 2× the call duration, or long enough to contain at least 5 pulses.</li>
+            <li>For slowly pulsing species (0.5 pulses/sec), use a longer window (≥10 sec) so enough pulses fit.</li>
+            <li>Typical range: 0.3–10 sec.</li>
+          </ul>
+
+          <h4 id="ribbit-clip-overlap">Clip Overlap</h4>
+          <p>How much consecutive windows overlap (seconds). Zero overlap is fastest. Overlap reduces the chance of a call being split across two window boundaries, at the cost of more computation.</p>
+
+          <h4 id="ribbit-noise-bands">Noise Bands</h4>
+          <p>Frequency ranges to subtract from the signal band energy. Sounds in these bands are treated as noise and reduce the score. Use noise bands to suppress:</p>
+          <ul>
+            <li><strong>Microphone artefacts:</strong> A band at 0–200 Hz removes rain drops, wind pops, and digital clicks.</li>
+            <li><strong>Confusion species:</strong> Add bands covering other species that call simultaneously.</li>
+            <li><strong>Flanking bands:</strong> Two narrow bands directly above and below the signal band help isolate it.</li>
+          </ul>
+
+          <h3 id="cwt-overview">CWT Detector — Accelerating Pulse Sequence Detector</h3>
+          <p>
+            Uses a continuous wavelet transform (CWT) to find sequences of peaks that accelerate over time —
+            the characteristic pattern of Ruffed Grouse drumming. Default parameters are tuned for RUGR detection
+            as described in <em>Lapp et al. 2023, Wildlife Society Bulletin</em>. The algorithm can be applied to
+            any species with a similar accelerating pulse structure by adjusting the parameters.
+          </p>
+          <p>
+            The output is a CSV with one row per detected sequence, with columns <code>start_time</code>,
+            <code>end_time</code>, and the class name (score = sequence length, i.e. number of detected peaks).
+            Longer sequences indicate higher confidence detections.
+          </p>
+          <p><strong>Tip:</strong> Use "Load Default RUGR Parameters" to populate all fields with the published manuscript values.</p>
+
+          <h4 id="cwt-sample-rate">Sample Rate</h4>
+          <p>Audio is resampled to this rate before analysis. Choose at least 2× the target frequency. For low-pitched sounds like RUGR drumming (~50 Hz), resampling to 400 Hz dramatically speeds up the CWT while retaining all relevant information.</p>
+
+          <h4 id="cwt-window-len">Window Length</h4>
+          <p>Each audio file is analyzed in non-overlapping windows of this length. The CWT signal is normalized within each window, so changing this value can affect detection results. Detections from all windows are aggregated. Incomplete final windows are discarded.</p>
+
+          <h4 id="cwt-center-frequency">Center Frequency</h4>
+          <p>The target audio frequency (Hz) for the wavelet transform. Should match the dominant frequency of the sound being detected. For RUGR drumming, 50 Hz captures the low-frequency thump.</p>
+
+          <h4 id="cwt-wavelet">Wavelet</h4>
+          <p>The PyWavelets wavelet name to use. <code>morl</code> (Morlet) is appropriate for most bioacoustic pulse detection. See the <a href="https://pywavelets.readthedocs.io" target="_blank" rel="noreferrer">PyWavelets documentation</a> for other options.</p>
+
+          <h4 id="cwt-peak-threshold">Peak Threshold</h4>
+          <p>Minimum normalised CWT amplitude (0–1) for a time point to be treated as a peak. The CWT signal is normalised per window before peak finding. Higher values are more selective; lower values are more sensitive.</p>
+
+          <h4 id="cwt-peak-separation">Peak Separation</h4>
+          <p>Minimum time (seconds) between successive detected peaks. Prevents a single broad impulse from generating multiple peaks. Default (15/400 ≈ 0.0375 sec) is calibrated for RUGR drumming.</p>
+
+          <h4>Sequence Detection Criteria</h4>
+          <p>After peaks are detected, the algorithm searches for accelerating sequences. The following criteria must all be satisfied for a sequence of points to be considered a valid detection:</p>
+
+          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.85rem', marginBottom: 12 }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-secondary, #f5f5f5)' }}>
+                <th style={{ padding: '6px 10px', textAlign: 'left', border: '1px solid var(--border, #ddd)' }}>Parameter</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left', border: '1px solid var(--border, #ddd)' }}>RUGR default</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left', border: '1px solid var(--border, #ddd)' }}>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }} id="cwt-dt-range"><strong>&delta;t range</strong></td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>[0.05, 0.8] sec</td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>Allowed time interval between consecutive sequence points. The upper bound also terminates a sequence after a long gap.</td></tr>
+              <tr><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }} id="cwt-dy-range"><strong>&delta;y range</strong></td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>[−0.2, 0.0]</td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>Allowed change in inter-pulse interval between consecutive points. A negative upper bound enforces acceleration (intervals must shorten).</td></tr>
+              <tr><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }} id="cwt-d2y-range"><strong>&delta;²y range</strong></td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>[−0.05, 0.15]</td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>Allowed change in acceleration between consecutive points. Constrains how smoothly the sequence must accelerate.</td></tr>
+              <tr><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }} id="cwt-max-skip"><strong>Max Skip</strong></td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>3 points</td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>Maximum consecutive invalid peaks that can be skipped before a sequence is terminated. Allows the sequence to continue past occasional missed peaks.</td></tr>
+              <tr><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }} id="cwt-duration-range"><strong>Duration Range</strong></td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>[1, 15] sec</td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>Minimum and maximum total duration of a valid sequence. Rejects very short noise bursts and unrealistically long sequences.</td></tr>
+              <tr><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }} id="cwt-points-range"><strong>Points Range</strong></td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>[9, 100] points</td><td style={{ padding: '5px 10px', border: '1px solid var(--border, #ddd)' }}>Minimum and maximum number of peaks in a valid sequence. The minimum (9) ensures enough points to confirm an accelerating pattern.</td></tr>
+            </tbody>
+          </table>
         </div>
       )
     },

@@ -370,7 +370,9 @@ class TaskManager {
         testing_mode: {
           enabled: config.testing_mode_enabled || false,
           subset_size: config.subset_size || 10
-        }
+        },
+        ribbit_settings: config.ribbit_settings || null,
+        cwt_settings: config.cwt_settings || null,
       };
 
       // Save temporary config file using HTTP API
@@ -1022,10 +1024,15 @@ class TaskManager {
   generateTaskName(config, taskType = TASK_TYPE.INFERENCE) {
     let modelName;
     if (config.model_source === 'bmz') {
-      // Use model name from BMZ config
       modelName = config.model || 'Unknown';
+    } else if (config.model_source === 'ribbit') {
+      const cls = config.ribbit_settings?.class_name;
+      modelName = cls ? `RIBBIT (${cls})` : 'RIBBIT';
+    } else if (config.model_source === 'cwt_detector') {
+      const cls = config.cwt_settings?.class_name;
+      modelName = cls ? `CWT (${cls})` : 'CWT Detector';
     } else {
-      modelName = "Local Model"
+      modelName = 'Local Model';
     }
     const timestamp = new Date().toLocaleString();
 

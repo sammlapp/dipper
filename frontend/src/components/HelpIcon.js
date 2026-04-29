@@ -17,6 +17,31 @@ const HELP_TOOLTIPS = {
   'inference-tasks': 'Create a task to queue it, or Create and Run to start immediately.',
   'inference-subfolder-split': 'Create separate output files per subfolder in the audio directory.',
 
+  // RIBBIT
+  'ribbit-overview': 'RIBBIT detects species with periodic, pulsed vocalizations (frogs, toads, insects) by searching for rhythmic energy fluctuations at a target pulse rate.',
+  'ribbit-class-name': 'Label for the output score column in the CSV. Use the species name or a short identifier.',
+  'ribbit-signal-band': 'Frequency range (Hz) where the target vocalization is loudest. Choose a narrow band centered on the call energy.',
+  'ribbit-pulse-rate': 'Expected range of pulses per second (repetition rate) for the target species. Check a spectrogram to measure this.',
+  'ribbit-clip-duration': 'Length of each analysis window (sec). Should be ~2× the call duration, or long enough to contain at least 5 pulses.',
+  'ribbit-clip-overlap': 'Overlap between consecutive windows (sec). Increasing overlap reduces the chance of a call being split across two windows.',
+  'ribbit-noise-bands': 'Frequency ranges to subtract from the signal band. Use low-frequency bands (0–200 Hz) to suppress mic pops/clicks. Add bands around confusion species.',
+
+  // CWT Detector
+  'cwt-overview': 'Detects accelerating sequences of peaks via continuous wavelet transform. Designed for Ruffed Grouse drumming; customisable for other species with similar accelerating pulse patterns.',
+  'cwt-class-name': 'Label for the output score column in the CSV. Use the species name or a short identifier.',
+  'cwt-sample-rate': 'Audio is resampled to this rate (Hz) before analysis. Choose ≥2× the target frequency. Lower values (e.g. 400 Hz) speed up the CWT dramatically for low-frequency sounds.',
+  'cwt-window-len': 'Length of each analysis window (sec). The CWT is computed independently on each window. Incomplete final windows are discarded.',
+  'cwt-center-frequency': 'Target frequency (Hz) for the wavelet transform — should match the dominant frequency of the sound being detected.',
+  'cwt-wavelet': 'PyWavelets wavelet name (e.g. "morl" for Morlet). See pywt.wavelist() for options.',
+  'cwt-peak-threshold': 'Minimum normalised CWT amplitude (0–1) for a time point to be considered a peak.',
+  'cwt-peak-separation': 'Minimum time (sec) between successive peaks. Prevents double-counting a single impulse.',
+  'cwt-dt-range': 'Allowed time interval (sec) between consecutive points in a candidate sequence. Points outside this range are rejected.',
+  'cwt-dy-range': 'Allowed change in inter-pulse interval between consecutive points. Negative upper bound enforces acceleration.',
+  'cwt-d2y-range': 'Allowed change in acceleration between consecutive points. Constrains how smoothly the sequence must accelerate.',
+  'cwt-max-skip': 'Maximum number of consecutive invalid points allowed before a sequence is terminated.',
+  'cwt-duration-range': 'Minimum and maximum total duration (sec) of a valid detected sequence.',
+  'cwt-points-range': 'Minimum and maximum number of peaks in a valid detected sequence.',
+
   // Training
   'training-mode': 'Choose between fine-tuning a pre-trained model or training from scratch.',
   'training-model-source': 'Use a model from the zoo or load a locally saved model file.',

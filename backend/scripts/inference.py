@@ -63,25 +63,34 @@ def update_status(
 
 
 def run_inference(files, model, config_data):
-    """Run inference on audio files using the model's predict method"""
-    logger.info(f"Processing {len(files)} audio files")
-    logger.info(f"Inference config: {config_data['inference_settings']}")
+    """Run inference on audio files and return a predictions DataFrame.
+
+    Dispatches to the appropriate algorithm based on model_source:
+    - 'ribbit': RIBBIT pulse-rate detector
+    - 'cwt_detector': CWT peak-sequence detector
+    - anything else: model.predict() (BMZ / local file / hoplite)
+    """
+    model_source = config_data.get("model_source", "bmz")
+    total_files = len(files)
+    job_folder = config_data["job_folder"]
+    logger.info(f"Processing {total_files} audio files (model_source='{model_source}')")
 
     try:
-        # Progress tracking
-        total_files = len(files)
-        job_folder = config_data["job_folder"]
+        if model_source == "ribbit":
+            predictions = _run_ribbit(files, config_data)
 
-        # Use the model's predict method with the configuration
-        # This matches the streamlit implementation: model.predict(ss.selected_files, **ss.cfg["inference"])
-        logger.info("Starting model prediction...")
+        elif model_source == "cwt_detector":
+            predictions = _run_cwt(files, config_data)
 
-        # Note: mode field is optional, defaults to normal classification
-        if config_data.get("mode") == "classify_from_hoplite":
-            # run shallow classifier on features retrieved from hoplite db
-            predictions = classify_from_hoplite_embeddings(files, model, config_data)
-        else:  # run full forward pass of model
-            predictions = model.predict(files, **config_data["inference_settings"])
+        else:
+            logger.info(f"Inference config: {config_data['inference_settings']}")
+            logger.info("Starting model prediction...")
+            if config_data.get("mode") == "classify_from_hoplite":
+                predictions = classify_from_hoplite_embeddings(
+                    files, model, config_data
+                )
+            else:
+                predictions = model.predict(files, **config_data["inference_settings"])
 
         logger.info(f"Progress: 100% ({total_files}/{total_files})")
         logger.info(f"Predictions generated with shape: {predictions.shape}")
@@ -92,7 +101,6 @@ def run_inference(files, model, config_data):
             progress=100,
             message=f"Completed processing {total_files} files",
         )
-
         return predictions
 
     except Exception as e:
@@ -194,9 +202,94 @@ def group_files_by_subfolder(files):
     return dict(subfolder_groups)
 
 
+def _run_ribbit(files, config_data):
+    """RIBBIT pulse-rate detector. Returns (file, start_time, end_time) indexed DataFrame."""
+    from opensoundscape.audio import Audio
+    from opensoundscape.spectrogram import Spectrogram
+    from opensoundscape.ribbit import ribbit
+
+    rs = config_data["ribbit_settings"]
+    class_name = rs["class_name"] or "ribbit_score"
+    noise_bands = [
+        b for b in rs.get("noise_bands", []) if b[0] is not None and b[1] is not None
+    ]
+    clip_duration = rs["clip_duration"]
+    frames = []
+
+    for path in files:
+        try:
+            spec = Spectrogram.from_audio(Audio.from_file(path))
+            score_df = ribbit(
+                spec,
+                pulse_rate_range=rs["pulse_rate_range"],
+                signal_band=rs["signal_band"],
+                clip_duration=clip_duration,
+                clip_overlap=rs.get("clip_overlap", 0.0),
+                noise_bands=noise_bands if noise_bands else None,
+                plot=False,
+            )
+            if len(score_df) > 0:
+                out = score_df[["start_time", "score"]].copy()
+                out["end_time"] = out["start_time"] + clip_duration
+                out.rename(columns={"score": class_name}, inplace=True)
+                out.insert(0, "file", path)
+                frames.append(out)
+        except Exception as e:
+            logger.warning(f"Skipping {path}: {e}")
+
+    if frames:
+        return pd.concat(frames).set_index(["file", "start_time", "end_time"])
+    return pd.DataFrame(
+        columns=["file", "start_time", "end_time", class_name]
+    ).set_index(["file", "start_time", "end_time"])
+
+
+def _run_cwt(files, config_data):
+    """CWT peak-sequence detector. Returns (file, start_time, end_time) indexed DataFrame."""
+    from opensoundscape.audio import Audio
+    from opensoundscape.signal_processing import detect_peak_sequence_cwt
+
+    cs = config_data["cwt_settings"]
+    class_name = cs["class_name"] or "seq_len"
+    frames = []
+
+    for path in files:
+        try:
+            det_df = detect_peak_sequence_cwt(
+                Audio.from_file(path),
+                sample_rate=cs["sample_rate"],
+                window_len=cs["window_len"],
+                center_frequency=cs["center_frequency"],
+                wavelet=cs["wavelet"],
+                peak_threshold=cs["peak_threshold"],
+                peak_separation=cs["peak_separation"],
+                dt_range=cs["dt_range"],
+                dy_range=cs["dy_range"],
+                d2y_range=cs["d2y_range"],
+                max_skip=cs["max_skip"],
+                duration_range=cs["duration_range"],
+                points_range=cs["points_range"],
+                plot=False,
+            )
+            if det_df is not None and len(det_df) > 0:
+                out = det_df[["seq_start_time", "seq_end_time", "seq_len"]].rename(
+                    columns={"seq_start_time": "start_time", "seq_end_time": "end_time", "seq_len": class_name}
+                )
+                out.insert(0, "file", path)
+                frames.append(out)
+        except Exception as e:
+            logger.warning(f"Skipping {path}: {e}")
+
+    if frames:
+        return pd.concat(frames).set_index(["file", "start_time", "end_time"])
+    return pd.DataFrame(
+        columns=["file", "start_time", "end_time", class_name]
+    ).set_index(["file", "start_time", "end_time"])
+
+
 def run_classification(model, files, config_data):
     # Extract values from config file (no defaults - require fields to exist)
-    inference_config = config_data["inference_settings"]
+    inference_config = config_data.get("inference_settings", {})
     logger.info(f"Inference Configuration: {inference_config}")
 
     job_folder = config_data["job_folder"]
@@ -451,15 +544,20 @@ def main():
                 f"Did not find first file {files[0]}: was this config generated for a different file system? Perhaps an external drive is detached?"
             )
 
-        # initialize model from BMZ or local file
-        logger.info("Loading and initializing model from configuration")
-        update_status(
-            job_folder,
-            "running",
-            stage="loading_model",
-            message="Loading and initializing model",
-        )
-        model = load_model(config_data, logger)
+        # initialize model from BMZ or local file (skipped for signal-processing methods)
+        model_source = config_data.get("model_source", "bmz")
+        if model_source in ("ribbit", "cwt_detector"):
+            logger.info(f"Skipping model load for model_source='{model_source}'")
+            model = None
+        else:
+            logger.info("Loading and initializing model from configuration")
+            update_status(
+                job_folder,
+                "running",
+                stage="loading_model",
+                message="Loading and initializing model",
+            )
+            model = load_model(config_data, logger)
 
         logger.info(f"Output directory: {config_data['output_dir']}")
 

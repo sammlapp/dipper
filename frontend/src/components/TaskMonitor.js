@@ -73,7 +73,7 @@ function TaskMonitor({ taskManager }) {
   };
 
   const handleClearHistory = () => {
-    if (taskManager && window.confirm('Clear all completed, failed, and canceled tasks?')) {
+    if (taskManager) {
       const tasksToDelete = tasks.filter(task =>
         [TASK_STATUS.COMPLETED, TASK_STATUS.FAILED, TASK_STATUS.CANCELLED].includes(task.status)
       );

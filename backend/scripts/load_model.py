@@ -33,6 +33,12 @@ def load_bmz_model(model_name, logger=None):
 
 def load_model(config_data, logger=None):
     model_source = config_data.get("model_source")
+
+    # Signal-processing methods don't require a model object
+    if model_source in ("ribbit", "cwt_detector"):
+        if logger:
+            logger.info(f"model_source='{model_source}': no model to load")
+        return None
     if model_source == "custom":
         preprocessing_config = config_data.get("preprocessing")
         # option: ['resnet18','resnet34','resnet50','efficientnet_b0','efficientnet_b1']

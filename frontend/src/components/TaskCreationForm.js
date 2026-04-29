@@ -28,8 +28,47 @@ const DEFAULT_VALUES = {
     use_custom_python_env: false,
     custom_python_env_path: '',
     testing_mode_enabled: false,
-    subset_size: 10
+    subset_size: 10,
+    ribbit_settings: {
+      class_name: '',
+      signal_band: [1000, 2000],
+      noise_bands: [[0, 200]],
+      pulse_rate_range: [5, 20],
+      clip_duration: 2.0,
+      clip_overlap: 0.0,
+    },
+    cwt_settings: {
+      class_name: '',
+      sample_rate: 400,
+      window_len: 60,
+      center_frequency: 50,
+      wavelet: 'morl',
+      peak_threshold: 0.2,
+      peak_separation: 0.0375,
+      dt_range: [0.05, 0.8],
+      dy_range: [-0.2, 0.0],
+      d2y_range: [-0.05, 0.15],
+      max_skip: 3,
+      duration_range: [1, 15],
+      points_range: [9, 100],
+    },
   }
+};
+
+const RUGR_CWT_DEFAULTS = {
+  class_name: 'Ruffed Grouse',
+  sample_rate: 400,
+  window_len: 60,
+  center_frequency: 50,
+  wavelet: 'morl',
+  peak_threshold: 0.2,
+  peak_separation: 0.0375,
+  dt_range: [0.05, 0.8],
+  dy_range: [-0.2, 0.0],
+  d2y_range: [-0.05, 0.15],
+  max_skip: 3,
+  duration_range: [1, 15],
+  points_range: [9, 100],
 };
 
 function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
@@ -294,7 +333,10 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
       selected_extensions: selectedExtensions,
       glob_patterns_text: globPatterns,
       // Convert sparse outputs settings for TaskManager
-      sparse_save_threshold: config.sparse_outputs_enabled ? config.sparse_save_threshold : null
+      sparse_save_threshold: config.sparse_outputs_enabled ? config.sparse_save_threshold : null,
+      // Signal-processing method settings (passed through as-is)
+      ribbit_settings: config.ribbit_settings,
+      cwt_settings: config.cwt_settings,
     };
     const finalTaskName = taskName.trim() || null; // Let TaskManager generate name if empty
 
@@ -313,7 +355,11 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
     setFileCount(DEFAULT_VALUES.fileCount);
     setFirstFile('');
     setSelectedExtensions([...DEFAULT_VALUES.selectedExtensions]);
-    setConfig({ ...DEFAULT_VALUES.config });
+    setConfig({
+      ...DEFAULT_VALUES.config,
+      ribbit_settings: { ...DEFAULT_VALUES.config.ribbit_settings, noise_bands: [[0, 200]] },
+      cwt_settings: { ...DEFAULT_VALUES.config.cwt_settings },
+    });
   };
 
   const saveInferenceConfig = async () => {
@@ -351,7 +397,9 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
           testing_mode: {
             enabled: config.testing_mode_enabled,
             subset_size: config.testing_mode_enabled ? config.subset_size : null
-          }
+          },
+          ribbit_settings: config.ribbit_settings,
+          cwt_settings: config.cwt_settings,
         };
 
         // Use HTTP API to save config
@@ -420,7 +468,9 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
             use_custom_python_env: configData.python_environment?.use_custom || false,
             custom_python_env_path: configData.python_environment?.custom_path || '',
             testing_mode_enabled: configData.testing_mode?.enabled || false,
-            subset_size: configData.testing_mode?.subset_size || 10
+            subset_size: configData.testing_mode?.subset_size || 10,
+            ribbit_settings: configData.ribbit_settings || DEFAULT_VALUES.config.ribbit_settings,
+            cwt_settings: configData.cwt_settings || DEFAULT_VALUES.config.cwt_settings,
           }));
 
           // Update file count based on loaded config
@@ -723,34 +773,36 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                 <button
                   type="button"
                   className={`segment ${config.model_source === 'bmz' ? 'active' : ''}`}
-                  onClick={() => {
-                    setConfig(prev => ({
-                      ...prev,
-                      model_source: 'bmz',
-                      model: 'BirdSetEfficientNetB1'
-                    }));
-                  }}
+                  onClick={() => setConfig(prev => ({ ...prev, model_source: 'bmz', model: 'BirdSetEfficientNetB1' }))}
                 >
                   Bioacoustics Model Zoo
                 </button>
                 <button
                   type="button"
                   className={`segment ${config.model_source === 'local_file' ? 'active' : ''}`}
-                  onClick={() => {
-                    setConfig(prev => ({
-                      ...prev,
-                      model_source: 'local_file',
-                      model: ''
-                    }));
-                  }}
+                  onClick={() => setConfig(prev => ({ ...prev, model_source: 'local_file', model: '' }))}
                 >
                   Local Model File
+                </button>
+                <button
+                  type="button"
+                  className={`segment ${config.model_source === 'ribbit' ? 'active' : ''}`}
+                  onClick={() => setConfig(prev => ({ ...prev, model_source: 'ribbit', model: 'ribbit' }))}
+                >
+                  RIBBIT
+                </button>
+                <button
+                  type="button"
+                  className={`segment ${config.model_source === 'cwt_detector' ? 'active' : ''}`}
+                  onClick={() => setConfig(prev => ({ ...prev, model_source: 'cwt_detector', model: 'cwt_detector' }))}
+                >
+                  CWT Detector
                 </button>
               </div>
             </div>
 
-            {/* Conditional Model Selection */}
-            {config.model_source === 'bmz' ? (
+            {/* BMZ model picker */}
+            {config.model_source === 'bmz' && (
               <div className="form-group">
                 <label>Model <HelpIcon section="inference-models" /></label>
                 <FormControl size="small" sx={{ mt: 0.5, minWidth: 320, maxWidth: '100%' }}>
@@ -760,76 +812,350 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                   >
                     <MenuItem value="HawkEars">HawkEars</MenuItem>
                     <MenuItem value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</MenuItem>
-                    <MenuItem value="HawkEars_Low_Band">Ruffed & Spruce Grouse (HawkEars Low-band)</MenuItem>
+                    <MenuItem value="HawkEars_Low_Band">Ruffed &amp; Spruce Grouse (HawkEars Low-band)</MenuItem>
                     <MenuItem value="BirdNET">BirdNET Global bird species classifier</MenuItem>
                     <MenuItem value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</MenuItem>
                     <MenuItem value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</MenuItem>
                   </Select>
                 </FormControl>
               </div>
-            ) : (
+            )}
+
+            {/* Local file model picker */}
+            {config.model_source === 'local_file' && (
               <div className="form-group full-width">
                 <label>Local Model File <HelpIcon section="inference-local-model" /></label>
                 <div className="file-selection">
                   <div className="file-selection-buttons">
-                    <button onClick={handleModelFileSelection}>
-                      Select Model File
-                    </button>
+                    <button onClick={handleModelFileSelection}>Select Model File</button>
                     {config.model && (
-                      <button
-                        onClick={() => setConfig(prev => ({ ...prev, model: '' }))}
-                        className="button-clear"
-                        title="Clear selected model file"
-                      >
+                      <button onClick={() => setConfig(prev => ({ ...prev, model: '' }))} className="button-clear" title="Clear selected model file">
                         Clear
                       </button>
                     )}
                   </div>
-                  {config.model && (
-                    <span className="selected-path">
-                      {basename(config.model)}
-                    </span>
-                  )}
+                  {config.model && <span className="selected-path">{basename(config.model)}</span>}
                 </div>
               </div>
             )}
 
-            <div className="form-group">
-              <label>Clip Overlap (sec) <HelpIcon section="inference-overlap" /></label>
-              <input
-                className="compact-input"
-                type="number"
-                min="0"
-                max="1"
-                step="0.1"
-                value={config.overlap}
-                onChange={(e) => setConfig(prev => ({ ...prev, overlap: parseFloat(e.target.value) }))}
-              />
-            </div>
+            {/* RIBBIT parameters */}
+            {config.model_source === 'ribbit' && (
+              <div className="form-group full-width">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--medium-gray)' }}>
+                    Detects periodic, pulsed vocalizations by measuring rhythmic energy at a target pulse rate.{' '}
+                    <HelpIcon section="ribbit-overview" />
+                  </div>
 
-            <div className="form-group">
-              <label>Batch Size <HelpIcon section="inference-batch-size" /></label>
-              <input
-                className="compact-input"
-                type="number"
-                min="1"
-                max="32"
-                value={config.batch_size}
-                onChange={(e) => setConfig(prev => ({ ...prev, batch_size: parseInt(e.target.value) }))}
-              />
-            </div>
+                  <div className="form-group">
+                    <label>Output Class Name <HelpIcon section="ribbit-class-name" /></label>
+                    <input
+                      type="text"
+                      value={config.ribbit_settings.class_name}
+                      onChange={(e) => setConfig(prev => ({ ...prev, ribbit_settings: { ...prev.ribbit_settings, class_name: e.target.value } }))}
+                      placeholder="e.g. Great Plains Toad"
+                      style={{ maxWidth: 280 }}
+                    />
+                    <small style={{ display: 'block', marginTop: 2, color: 'var(--medium-gray)' }}>Column name in output CSV</small>
+                  </div>
 
-            <div className="form-group">
-              <label>Workers <HelpIcon section="inference-workers" /></label>
-              <input
-                className="compact-input"
-                type="number"
-                min="1"
-                max="8"
-                value={config.worker_count}
-                onChange={(e) => setConfig(prev => ({ ...prev, worker_count: parseInt(e.target.value) }))}
-              />
-            </div>
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    <div className="form-group">
+                      <label>Signal Band (Hz) <HelpIcon section="ribbit-signal-band" /></label>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input className="compact-input" type="number" min="0" max="20000" step="50"
+                          value={config.ribbit_settings.signal_band[0]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, ribbit_settings: { ...prev.ribbit_settings, signal_band: [parseFloat(e.target.value), prev.ribbit_settings.signal_band[1]] } }))}
+                        />
+                        <span style={{ color: 'var(--medium-gray)' }}>–</span>
+                        <input className="compact-input" type="number" min="0" max="20000" step="50"
+                          value={config.ribbit_settings.signal_band[1]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, ribbit_settings: { ...prev.ribbit_settings, signal_band: [prev.ribbit_settings.signal_band[0], parseFloat(e.target.value)] } }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Pulse Rate Range (pulses/sec) <HelpIcon section="ribbit-pulse-rate" /></label>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input className="compact-input" type="number" min="0" max="100" step="0.5"
+                          value={config.ribbit_settings.pulse_rate_range[0]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, ribbit_settings: { ...prev.ribbit_settings, pulse_rate_range: [parseFloat(e.target.value), prev.ribbit_settings.pulse_rate_range[1]] } }))}
+                        />
+                        <span style={{ color: 'var(--medium-gray)' }}>–</span>
+                        <input className="compact-input" type="number" min="0" max="100" step="0.5"
+                          value={config.ribbit_settings.pulse_rate_range[1]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, ribbit_settings: { ...prev.ribbit_settings, pulse_rate_range: [prev.ribbit_settings.pulse_rate_range[0], parseFloat(e.target.value)] } }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Clip Duration (sec) <HelpIcon section="ribbit-clip-duration" /></label>
+                      <input className="compact-input" type="number" min="0.1" max="60" step="0.1"
+                        value={config.ribbit_settings.clip_duration}
+                        onChange={(e) => setConfig(prev => ({ ...prev, ribbit_settings: { ...prev.ribbit_settings, clip_duration: parseFloat(e.target.value) } }))}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Clip Overlap (sec) <HelpIcon section="ribbit-clip-overlap" /></label>
+                      <input className="compact-input" type="number" min="0" max="60" step="0.1"
+                        value={config.ribbit_settings.clip_overlap}
+                        onChange={(e) => setConfig(prev => ({ ...prev, ribbit_settings: { ...prev.ribbit_settings, clip_overlap: parseFloat(e.target.value) } }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Noise Bands (Hz) <small style={{ fontWeight: 400, color: 'var(--medium-gray)' }}>— up to 3, subtracted from signal</small> <HelpIcon section="ribbit-noise-bands" /></label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {[0, 1, 2].map(i => (
+                        <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--medium-gray)', minWidth: 16 }}>{i + 1}.</span>
+                          <input className="compact-input" type="number" min="0" max="20000" step="50"
+                            placeholder="min"
+                            value={config.ribbit_settings.noise_bands[i] ? config.ribbit_settings.noise_bands[i][0] : ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                              setConfig(prev => {
+                                const bands = [
+                                  [...(prev.ribbit_settings.noise_bands[0] || [null, null])],
+                                  [...(prev.ribbit_settings.noise_bands[1] || [null, null])],
+                                  [...(prev.ribbit_settings.noise_bands[2] || [null, null])],
+                                ];
+                                bands[i][0] = val;
+                                return { ...prev, ribbit_settings: { ...prev.ribbit_settings, noise_bands: bands.filter(b => b[0] !== null || b[1] !== null) } };
+                              });
+                            }}
+                          />
+                          <span style={{ color: 'var(--medium-gray)' }}>–</span>
+                          <input className="compact-input" type="number" min="0" max="20000" step="50"
+                            placeholder="max"
+                            value={config.ribbit_settings.noise_bands[i] ? config.ribbit_settings.noise_bands[i][1] : ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                              setConfig(prev => {
+                                const bands = [
+                                  [...(prev.ribbit_settings.noise_bands[0] || [null, null])],
+                                  [...(prev.ribbit_settings.noise_bands[1] || [null, null])],
+                                  [...(prev.ribbit_settings.noise_bands[2] || [null, null])],
+                                ];
+                                bands[i][1] = val;
+                                return { ...prev, ribbit_settings: { ...prev.ribbit_settings, noise_bands: bands.filter(b => b[0] !== null || b[1] !== null) } };
+                              });
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CWT Detector parameters */}
+            {config.model_source === 'cwt_detector' && (
+              <div className="form-group full-width">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--medium-gray)' }}>
+                    Detects accelerating sequences of peaks via continuous wavelet transform — designed for Ruffed Grouse drumming and similar accelerating pulse patterns.{' '}
+                    <HelpIcon section="cwt-overview" />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                      onClick={() => setConfig(prev => ({ ...prev, cwt_settings: { ...RUGR_CWT_DEFAULTS } }))}
+                    >
+                      Load Default RUGR Parameters
+                    </button>
+                    <small style={{ color: 'var(--medium-gray)' }}>Ruffed Grouse drumming (Lapp et al. 2022)</small>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Output Class Name <HelpIcon section="cwt-class-name" /></label>
+                    <input
+                      type="text"
+                      value={config.cwt_settings.class_name}
+                      onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, class_name: e.target.value } }))}
+                      placeholder="e.g. Ruffed Grouse"
+                      style={{ maxWidth: 280 }}
+                    />
+                    <small style={{ display: 'block', marginTop: 2, color: 'var(--medium-gray)' }}>Column name in output CSV</small>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    <div className="form-group">
+                      <label>Sample Rate (Hz) <HelpIcon section="cwt-sample-rate" /></label>
+                      <input className="compact-input" type="number" min="100" max="48000"
+                        value={config.cwt_settings.sample_rate}
+                        onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, sample_rate: parseInt(e.target.value) } }))}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Window Length (sec) <HelpIcon section="cwt-window-len" /></label>
+                      <input className="compact-input" type="number" min="1" max="600"
+                        value={config.cwt_settings.window_len}
+                        onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, window_len: parseFloat(e.target.value) } }))}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Center Frequency (Hz) <HelpIcon section="cwt-center-frequency" /></label>
+                      <input className="compact-input" type="number" min="1" max="500"
+                        value={config.cwt_settings.center_frequency}
+                        onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, center_frequency: parseFloat(e.target.value) } }))}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Wavelet <HelpIcon section="cwt-wavelet" /></label>
+                      <input className="compact-input" type="text"
+                        value={config.cwt_settings.wavelet}
+                        onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, wavelet: e.target.value } }))}
+                        style={{ width: 80 }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Peak Threshold <HelpIcon section="cwt-peak-threshold" /></label>
+                      <input className="compact-input" type="number" min="0" max="1" step="0.01"
+                        value={config.cwt_settings.peak_threshold}
+                        onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, peak_threshold: parseFloat(e.target.value) } }))}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Peak Separation (sec) <HelpIcon section="cwt-peak-separation" /></label>
+                      <input className="compact-input" type="number" min="0" max="1" step="0.001"
+                        value={config.cwt_settings.peak_separation}
+                        onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, peak_separation: parseFloat(e.target.value) } }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    <div className="form-group">
+                      <label>&delta;t Range (sec) <HelpIcon section="cwt-dt-range" /></label>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input className="compact-input" type="number" step="0.01"
+                          value={config.cwt_settings.dt_range[0]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, dt_range: [parseFloat(e.target.value), prev.cwt_settings.dt_range[1]] } }))}
+                        />
+                        <span style={{ color: 'var(--medium-gray)' }}>–</span>
+                        <input className="compact-input" type="number" step="0.01"
+                          value={config.cwt_settings.dt_range[1]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, dt_range: [prev.cwt_settings.dt_range[0], parseFloat(e.target.value)] } }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label>&delta;y Range <HelpIcon section="cwt-dy-range" /></label>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input className="compact-input" type="number" step="0.01"
+                          value={config.cwt_settings.dy_range[0]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, dy_range: [parseFloat(e.target.value), prev.cwt_settings.dy_range[1]] } }))}
+                        />
+                        <span style={{ color: 'var(--medium-gray)' }}>–</span>
+                        <input className="compact-input" type="number" step="0.01"
+                          value={config.cwt_settings.dy_range[1]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, dy_range: [prev.cwt_settings.dy_range[0], parseFloat(e.target.value)] } }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label>&delta;²y Range <HelpIcon section="cwt-d2y-range" /></label>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input className="compact-input" type="number" step="0.01"
+                          value={config.cwt_settings.d2y_range[0]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, d2y_range: [parseFloat(e.target.value), prev.cwt_settings.d2y_range[1]] } }))}
+                        />
+                        <span style={{ color: 'var(--medium-gray)' }}>–</span>
+                        <input className="compact-input" type="number" step="0.01"
+                          value={config.cwt_settings.d2y_range[1]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, d2y_range: [prev.cwt_settings.d2y_range[0], parseFloat(e.target.value)] } }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label>Max Skip <HelpIcon section="cwt-max-skip" /></label>
+                      <input className="compact-input" type="number" min="0" max="20"
+                        value={config.cwt_settings.max_skip}
+                        onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, max_skip: parseInt(e.target.value) } }))}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Duration Range (sec) <HelpIcon section="cwt-duration-range" /></label>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input className="compact-input" type="number" min="0" step="0.5"
+                          value={config.cwt_settings.duration_range[0]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, duration_range: [parseFloat(e.target.value), prev.cwt_settings.duration_range[1]] } }))}
+                        />
+                        <span style={{ color: 'var(--medium-gray)' }}>–</span>
+                        <input className="compact-input" type="number" min="0" step="0.5"
+                          value={config.cwt_settings.duration_range[1]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, duration_range: [prev.cwt_settings.duration_range[0], parseFloat(e.target.value)] } }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label>Points Range <HelpIcon section="cwt-points-range" /></label>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input className="compact-input" type="number" min="1"
+                          value={config.cwt_settings.points_range[0]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, points_range: [parseInt(e.target.value), prev.cwt_settings.points_range[1]] } }))}
+                        />
+                        <span style={{ color: 'var(--medium-gray)' }}>–</span>
+                        <input className="compact-input" type="number" min="1"
+                          value={config.cwt_settings.points_range[1]}
+                          onChange={(e) => setConfig(prev => ({ ...prev, cwt_settings: { ...prev.cwt_settings, points_range: [prev.cwt_settings.points_range[0], parseInt(e.target.value)] } }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Standard inference settings — hidden for signal-processing methods */}
+            {(config.model_source === 'bmz' || config.model_source === 'local_file') && (<>
+              <div className="form-group">
+                <label>Clip Overlap (sec) <HelpIcon section="inference-overlap" /></label>
+                <input
+                  className="compact-input"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={config.overlap}
+                  onChange={(e) => setConfig(prev => ({ ...prev, overlap: parseFloat(e.target.value) }))}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Batch Size <HelpIcon section="inference-batch-size" /></label>
+                <input
+                  className="compact-input"
+                  type="number"
+                  min="1"
+                  max="32"
+                  value={config.batch_size}
+                  onChange={(e) => setConfig(prev => ({ ...prev, batch_size: parseInt(e.target.value) }))}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Workers <HelpIcon section="inference-workers" /></label>
+                <input
+                  className="compact-input"
+                  type="number"
+                  min="1"
+                  max="8"
+                  value={config.worker_count}
+                  onChange={(e) => setConfig(prev => ({ ...prev, worker_count: parseInt(e.target.value) }))}
+                />
+              </div>
+            </>)}
           </div>
         )}
 
