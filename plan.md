@@ -11,6 +11,22 @@ take a close look at this codebase, especially documentation markdowns such as r
 - an annotation-only version of the app is built for each platform (Mac ARM, Win 64, Linux 64)
 - server mode: user clones github repo, runs install script, edits config file, launches server that can be accessed on web browser via port forwarding
 
+# Bugs
+after using 'Close Task' button in Review Tab: 
+ERROR
+Cannot read properties of undefined (reading 'column')
+TypeError: Cannot read properties of undefined (reading 'column')
+    at ReviewTab (http://localhost:3011/static/js/bundle.js:102294:29)
+    at renderWithHooks (http://localhost:3011/static/js/bundle.js:53425:22)
+    at updateFunctionComponent (http://localhost:3011/static/js/bundle.js:56993:24)
+    at beginWork (http://localhost:3011/static/js/bundle.js:58712:20)
+    at HTMLUnknownElement.callCallback (http://localhost:3011/static/js/bundle.js:43681:18)
+    at Object.invokeGuardedCallbackDev (http://localhost:3011/static/js/bundle.js:43725:20)
+    at invokeGuardedCallback (http://localhost:3011/static/js/bundle.js:43782:35)
+    at beginWork$1 (http://localhost:3011/static/js/bundle.js:63681:11)
+    at performUnitOfWork (http://localhost:3011/static/js/bundle.js:62929:16)
+    at workLoopSync (http://localhost:3011/static/js/bundle.js:62852:9)
+
 # Incomplete items / TODO /feature request
 test download and use of ML env from HF/GitHub release 
 
@@ -19,7 +35,6 @@ test download and use of ML env from HF/GitHub release
 custom classifiers during inference
 
 create look-up table for default batch size and num_workers arguments based on system specs and model
-
 
 embedding to hoplite as an option during inference
 
@@ -73,10 +88,6 @@ Settings panel, implement buttons for:
 
 - search/filter for clip by name
 
-- [in progress] implement right click menu and actions on a spectrogram/audio widget, available both in Grid Mode and Focus Mode: download audio, download spectrogram, copy audio file path
-
-- dark mode
-
 Jeff Larkin: 
 - ecological inference, basics like map, modelled occupancy in two treatment groups 
 
@@ -85,7 +96,7 @@ JT Larkin:
 
 Davis Hines:
 when you annotate, it continues playing the old clip even after youve selected a label with asdf-keys, which plays overtop of the other clip, which detracted from the softwares intended function of fast review
-- I actually like this feature, but we could make it configurable
+- SL: I actually like this feature, but we could make it configurable
 
 would be nice to have a audacity esq bar that tranverses the entire spectrogram to visualize what part of clip is playing (vertical scroll bar shows playback position)
 - I tried to implement this and it was a huge pain, kept doing ugly jupy thing

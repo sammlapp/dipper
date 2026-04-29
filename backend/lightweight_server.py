@@ -407,11 +407,15 @@ def extract_environment(archive_path, extract_dir):
             logger.info("Running conda-unpack to fix library paths...")
             result = subprocess.run([conda_unpack], capture_output=True, text=True)
             if result.returncode != 0:
-                logger.warning(f"conda-unpack exited with code {result.returncode}: {result.stderr}")
+                logger.warning(
+                    f"conda-unpack exited with code {result.returncode}: {result.stderr}"
+                )
             else:
                 logger.info("conda-unpack complete")
         else:
-            logger.warning(f"conda-unpack not found at {conda_unpack} — skipping prefix rewrite")
+            logger.warning(
+                f"conda-unpack not found at {conda_unpack} — skipping prefix rewrite"
+            )
 
         # Check if extraction was successful
         env_check = check_environment(extract_dir)
@@ -1430,6 +1434,22 @@ class LightweightServer:
         self.app.router.add_post("/files/read", self.read_file_server)
         self.app.router.add_post("/files/unique-name", self.generate_unique_name)
 
+        # SongSpace routes
+        self.app.router.add_post("/songspace/open", self.songspace_open)
+        self.app.router.add_post("/songspace/create", self.songspace_create)
+        self.app.router.add_post("/songspace/info", self.songspace_info)
+        self.app.router.add_post("/songspace/ingest", self.songspace_ingest)
+        self.app.router.add_post(
+            "/songspace/fit-classifier", self.songspace_fit_classifier
+        )
+        self.app.router.add_post("/songspace/predict", self.songspace_predict)
+        self.app.router.add_post(
+            "/songspace/similarity-search", self.songspace_similarity_search
+        )
+        self.app.router.add_post(
+            "/songspace/dataset-samples", self.songspace_dataset_samples
+        )
+
     async def root_handler(self, request):
         """Root endpoint to handle HEAD requests from wait-on"""
         return web.json_response({"status": "ok", "server": "lightweight_server"})
@@ -1951,45 +1971,87 @@ class LightweightServer:
         # Check if already ready
         env_check = check_environment(get_default_env_path())
         if env_check["status"] == "ready":
-            self._env_install_state = {"stage": "ready", "message": "Environment already ready", "error": None}
-            return web.json_response({"status": "already_ready", "state": self._env_install_state})
+            self._env_install_state = {
+                "stage": "ready",
+                "message": "Environment already ready",
+                "error": None,
+            }
+            return web.json_response(
+                {"status": "already_ready", "state": self._env_install_state}
+            )
 
         def _run():
             try:
                 archive_path = get_default_env_archive_path()
                 if not os.path.exists(archive_path):
-                    self._env_install_state = {"stage": "downloading", "message": "Downloading ML environment...", "error": None}
+                    self._env_install_state = {
+                        "stage": "downloading",
+                        "message": "Downloading ML environment...",
+                        "error": None,
+                    }
                     logger.info("Starting background environment download...")
                     result = download_environment()
                     if result["status"] != "success":
-                        self._env_install_state = {"stage": "error", "message": result.get("error", "Download failed"), "error": result.get("error")}
+                        self._env_install_state = {
+                            "stage": "error",
+                            "message": result.get("error", "Download failed"),
+                            "error": result.get("error"),
+                        }
                         return
                 else:
                     logger.info("Archive already cached, skipping download")
 
                 env_dir = get_default_env_path()
-                self._env_install_state = {"stage": "extracting", "message": "Extracting ML environment (this may take a few minutes)...", "error": None}
+                self._env_install_state = {
+                    "stage": "extracting",
+                    "message": "Extracting ML environment (this may take a few minutes)...",
+                    "error": None,
+                }
                 logger.info("Starting background environment extraction...")
                 extract_result = extract_environment(archive_path, env_dir)
                 if extract_result["status"] != "success":
-                    self._env_install_state = {"stage": "error", "message": extract_result.get("error", "Extraction failed"), "error": extract_result.get("error")}
+                    self._env_install_state = {
+                        "stage": "error",
+                        "message": extract_result.get("error", "Extraction failed"),
+                        "error": extract_result.get("error"),
+                    }
                     return
 
                 final = check_environment(env_dir)
                 if final["status"] == "ready":
-                    self._env_install_state = {"stage": "ready", "message": "ML environment ready", "error": None}
+                    self._env_install_state = {
+                        "stage": "ready",
+                        "message": "ML environment ready",
+                        "error": None,
+                    }
                     logger.info("Background environment install complete")
                 else:
-                    self._env_install_state = {"stage": "error", "message": final.get("error", "Environment not valid after extraction"), "error": final.get("error")}
+                    self._env_install_state = {
+                        "stage": "error",
+                        "message": final.get(
+                            "error", "Environment not valid after extraction"
+                        ),
+                        "error": final.get("error"),
+                    }
 
             except Exception as e:
                 logger.error(f"Background env install failed: {e}")
-                self._env_install_state = {"stage": "error", "message": str(e), "error": str(e)}
+                self._env_install_state = {
+                    "stage": "error",
+                    "message": str(e),
+                    "error": str(e),
+                }
 
         thread = threading.Thread(target=_run, daemon=True)
         thread.start()
-        self._env_install_state = {"stage": "downloading", "message": "Starting download...", "error": None}
-        return web.json_response({"status": "started", "state": self._env_install_state})
+        self._env_install_state = {
+            "stage": "downloading",
+            "message": "Starting download...",
+            "error": None,
+        }
+        return web.json_response(
+            {"status": "started", "state": self._env_install_state}
+        )
 
     async def install_env_status(self, request):
         """Return current state of background env install."""
@@ -2966,6 +3028,341 @@ class LightweightServer:
 
         logger.info(f"Lightweight server started on http://{self.host}:{self.port}")
         return runner
+
+    # ------------------------------------------------------------------ #
+    # SongSpace endpoints                                                  #
+    # ------------------------------------------------------------------ #
+
+    def _get_songspace_python(self):
+        """Return python path to use for SongSpace — opso_dev conda env if available."""
+        import shutil
+
+        # Try opso_dev env first (has SongSpace on the feature branch)
+        opso_dev = "/Users/SML161/miniconda3/envs/opso_dev/bin/python"
+        if Path(opso_dev).exists():
+            return opso_dev
+        # Fall back to the standard ML environment
+        result = setup_environment(None)
+        if result.get("status") == "ready":
+            return result["python_path"]
+        raise RuntimeError("No Python environment with SongSpace available")
+
+    def _run_songspace_fn(self, fn_name: str, **kwargs) -> dict:
+        """Run a songspace_utils function in a subprocess via the opso_dev python.
+
+        We serialize kwargs as JSON, pass via stdin, and read the result from stdout.
+        This keeps the SongSpace instance alive between calls via a persistent process
+        — but for simplicity we use module-level registry via a long-running subprocess.
+
+        For now: run each call as a short subprocess that loads the registry from a
+        shelf file on disk.  Simple and reliable for a prototype.
+        """
+        import subprocess, json, sys, os, tempfile
+
+        script = f"""
+import sys, json
+sys.path.insert(0, {repr(str(Path(__file__).parent / "scripts"))})
+import songspace_utils as su
+kwargs = json.loads(sys.stdin.read())
+result = su.{fn_name}(**kwargs)
+print(json.dumps(result))
+"""
+        python = self._get_songspace_python()
+        proc = subprocess.run(
+            [python, "-c", script],
+            input=json.dumps(kwargs),
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        if proc.returncode != 0:
+            stderr = proc.stderr[-2000:] if proc.stderr else ""
+            return {"status": "error", "error": f"Subprocess failed:\n{stderr}"}
+        stdout = proc.stdout.strip()
+        if not stdout:
+            return {
+                "status": "error",
+                "error": f"Empty response from subprocess. stderr: {proc.stderr[-500:]}",
+            }
+        # Take last line (avoid any stray print output before ours)
+        last_line = [l for l in stdout.splitlines() if l.strip()][-1]
+        try:
+            return json.loads(last_line)
+        except json.JSONDecodeError as e:
+            return {
+                "status": "error",
+                "error": f"JSON decode error: {e}. Output: {stdout[-500:]}",
+            }
+
+    # SongSpace instances are heavy — keep them alive in a per-process registry
+    # managed by a long-running worker process.  For the prototype we use a simpler
+    # approach: a persistent background worker process per open SongSpace that keeps
+    # the SS instance in memory and handles requests via stdin/stdout JSON-RPC.
+    # We store worker processes in self._ss_workers keyed by resolved db_path.
+
+    def _ensure_ss_worker(self, ssdb_path: str):
+        """Ensure a SongSpace worker process is running for db_path. Return its handle."""
+        import subprocess, tempfile, os
+
+        if not hasattr(self, "_ss_workers"):
+            self._ss_workers = {}
+            self._ss_worker_logs = {}
+        key = str(Path(ssdb_path).resolve())
+        worker = self._ss_workers.get(key)
+        if worker is None or worker.poll() is not None:
+            python = self._get_songspace_python()
+            worker_script = str(
+                Path(__file__).parent / "scripts" / "songspace_worker.py"
+            )
+            # Write stderr to a temp log file — avoids pipe buffer deadlock from TF warnings
+            log_path = os.path.join(
+                tempfile.gettempdir(),
+                f"dipper_songspace_{key.replace('/', '_')[-40:]}.log",
+            )
+            log_fh = open(log_path, "w")
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"  # disable Python stdout buffering
+            env["TF_CPP_MIN_LOG_LEVEL"] = "3"  # suppress TF C++ logs to stdout
+            proc = subprocess.Popen(
+                [python, worker_script],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=log_fh,
+                text=True,
+                bufsize=1,  # line-buffered
+                env=env,
+            )
+            self._ss_workers[key] = proc
+            self._ss_worker_logs[key] = log_path
+            logger.info(f"Started SongSpace worker PID {proc.pid}, log: {log_path}")
+        return self._ss_workers[key]
+
+    def _call_worker(self, ssdb_path: str, method: str, **params) -> dict:
+        """Send a JSON-RPC call to the SongSpace worker for ssdb_path."""
+        import json, threading
+
+        key = str(Path(ssdb_path).resolve())
+        worker = self._ensure_ss_worker(ssdb_path)
+        log_path = getattr(self, "_ss_worker_logs", {}).get(key, "")
+        msg = json.dumps({"method": method, "params": params}) + "\n"
+        try:
+            worker.stdin.write(msg)
+            worker.stdin.flush()
+            result_holder = [None]
+            err_holder = [None]
+
+            def read():
+                try:
+                    # Skip blank lines — some libraries (TF) print to stdout
+                    line = ""
+                    while not line.strip():
+                        line = worker.stdout.readline()
+                        if line == "":  # EOF / process died
+                            break
+                    result_holder[0] = line
+                except Exception as e:
+                    err_holder[0] = str(e)
+
+            t = threading.Thread(target=read, daemon=True)
+            t.start()
+            t.join(timeout=600)
+            if t.is_alive():
+                return {
+                    "status": "error",
+                    "error": "Worker timed out after 600s",
+                    "log_path": log_path,
+                }
+            if err_holder[0]:
+                return {"status": "error", "error": err_holder[0], "log_path": log_path}
+            line = result_holder[0]
+            if not line:
+                # Worker died — read last lines from log file for context
+                tail = ""
+                try:
+                    with open(log_path) as f:
+                        tail = "".join(f.readlines()[-30:])
+                except Exception:
+                    pass
+                del self._ss_workers[key]
+                return {
+                    "status": "error",
+                    "error": "Worker process exited unexpectedly",
+                    "log": tail,
+                    "log_path": log_path,
+                }
+            result = json.loads(line.strip())
+            result["log_path"] = log_path
+            return result
+        except Exception as e:
+            try:
+                worker.kill()
+            except Exception:
+                pass
+            if key in self._ss_workers:
+                del self._ss_workers[key]
+            return {"status": "error", "error": str(e), "log_path": log_path}
+
+    async def songspace_open(self, request):
+        """POST /songspace/open — open or create a SongSpace."""
+        try:
+            data = await request.json()
+            db_path = data.get("db_path", "")
+            if not db_path:
+                return web.json_response(
+                    {"status": "error", "error": "db_path required"}, status=400
+                )
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: self._call_worker(db_path, "open", db_path=db_path),
+            )
+            return self.json_response_with_nan_handling(result)
+        except Exception as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def songspace_create(self, request):
+        """POST /songspace/create — create a new SongSpace."""
+        try:
+            data = await request.json()
+            db_path = data.get("db_path", "")
+            feature_extractor = data.get("feature_extractor", "perch2")
+            if not db_path:
+                return web.json_response(
+                    {"status": "error", "error": "db_path required"}, status=400
+                )
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: self._call_worker(
+                    db_path, "create", db_path=db_path, feature_extractor=feature_extractor
+                ),
+            )
+            return self.json_response_with_nan_handling(result)
+        except Exception as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def songspace_info(self, request):
+        """POST /songspace/info — get info about an open SongSpace."""
+        try:
+            data = await request.json()
+            db_path = data.get("db_path", "")
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: self._call_worker(db_path, "info", db_path=db_path)
+            )
+            return self.json_response_with_nan_handling(result)
+        except Exception as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def songspace_ingest(self, request):
+        """POST /songspace/ingest — ingest audio into a SongSpace dataset."""
+        try:
+            data = await request.json()
+            db_path = data.get("db_path", "")
+            if not db_path:
+                return web.json_response({"status": "error", "error": "db_path required"}, status=400)
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: self._call_worker(
+                    db_path,
+                    "ingest_audio",
+                    db_path=db_path,
+                    samples=data.get("samples", ""),
+                    dataset_name=data.get("dataset_name", ""),
+                    allow_training=data.get("allow_training", True),
+                    file_to_deployment=data.get("file_to_deployment", "parent_folder_name"),
+                    embedding_exists_mode=data.get("embedding_exists_mode", "skip"),
+                    bypass_augmentations=data.get("bypass_augmentations", True),
+                    audio_root=data.get("audio_root") or None,
+                ),
+            )
+            return self.json_response_with_nan_handling(result)
+        except Exception as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def songspace_fit_classifier(self, request):
+        """POST /songspace/fit-classifier — train a classifier."""
+        try:
+            data = await request.json()
+            db_path = data.get("db_path", "")
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: self._call_worker(
+                    db_path,
+                    "fit_classifier",
+                    db_path=db_path,
+                    classifier_name=data.get("classifier_name", "classifier"),
+                    classes=data.get("classes", []),
+                    train_datasets=data.get("train_datasets", []),
+                    validation_dataset=data.get("validation_dataset", None),
+                    weak_negatives_proportion=data.get(
+                        "weak_negatives_proportion", 2.0
+                    ),
+                    steps=data.get("steps", 500),
+                    batch_size=data.get("batch_size", 128),
+                ),
+            )
+            return self.json_response_with_nan_handling(result)
+        except Exception as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def songspace_predict(self, request):
+        """POST /songspace/predict — apply classifier, save CSV."""
+        try:
+            data = await request.json()
+            db_path = data.get("db_path", "")
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: self._call_worker(
+                    db_path,
+                    "predict",
+                    db_path=db_path,
+                    classifier_name=data.get("classifier_name", ""),
+                    dataset_name=data.get("dataset_name", ""),
+                    output_csv=data.get("output_csv", ""),
+                    batch_size=data.get("batch_size", 1024),
+                ),
+            )
+            return self.json_response_with_nan_handling(result)
+        except Exception as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def songspace_similarity_search(self, request):
+        """POST /songspace/similarity-search — embedding similarity search."""
+        try:
+            data = await request.json()
+            db_path = data.get("db_path", "")
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: self._call_worker(
+                    db_path,
+                    "similarity_search",
+                    db_path=db_path,
+                    dataset_name=data.get("dataset_name", ""),
+                    sample_indices=data.get("sample_indices", []),
+                    k=data.get("k", 20),
+                    exact_search=data.get("exact_search", False),
+                ),
+            )
+            return self.json_response_with_nan_handling(result)
+        except Exception as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def songspace_dataset_samples(self, request):
+        """POST /songspace/dataset-samples — get sample rows from a dataset."""
+        try:
+            data = await request.json()
+            db_path = data.get("db_path", "")
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: self._call_worker(
+                    db_path,
+                    "get_dataset_samples",
+                    db_path=db_path,
+                    dataset_name=data.get("dataset_name", ""),
+                    max_rows=data.get("max_rows", 500),
+                ),
+            )
+            return self.json_response_with_nan_handling(result)
+        except Exception as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
 
 
 def main():

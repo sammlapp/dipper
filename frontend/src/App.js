@@ -23,8 +23,10 @@ import HelpIcon from '@mui/icons-material/Help';
 import ColorizeIcon from '@mui/icons-material/Colorize';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ListAltIcon from '@mui/icons-material/PlaylistPlay'
+import BubbleChartIcon from '@mui/icons-material/BubbleChart';
 import './App.css';
 import ExploreTab from './components/ExploreTab';
+import SongSpaceTab from './components/SongSpaceTab';
 import ReviewTab from './components/ReviewTab';
 import HelpTab from './components/HelpTab';
 import SettingsTab from './components/SettingsTab';
@@ -147,6 +149,7 @@ function App() {
     { id: 'tasks', name: 'Task Queue', icon: <ListAltIcon /> },
     { id: 'explore', name: 'Explore', icon: <ExploreIcon /> },
     { id: 'review', name: 'Review', icon: <RuleIcon /> },
+    { id: 'songspace', name: 'SongSpace', icon: <BubbleChartIcon /> },
     { id: 'settings', name: 'Settings', icon: <SettingsIcon /> },
     { id: 'help', name: 'Help', icon: <HelpIcon /> }
   ];
@@ -452,6 +455,10 @@ function App() {
 
         <div style={{ display: activeTab === 'review' ? 'block' : 'none' }}>
           <ReviewTab drawerOpen={isDrawerOpen} isActive={activeTab === 'review'} />
+        </div>
+
+        <div style={{ display: activeTab === 'songspace' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <SongSpaceTab />
         </div>
 
         <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }}>

@@ -234,7 +234,19 @@ body.dark-mode .MuiTabs-indicator {
 .annotation-error,
 .task-error,
 .error-details,
-.server-status {
+.server-status,
+pre,
+pre *,
+code,
+code *,
+textarea,
+input[type="text"],
+input[type="number"],
+input[type="search"],
+input[type="email"],
+input[type="url"],
+.selectable,
+.selectable * {
   user-select: text;
   -webkit-user-select: text;
 }
