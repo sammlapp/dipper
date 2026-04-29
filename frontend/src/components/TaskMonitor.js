@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { TASK_STATUS } from '../utils/TaskManager';
+import { openFolder } from '../utils/fileOperations';
+import { isLocalMode } from '../utils/mode';
 
-function TaskMonitor({ taskManager }) {
+function TaskMonitor({ taskManager, onExtractClips }) {
   const [tasks, setTasks] = useState([]);
   const [queueInfo, setQueueInfo] = useState({
     currentTask: null,
@@ -272,12 +274,30 @@ function TaskMonitor({ taskManager }) {
                 )}
 
                 {task.status === TASK_STATUS.COMPLETED && (
-                  <button
-                    className="task-action delete"
-                    onClick={() => handleDeleteTask(task.id)}
-                  >
-                    Delete
-                  </button>
+                  <>
+                    {task.result?.job_folder && (
+                      <button
+                        className="task-action"
+                        onClick={() => openFolder(task.result.job_folder)}
+                      >
+                        {isLocalMode() ? 'Open Folder' : 'Copy Path'}
+                      </button>
+                    )}
+                    {task.type === 'inference' && task.result?.job_folder && onExtractClips && (
+                      <button
+                        className="task-action"
+                        onClick={() => onExtractClips(task.result.job_folder)}
+                      >
+                        Extract Clips
+                      </button>
+                    )}
+                    <button
+                      className="task-action delete"
+                      onClick={() => handleDeleteTask(task.id)}
+                    >
+                      Delete
+                    </button>
+                  </>
                 )}
               </div>
             </div>

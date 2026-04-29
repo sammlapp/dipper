@@ -2844,6 +2844,60 @@ body.dark-mode .multiclass-select .select__indicator-separator {
   background-color: var(--border-color);
 }
 
+/* react-select (classNamePrefix="react-select") dark mode — used in ClassifierGuidedPanel */
+body.dark-mode .react-select__control {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--text-primary);
+}
+
+body.dark-mode .react-select__control:hover {
+  border-color: var(--text-secondary);
+}
+
+body.dark-mode .react-select__menu {
+  background-color: var(--dropdown-bg);
+  border-color: var(--dropdown-border);
+}
+
+body.dark-mode .react-select__option {
+  background-color: var(--dropdown-bg);
+  color: var(--text-primary);
+}
+
+body.dark-mode .react-select__option--is-focused {
+  background-color: var(--toolbar-btn-hover);
+}
+
+body.dark-mode .react-select__option--is-selected {
+  background-color: var(--toolbar-btn-active-bg);
+}
+
+body.dark-mode .react-select__single-value,
+body.dark-mode .react-select__multi-value__label,
+body.dark-mode .react-select__input-container {
+  color: var(--text-primary);
+}
+
+body.dark-mode .react-select__multi-value {
+  background-color: var(--toolbar-btn-hover);
+}
+
+body.dark-mode .react-select__multi-value__remove:hover {
+  background-color: var(--toolbar-btn-active-bg);
+  color: var(--text-primary);
+}
+
+body.dark-mode .react-select__indicator,
+body.dark-mode .react-select__indicator-separator {
+  color: var(--text-secondary);
+  background-color: var(--border-color);
+}
+
+body.dark-mode .react-select__placeholder {
+  color: var(--text-secondary);
+}
+
 /* Comments Field */
 .comments-field {
   width: 100%;
@@ -4040,7 +4094,8 @@ body.dark-mode .multiclass-select .select__indicator-separator {
   flex-direction: column;
   height: 100%;
   /* Remove fixed height calculation for drawer integration */
-  background-color: var(--light-bg);
+  background-color: transparent;
+  /* var(--light-bg); */
   width: 100%;
   position: relative;
 }
@@ -6109,6 +6164,16 @@ body.dark-mode .multiclass-select .select__indicator-separator {
   border-color: #4caf50;
 }
 
+body.dark-mode .bin-status-display.incomplete {
+  background: var(--input-bg);
+  border-color: var(--text-secondary);
+}
+
+body.dark-mode .bin-status-display.complete {
+  background: rgba(76, 175, 80, 0.12);
+  border-color: #4caf50;
+}
+
 .bin-status-header {
   display: flex;
   justify-content: space-between;
@@ -6235,7 +6300,7 @@ body.dark-mode {
 
 /* Panels and surfaces */
 body.dark-mode .settings-panel,
-body.dark-mode .review-tab-layout,
+/* body.dark-mode .review-tab-layout, */
 body.dark-mode .left-tray,
 body.dark-mode .left-tray-content,
 body.dark-mode .annotation-settings-tray,

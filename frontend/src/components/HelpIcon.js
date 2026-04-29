@@ -77,7 +77,7 @@ const HELP_TOOLTIPS = {
   'extraction-audio-export': 'Also copy the raw audio segments alongside the annotation task.',
   'extraction-output-mode': 'Format of the output: binary review (yes/no) or multi-class labels.',
   'extraction-class-selection': 'Which classes to extract clips for.',
-  'extraction-stratification': 'Balance extracted clips across score ranges or subfolders.',
+  'extraction-stratification': 'Independently extract clips for each audio subset (e.g., folder).',
   'extraction-filtering': 'Filter source clips by score range, file, or other criteria.',
   'extraction-python-env': 'Use a custom conda/Python environment instead of the bundled one.',
   'extraction-tasks': 'Create a task to queue it, or Create and Run to start immediately.',

@@ -155,31 +155,149 @@ def load_prediction_files(file_paths: List[str]) -> pd.DataFrame:
     return combined_df
 
 
+# generic, flexible timestamp parsing for turning file names into datetimes
+from aru_metadata_parser.parse import ARUFileTimestampParser
+
+default_datetime_parser = ARUFileTimestampParser()
+
+
+def parse_timestamp_from_filename(file_path):
+    return default_datetime_parser.parse(file_path)
+
+
+# utilities for guessing deployment name from file path
+def parent_folder_name(file_path):
+    """Utility function to extract the parent folder name from a file path"""
+    return Path(file_path).parent.name
+
+
+def two_parents_name(file_path):
+    """Utility function to extract "grandparent_parent" folder name from a file path"""
+    p = Path(file_path).parent
+    gp = p.parent
+    return f"{gp.name}_{p.name}"
+
+
+def second_parent_name(file_path):
+    """Utility function to extract the second parent folder name from a file path"""
+    return Path(file_path).parent.parent.name
+
+
+def filename_first_part(file_path):
+    """Utility function to extract the part of the filename before the first underscore from a file path"""
+    return Path(file_path).stem.split("_")[0]
+
+
+_GROUPING_FUNCS = {
+    "parent_folder": parent_folder_name,
+    "second_parent": second_parent_name,
+    "two_parents": two_parents_name,
+    "filename_prefix": filename_first_part,
+}
+
+
+def _assign_date_group(
+    timestamp, date_grouping: str, date_ranges: list
+) -> Optional[str]:
+    """Return the date-group label for a timestamp, or None if it falls in no group."""
+    if timestamp is None:
+        return None
+    if date_grouping == "by_day":
+        return timestamp.strftime("%Y-%m-%d")
+    if date_grouping == "custom":
+        from datetime import date as _date
+
+        ts_date = timestamp.date() if hasattr(timestamp, "date") else timestamp
+        for r in date_ranges:
+            try:
+                start = _date.fromisoformat(r["start"])
+                end = _date.fromisoformat(r["end"])
+            except (KeyError, ValueError):
+                continue
+            if start <= ts_date <= end:
+                return r.get("label") or f"{r['start']}_{r['end']}"
+        return None  # outside all ranges → exclude row
+    return None
+
+
 def apply_stratification(
     df: pd.DataFrame, config: Dict[str, Any]
 ) -> Dict[str, pd.DataFrame]:
     """
-    Apply stratification to group predictions
+    Apply stratification to group predictions.
+
+    Path grouping (filepath_grouping):
+        none             – all files in a single group
+        parent_folder    – immediate parent directory name
+        second_parent    – grandparent directory name
+        two_parents      – "grandparent_parent"
+        filename_prefix  – filename stem up to first underscore
+
+    Date grouping (date_grouping):
+        none    – no date splitting
+        by_day  – one group per calendar date parsed from filename
+        custom  – user-supplied list of {start, end, label} date ranges (inclusive)
+
+    The two axes are intersected: a row's group key is
+    "<path_group>|<date_group>" (or just one part when the other is "none").
+    Rows whose timestamp falls outside all custom ranges are excluded.
 
     Returns:
         Dictionary mapping group names to DataFrames
     """
     stratification = config.get("stratification", {})
+    path_grouping = stratification.get("filepath_grouping", "none")
+    # backwards-compat
+    if path_grouping == "none" and stratification.get("by_subfolder", False):
+        path_grouping = "parent_folder"
 
-    # Apply subfolder stratification
-    if stratification.get("by_subfolder", False):
-        # if "subfolder" not in df.columns:  # if existing, use whatever is there!
-        df["subfolder"] = df["file"].apply(
-            lambda x: str(Path(x).parent.name) if pd.notna(x) else "unknown"
-        )
-        groups = {group: group_df for group, group_df in df.groupby("subfolder")}
-        logging.info(
-            f"Stratification created {len(groups)} groups: {list(groups.keys())}"
-        )
-        # df = df.drop(columns=["subfolder"])
-        return groups
+    date_grouping = stratification.get("date_grouping", "none")
+    date_ranges = stratification.get("date_ranges", [])
 
-    return {"all_data": df}
+    df = df.copy()
+
+    # ── path component ────────────────────────────────────────────────────────
+    path_func = _GROUPING_FUNCS.get(path_grouping)
+    use_path = path_func is not None
+    if use_path:
+        df["_path_group"] = df["file"].apply(
+            lambda x: path_func(x) if pd.notna(x) else "unknown"
+        )
+
+    # ── date component ────────────────────────────────────────────────────────
+    use_date = date_grouping != "none"
+    if use_date:
+        if "start_timestamp" not in df.columns:
+            df["start_timestamp"] = df["file"].apply(parse_timestamp_from_filename)
+        df["_date_group"] = df["start_timestamp"].apply(
+            lambda ts: _assign_date_group(ts, date_grouping, date_ranges)
+        )
+        # rows outside all custom ranges get None → drop them
+        if date_grouping == "custom":
+            before = len(df)
+            df = df[df["_date_group"].notna()].copy()
+            logging.info(
+                f"Date stratification: dropped {before - len(df)} rows outside all date ranges"
+            )
+
+    # ── build combined group key ──────────────────────────────────────────────
+    if use_path and use_date:
+        df["_group"] = (
+            df["_path_group"].astype(str) + "|" + df["_date_group"].astype(str)
+        )
+    elif use_path:
+        df["_group"] = df["_path_group"]
+    elif use_date:
+        df["_group"] = df["_date_group"]
+    else:
+        return {"all_data": df}
+
+    groups = {g: gdf for g, gdf in df.groupby("_group")}
+    logging.info(
+        f"Stratification (path={path_grouping}, date={date_grouping}) "
+        f"created {len(groups)} groups: {list(groups.keys())}"
+    )
+    return groups
 
 
 def apply_filtering(
@@ -210,6 +328,8 @@ def apply_filtering(
             logging.info(
                 f"Score threshold filtering: {original_length} -> {len(df)} predictions"
             )
+
+    # apply start timestamp based filtering
 
     return df
 
@@ -448,16 +568,28 @@ def extract_clips_from_groups(
         if extraction.get("random_clips", {}).get("enabled", False):
             group_clips.extend(extract_random_clips(filtered_df, class_list, config))
 
-        # Add group info to clips
+        # Add group info to clips — split combined key back into its two axes
+        # group_name is "<path_group>|<date_group>" when both axes are active,
+        # or just one part when only one axis is active.
+        parts = group_name.split("|", 1)
+        path_part = parts[0] if len(parts) >= 1 else ""
+        date_part = parts[1] if len(parts) == 2 else ""
         for clip in group_clips:
-            clip["group"] = group_name
+            clip["group"] = group_name  # kept for internal dedup / legacy use
+            clip["audio_file_group"] = path_part
+            clip["date_group"] = date_part
 
         all_selected_clips.extend(group_clips)
 
-    # remove duplicates #TODO - this can make it look like clips are missing from some
-    # extraction strategies (eg kept random but not highest / score-bin stratified)
     clip_df = pd.DataFrame.from_records(all_selected_clips)
-    clip_df = clip_df.drop_duplicates(subset=["file", "start_time", "end_time"])
+    # Deduplicate per class so the same clip can appear for multiple species,
+    # but the same (file, start_time, end_time, class) combo isn't repeated.
+    dedup_cols = (
+        ["file", "start_time", "end_time", "class"]
+        if "class" in clip_df.columns
+        else ["file", "start_time", "end_time"]
+    )
+    clip_df = clip_df.drop_duplicates(subset=dedup_cols)
 
     logging.info(f"Total clips selected: {len(clip_df)}")
     return clip_df
@@ -613,9 +745,15 @@ def create_extraction_csvs(
                     # start and end refer to the clip's offset from full audio file
                     pass
 
-                # Add subfolder column if stratification by subfolder is enabled
-                if config.get("stratification", {}).get("by_subfolder", False):
-                    extracted_clip_info["subfolder"] = clip.get("group", "")
+                # Add group columns if any stratification is active
+                strat = config.get("stratification", {})
+                if (
+                    strat.get("filepath_grouping", "none") != "none"
+                    or strat.get("date_grouping", "none") != "none"
+                    or strat.get("by_subfolder", False)
+                ):
+                    extracted_clip_info["audio_file_group"] = clip.get("audio_file_group", "")
+                    extracted_clip_info["date_group"] = clip.get("date_group", "")
 
                 csv_data.append(extracted_clip_info)
 
@@ -687,9 +825,15 @@ def create_extraction_csvs(
                 # Use original file path and times
                 pass
 
-            # Add subfolder column if stratification by subfolder is enabled
-            if config.get("stratification", {}).get("by_subfolder", False):
-                row["subfolder"] = row.get("group", "")
+            # Add group columns if any stratification is active
+            strat = config.get("stratification", {})
+            if (
+                strat.get("filepath_grouping", "none") != "none"
+                or strat.get("date_grouping", "none") != "none"
+                or strat.get("by_subfolder", False)
+            ):
+                row["audio_file_group"] = row.get("audio_file_group", "")
+                row["date_group"] = row.get("date_group", "")
 
             # Add columns for each class with actual scores (not empty strings)
             for class_name in all_classes:

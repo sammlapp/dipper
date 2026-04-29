@@ -251,6 +251,22 @@ export const readFile = async (filePath) => {
 };
 
 /**
+ * Open a folder in the native file browser (desktop) or copy path to clipboard (server)
+ * @param {string} folderPath - Folder path to open or copy
+ */
+export const openFolder = async (folderPath) => {
+  if (isLocalMode()) {
+    if (isTauriAvailable()) {
+      await invokeTauri('open_file', { filePath: folderPath });
+      return;
+    }
+    throw new Error('Local mode folder open not available');
+  } else {
+    await navigator.clipboard.writeText(folderPath);
+  }
+};
+
+/**
  * Default export with all file operations
  */
 const fileOperations = {
@@ -263,7 +279,8 @@ const fileOperations = {
   generateUniqueFolderName,
   saveFile,
   writeFile,
-  readFile
+  readFile,
+  openFolder
 };
 
 export default fileOperations;

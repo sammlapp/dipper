@@ -14,7 +14,6 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SchoolIcon from '@mui/icons-material/School';
-import ExploreIcon from '@mui/icons-material/Explore';
 import RuleIcon from '@mui/icons-material/Rule';
 import HelpIcon from '@mui/icons-material/Help';
 import ColorizeIcon from '@mui/icons-material/Colorize';
@@ -22,7 +21,6 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import ListAltIcon from '@mui/icons-material/PlaylistPlay'
 import BubbleChartIcon from '@mui/icons-material/BubbleChart';
 import './App.css';
-import ExploreTab from './components/ExploreTab';
 import SongSpaceTab from './components/SongSpaceTab';
 import ReviewTab from './components/ReviewTab';
 import HelpTab from './components/HelpTab';
@@ -34,6 +32,12 @@ import TaskMonitor from './components/TaskMonitor';
 import taskManager from './utils/TaskManager';
 import { useBackendUrl } from './hooks/useBackendUrl';
 import { useDarkMode } from './hooks/useDarkMode';
+
+// ─── Feature flags ────────────────────────────────────────────────────────────
+// Set to false to hide a tab from the full app build.
+const ENABLE_TRAINING  = false;
+const ENABLE_SONGSPACE = false;
+// ─────────────────────────────────────────────────────────────────────────────
 
 const drawerWidth = 240;
 
@@ -105,6 +109,7 @@ function App() {
   const [currentTask, setCurrentTask] = useState(null);
   const [runningTasks, setRunningTasks] = useState([]);
   const [taskHistory, setTaskHistory] = useState([]);
+  const [extractionPredictionsFolder, setExtractionPredictionsFolder] = useState(null); // {folder, ts}
   const backendUrl = useBackendUrl();
 
   // ML environment state
@@ -115,16 +120,15 @@ function App() {
   const envPollRef = React.useRef(null);
 
   const tabs = [
-    { id: 'inference', name: 'Inference', icon: <PlayArrowIcon /> },
-    { id: 'training', name: 'Training', icon: <SchoolIcon /> },
-    { id: 'extraction', name: 'Extraction', icon: <ColorizeIcon /> },
-    { id: 'tasks', name: 'Task Queue', icon: <ListAltIcon /> },
-    { id: 'explore', name: 'Explore', icon: <ExploreIcon /> },
-    { id: 'review', name: 'Review', icon: <RuleIcon /> },
-    { id: 'songspace', name: 'SongSpace', icon: <BubbleChartIcon /> },
-    { id: 'settings', name: 'Settings', icon: <SettingsIcon /> },
-    { id: 'help', name: 'Help', icon: <HelpIcon /> }
-  ];
+    { id: 'inference',  name: 'Inference',   icon: <PlayArrowIcon /> },
+    ENABLE_TRAINING  && { id: 'training',  name: 'Training',    icon: <SchoolIcon /> },
+    { id: 'extraction', name: 'Extraction',  icon: <ColorizeIcon /> },
+    { id: 'tasks',      name: 'Task Queue',  icon: <ListAltIcon /> },
+    { id: 'review',     name: 'Review',      icon: <RuleIcon /> },
+    ENABLE_SONGSPACE && { id: 'songspace', name: 'SongSpace',   icon: <BubbleChartIcon /> },
+    { id: 'settings',   name: 'Settings',    icon: <SettingsIcon /> },
+    { id: 'help',       name: 'Help',        icon: <HelpIcon /> },
+  ].filter(Boolean);
 
   const handleDrawerOpen = () => {
     setOpen(true);
@@ -226,6 +230,12 @@ function App() {
     const task = taskManager.createTask(taskConfig, taskName);
     taskManager.queueTask(task.id);
     console.log('Task created and queued:', task);
+  };
+
+  const handleExtractClips = (jobFolder) => {
+    // Wrap in object with timestamp so the effect always re-fires, even for the same folder
+    setExtractionPredictionsFolder({ folder: jobFolder, ts: Date.now() });
+    setActiveTab('extraction');
   };
 
   // If review-only mode, render only the ReviewTab without drawer
@@ -375,35 +385,36 @@ function App() {
           />
         </div>
 
-        <div className="tab-content" style={{ display: activeTab === 'training' ? 'block' : 'none' }}>
-          <TrainingTaskCreationForm
-            onTaskCreate={handleTaskCreate}
-            onTaskCreateAndRun={handleTaskCreateAndRun}
-          />
-        </div>
+        {ENABLE_TRAINING && (
+          <div className="tab-content" style={{ display: activeTab === 'training' ? 'block' : 'none' }}>
+            <TrainingTaskCreationForm
+              onTaskCreate={handleTaskCreate}
+              onTaskCreateAndRun={handleTaskCreateAndRun}
+            />
+          </div>
+        )}
 
         <div className="tab-content" style={{ display: activeTab === 'extraction' ? 'block' : 'none' }}>
           <ExtractionTaskCreationForm
             onTaskCreate={handleTaskCreate}
             onTaskCreateAndRun={handleTaskCreateAndRun}
+            initialPredictionsFolder={extractionPredictionsFolder}
           />
         </div>
 
         <div style={{ display: activeTab === 'tasks' ? 'flex' : 'none', flexDirection: 'column', flex: 1, padding: '24px', minHeight: 0 }}>
-          <TaskMonitor taskManager={taskManager} />
-        </div>
-
-        <div style={{ display: activeTab === 'explore' ? 'block' : 'none' }}>
-          <ExploreTab />
+          <TaskMonitor taskManager={taskManager} onExtractClips={handleExtractClips} />
         </div>
 
         <div style={{ display: activeTab === 'review' ? 'block' : 'none' }}>
           <ReviewTab drawerOpen={isDrawerOpen} isActive={activeTab === 'review'} />
         </div>
 
-        <div style={{ display: activeTab === 'songspace' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          <SongSpaceTab />
-        </div>
+        {ENABLE_SONGSPACE && (
+          <div style={{ display: activeTab === 'songspace' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <SongSpaceTab />
+          </div>
+        )}
 
         <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }}>
           <SettingsTab />

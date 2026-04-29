@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { basename } from 'pathe';
 import Select from 'react-select';
-import { Tabs, Tab, Box, Checkbox } from '@mui/material';
+import { Tabs, Tab, Box, Checkbox, FormControl, Select as MuiSelect, MenuItem } from '@mui/material';
 import HelpIcon from './HelpIcon';
 import { selectFolder, saveFile, selectJSONFiles } from '../utils/fileOperations';
 import { getBackendUrl } from '../utils/backendConfig';
@@ -13,7 +13,9 @@ const DEFAULT_VALUES = {
     predictions_folder: '',
     class_list: [],
     stratification: {
-      by_subfolder: false
+      filepath_grouping: 'none',
+      date_grouping: 'none',   // 'none' | 'by_day' | 'custom'
+      date_ranges: []           // [{start: 'YYYY-MM-DD', end: 'YYYY-MM-DD', label: ''}]
     },
     filtering: {
       score_threshold_enabled: false,
@@ -37,13 +39,22 @@ const DEFAULT_VALUES = {
   }
 };
 
-function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
+function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, initialPredictionsFolder }) {
   const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
   const [settingsTab, setSettingsTab] = useState(0);
   const [config, setConfig] = useState(DEFAULT_VALUES.config);
   const [availableClasses, setAvailableClasses] = useState([]);
   const [fileCount, setFileCount] = useState(0);
   const [isScanningFiles, setIsScanningFiles] = useState(false);
+
+  // Pre-populate predictions folder when navigating from a completed task
+  useEffect(() => {
+    if (initialPredictionsFolder?.folder) {
+      setConfig(prev => ({ ...prev, predictions_folder: initialPredictionsFolder.folder }));
+      scanPredictionsFolder(initialPredictionsFolder.folder);
+    }
+    // eslint-disable-next-line
+  }, [initialPredictionsFolder]);
 
   const handlePredictionsFolderSelection = async () => {
     try {
@@ -263,7 +274,11 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
             ...prev,
             predictions_folder: configData.predictions_folder || '',
             class_list: configData.class_list || [],
-            stratification: configData.stratification || DEFAULT_VALUES.config.stratification,
+            stratification: configData.stratification ? {
+              filepath_grouping: configData.stratification.filepath_grouping || (configData.stratification.by_subfolder ? 'parent_folder' : 'none'),
+              date_grouping: configData.stratification.date_grouping || 'none',
+              date_ranges: configData.stratification.date_ranges || [],
+            } : DEFAULT_VALUES.config.stratification,
             filtering: configData.filtering || DEFAULT_VALUES.config.filtering,
             extraction: configData.extraction || DEFAULT_VALUES.config.extraction,
             output_dir: configData.output_dir || '',
@@ -588,22 +603,109 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
         {settingsTab === 1 && (
           <div className="form-grid extraction-tab-grid">
             <div className="form-group full-width">
-              <label>Stratification <HelpIcon section="extraction-stratification" /></label>
-              <div className="help-text">Choose how to stratify clips across different groups for balanced sampling</div>
-              <div className="checkbox-group">
-                <label>
-                  <Checkbox
-                    size="small"
-                    checked={config.stratification.by_subfolder}
-                    onChange={(e) => setConfig(prev => ({
+              <label>Audio Filepath Stratification <HelpIcon section="extraction-stratification" /></label>
+              <div className="help-text">Group audio files by path component and select clips independently within each group</div>
+              <FormControl size="small" sx={{ mt: 0.75, minWidth: 320, maxWidth: '100%' }}>
+                <MuiSelect
+                  value={config.stratification.filepath_grouping}
+                  onChange={(e) => setConfig(prev => ({
+                    ...prev,
+                    stratification: { ...prev.stratification, filepath_grouping: e.target.value }
+                  }))}
+                >
+                  <MenuItem value="none">None (all files in one group)</MenuItem>
+                  <MenuItem value="parent_folder">Parent folder</MenuItem>
+                  <MenuItem value="second_parent">Second parent folder</MenuItem>
+                  <MenuItem value="two_parents">Two parents (grandparent_parent)</MenuItem>
+                  <MenuItem value="filename_prefix">Filename before first underscore</MenuItem>
+                </MuiSelect>
+              </FormControl>
+            </div>
+
+            <div className="form-group full-width">
+              <label>Date Stratification <HelpIcon section="extraction-stratification" /></label>
+              <div className="help-text">Group clips by recording date (parsed from filename). Intersected with filepath stratification.</div>
+              <FormControl size="small" sx={{ mt: 0.75, minWidth: 320, maxWidth: '100%' }}>
+                <MuiSelect
+                  value={config.stratification.date_grouping}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setConfig(prev => ({
                       ...prev,
-                      stratification: { ...prev.stratification, by_subfolder: e.target.checked }
-                    }))}
-                    sx={{ p: 0.25, mr: 0.5 }}
-                  />
-                  Stratify by subfolder
-                </label>
-              </div>
+                      stratification: {
+                        ...prev.stratification,
+                        date_grouping: val,
+                        date_ranges: val === 'custom' ? (prev.stratification.date_ranges.length > 0 ? prev.stratification.date_ranges : [{ start: '', end: '', label: '' }]) : []
+                      }
+                    }));
+                  }}
+                >
+                  <MenuItem value="none">None</MenuItem>
+                  <MenuItem value="by_day">By day (one group per calendar date)</MenuItem>
+                  <MenuItem value="custom">Custom date ranges</MenuItem>
+                </MuiSelect>
+              </FormControl>
+
+              {config.stratification.date_grouping === 'custom' && (
+                <div style={{ marginTop: '12px' }}>
+                  {config.stratification.date_ranges.map((range, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                      <input
+                        type="date"
+                        value={range.start}
+                        onChange={(e) => {
+                          const ranges = config.stratification.date_ranges.map((r, j) => j === i ? { ...r, start: e.target.value } : r);
+                          setConfig(prev => ({ ...prev, stratification: { ...prev.stratification, date_ranges: ranges } }));
+                        }}
+                      />
+                      <span>–</span>
+                      <input
+                        type="date"
+                        value={range.end}
+                        onChange={(e) => {
+                          const ranges = config.stratification.date_ranges.map((r, j) => j === i ? { ...r, end: e.target.value } : r);
+                          setConfig(prev => ({ ...prev, stratification: { ...prev.stratification, date_ranges: ranges } }));
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Label (optional)"
+                        value={range.label}
+                        onChange={(e) => {
+                          const ranges = config.stratification.date_ranges.map((r, j) => j === i ? { ...r, label: e.target.value } : r);
+                          setConfig(prev => ({ ...prev, stratification: { ...prev.stratification, date_ranges: ranges } }));
+                        }}
+                        style={{ width: '140px' }}
+                      />
+                      {range.start && range.end && (() => {
+                        const ms = new Date(range.end) - new Date(range.start);
+                        const days = Math.round(ms / 86400000) + 1;
+                        return days >= 1
+                          ? <span className="help-text" style={{ whiteSpace: 'nowrap' }}>{days} day{days !== 1 ? 's' : ''}</span>
+                          : <span className="help-text" style={{ color: 'var(--error, #f44336)', whiteSpace: 'nowrap' }}>end before start</span>;
+                      })()}
+                      <button
+                        type="button"
+                        className="button-clear"
+                        onClick={() => {
+                          const ranges = config.stratification.date_ranges.filter((_, j) => j !== i);
+                          setConfig(prev => ({ ...prev, stratification: { ...prev.stratification, date_ranges: ranges } }));
+                        }}
+                        title="Remove this range"
+                      >✕</button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    style={{ marginTop: '4px', fontSize: '0.8rem', padding: '4px 10px' }}
+                    onClick={() => {
+                      const ranges = [...config.stratification.date_ranges, { start: '', end: '', label: '' }];
+                      setConfig(prev => ({ ...prev, stratification: { ...prev.stratification, date_ranges: ranges } }));
+                    }}
+                  >+ Add Date Range</button>
+                </div>
+              )}
             </div>
 
             <div className="form-group full-width">
