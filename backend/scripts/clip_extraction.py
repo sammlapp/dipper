@@ -27,6 +27,7 @@ from typing import Dict, List, Tuple, Any, Optional
 import pickle
 import random
 from datetime import datetime
+from aru_metadata_parser.parse import ARUFileTimestampParser
 
 # Add the backend path to import opensoundscape if available
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -156,8 +157,6 @@ def load_prediction_files(file_paths: List[str]) -> pd.DataFrame:
 
 
 # generic, flexible timestamp parsing for turning file names into datetimes
-from aru_metadata_parser.parse import ARUFileTimestampParser
-
 default_datetime_parser = ARUFileTimestampParser()
 
 
@@ -752,7 +751,9 @@ def create_extraction_csvs(
                     or strat.get("date_grouping", "none") != "none"
                     or strat.get("by_subfolder", False)
                 ):
-                    extracted_clip_info["audio_file_group"] = clip.get("audio_file_group", "")
+                    extracted_clip_info["audio_file_group"] = clip.get(
+                        "audio_file_group", ""
+                    )
                     extracted_clip_info["date_group"] = clip.get("date_group", "")
 
                 csv_data.append(extracted_clip_info)

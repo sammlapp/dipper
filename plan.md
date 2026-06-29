@@ -11,6 +11,13 @@ take a close look at this codebase, especially documentation markdowns such as r
 - an annotation-only version of the app is built for each platform (Mac ARM, Win 64, Linux 64)
 - server mode: user clones github repo, runs install script, edits config file, launches server that can be accessed on web browser via port forwarding
 
+# Steps to next release
+- update env build with new opso and aru_metadata_parser versions
+
+## for songspace release
+- persistent background task for the open SongSpace allows rapid query/interaction; need proper IPC
+
+
 # Bugs
 after using 'Close Task' button in Review Tab: 
 ERROR

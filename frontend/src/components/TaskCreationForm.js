@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { basename } from 'pathe';
-import { FormControl, Select, MenuItem, Tabs, Tab, Box, Checkbox } from '@mui/material';
+import { FormControl, Select, MenuItem, Tabs, Tab, Box, Checkbox, Menu } from '@mui/material';
 import HelpIcon from './HelpIcon';
 import { selectFiles, selectFolder, selectTextFiles, selectModelFiles, saveFile, selectJSONFiles } from '../utils/fileOperations';
 import { getBackendUrl } from '../utils/backendConfig';
@@ -454,7 +454,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
           setConfig(prev => ({
             ...prev,
             model_source: configData.model_source || 'bmz',
-            model: configData.model || 'BirdNET',
+            model: configData.model || 'PerchV2',
             files: configData.files || [],
             file_globbing_patterns: configData.file_globbing_patterns || [],
             file_list: configData.file_list || '',
@@ -810,12 +810,16 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                     value={config.model}
                     onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
                   >
-                    <MenuItem value="HawkEars">HawkEars</MenuItem>
+                    <MenuItem value="Perch2">Perch V2 Global Classifier</MenuItem>
+                    <MenuItem value="Perch2LiteRT">Perch V2 (LiteRT)</MenuItem>
+                    <MenuItem value="Perch2ONNX">Perch V2 (ONNX)</MenuItem>
+                    <MenuItem value="HawkEars">HawkEars N. American Bird Classifier (V1.0.8)</MenuItem>
                     <MenuItem value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</MenuItem>
                     <MenuItem value="HawkEars_Low_Band">Ruffed &amp; Spruce Grouse (HawkEars Low-band)</MenuItem>
-                    <MenuItem value="BirdNET">BirdNET Global bird species classifier</MenuItem>
-                    <MenuItem value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</MenuItem>
-                    <MenuItem value="BirdSetConvNeXT">BirdSet Global bird species classifier ConvNext</MenuItem>
+                    <MenuItem value="Perch">Perch (V1) Global Classifier</MenuItem>
+                    <MenuItem value="BirdNET">BirdNET Global bird classifier (V2.4)</MenuItem>
+                    <MenuItem value="BirdSetEfficientNetB1">BirdSet-EfficientNetB1 Global bird classifier </MenuItem>
+                    <MenuItem value="BirdSetConvNeXT">BirdSet-ConvNeXT Global bird classifier </MenuItem>
                   </Select>
                 </FormControl>
               </div>

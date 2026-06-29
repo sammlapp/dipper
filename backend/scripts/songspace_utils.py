@@ -5,6 +5,7 @@ SongSpace backend utilities for Dipper.
 Each function is called by the lightweight_server and returns a JSON-serializable dict.
 The SongSpace instance is kept alive in a module-level registry keyed by db_path.
 """
+
 import json
 import traceback
 from pathlib import Path
@@ -30,6 +31,7 @@ def create_songspace(db_path: str, feature_extractor: str = "perch2") -> dict:
     """Create a new SongSpace at db_path with the given feature extractor."""
     try:
         from opensoundscape.ml.song_space import SongSpace
+
         db_path = str(Path(db_path).resolve())
         ss = SongSpace(db_path, feature_extractor=feature_extractor)
         ss.save()
@@ -43,6 +45,7 @@ def open_songspace(db_path: str) -> dict:
     """Open an existing SongSpace at db_path, restoring datasets and classifiers."""
     try:
         from opensoundscape.ml.song_space import SongSpace
+
         db_path = str(Path(db_path).resolve())
         ss = SongSpace.open(db_path)
         _register(db_path, ss)
@@ -99,7 +102,7 @@ def ingest_audio(
 ) -> dict:
     """Ingest audio into SongSpace from a folder path or annotation CSV."""
     try:
-        from opensoundscape.ml.song_space import (
+        from clip_extraction import (
             parent_folder_name,
             two_parents_name,
             second_parent_name,
@@ -125,7 +128,9 @@ def ingest_audio(
             if p.is_file() and p.suffix.lower() == ".csv":
                 df = pd.read_csv(samples)
                 # Set multi-index if columns present
-                idx_cols = [c for c in ["file", "start_time", "end_time"] if c in df.columns]
+                idx_cols = [
+                    c for c in ["file", "start_time", "end_time"] if c in df.columns
+                ]
                 if idx_cols:
                     df = df.set_index(idx_cols)
                 samples_arg = df
@@ -191,6 +196,7 @@ def fit_classifier(
         if val_metrics is not None:
             try:
                 import math
+
                 last = val_metrics[-1] if isinstance(val_metrics, list) else None
                 if last and isinstance(last, dict):
                     summary["last_val_metrics"] = {
@@ -216,7 +222,9 @@ def predict_and_save(
     """Apply classifier to dataset, save predictions CSV, return path."""
     try:
         ss = _ss(db_path)
-        preds = ss.predict_on_dataset(classifier_name, dataset_name, batch_size=batch_size)
+        preds = ss.predict_on_dataset(
+            classifier_name, dataset_name, batch_size=batch_size
+        )
         # Reset index so file/start_time/end_time become columns
         preds_out = preds.reset_index()
         Path(output_csv).parent.mkdir(parents=True, exist_ok=True)
@@ -255,9 +263,15 @@ def similarity_search(
         # results is a DataFrame with index (file,start_time,end_time) and similarity column
         results_reset = results.reset_index()
         # take top k by sort_score or similarity
-        score_col = "sort_score" if "sort_score" in results_reset.columns else "similarity" if "similarity" in results_reset.columns else None
+        score_col = (
+            "sort_score"
+            if "sort_score" in results_reset.columns
+            else "similarity" if "similarity" in results_reset.columns else None
+        )
         if score_col:
-            results_reset = results_reset.sort_values(score_col, ascending=False).head(k)
+            results_reset = results_reset.sort_values(score_col, ascending=False).head(
+                k
+            )
         records = []
         for _, row in results_reset.iterrows():
             rec = {
@@ -285,7 +299,9 @@ def get_dataset_samples(db_path: str, dataset_name: str, max_rows: int = 500) ->
         for _, row in subset.iterrows():
             rec = {
                 "file": str(row.get("file", "")),
-                "start_time": float(row.get("start_time", 0)) if "start_time" in row else 0,
+                "start_time": (
+                    float(row.get("start_time", 0)) if "start_time" in row else 0
+                ),
                 "end_time": float(row.get("end_time", 0)) if "end_time" in row else 0,
             }
             # include label columns
@@ -294,6 +310,7 @@ def get_dataset_samples(db_path: str, dataset_name: str, max_rows: int = 500) ->
                 if val is not None:
                     try:
                         import math
+
                         if isinstance(val, float) and math.isnan(val):
                             rec[col] = None
                         else:

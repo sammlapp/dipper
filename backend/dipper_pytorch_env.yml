@@ -22,13 +22,12 @@ dependencies:
     - aiohttp-cors>=0.7.0
 
     # Bioacoustics libraries (with development code)
-    - git+https://github.com/kitzeslab/opensoundscape.git@dev.20251120
-    - bioacoustics-model-zoo==0.12.3
+    - opensoundscape==0.13.1
+    - bioacoustics-model-zoo==0.13.1
     
-    # optional BMZ dependencies for extended model support
+    # BMZ dependencies for extended model support
     - timm>=1.0.0 # for HawkEars
-    - torchaudio # for HawkEarsc
     - ai-edge-litert # for BirdNET (.tflite)
     - transformers # for BirdSET
     - tensorflow>=2.20.0 # for Perch and Perch v2
-    - tensorflow-hub # for Perch and Perch v2
+    - kagglehub # for Perch and Perch v2

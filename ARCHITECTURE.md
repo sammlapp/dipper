@@ -14,6 +14,13 @@ Dipper is a cross-platform bioacoustics machine learning application with two de
 
 ## Architecture Diagram
 
+Key points:
+1. Backend: The python executable (lightweight_server.py) serves as the backend, providing the API to the frontend via aiohttp.
+2. Frontend: ReactJS front end is run either via Tauri (desktop mode) or launched with npx (server mode)
+3. File system operations: implemented via Tauri (desktop mode, see main.rs) or directly in lightweight_server.py (server mode)
+4. Background Tasks: The backend launches background ml tasks by running python scripts with a dedicated conda-pack environment. Task management is handled by task_manager.js in the React app. 
+
+
 ### Desktop Mode
 
 ```
