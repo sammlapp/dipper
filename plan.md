@@ -11,9 +11,6 @@ take a close look at this codebase, especially documentation markdowns such as r
 - an annotation-only version of the app is built for each platform (Mac ARM, Win 64, Linux 64)
 - server mode: user clones github repo, runs install script, edits config file, launches server that can be accessed on web browser via port forwarding
 
-# Steps to next release
-- update env build with new opso and aru_metadata_parser versions
-
 ## for songspace release
 - persistent background task for the open SongSpace allows rapid query/interaction; need proper IPC
 
@@ -34,13 +31,10 @@ TypeError: Cannot read properties of undefined (reading 'column')
     at performUnitOfWork (http://localhost:3011/static/js/bundle.js:62929:16)
     at workLoopSync (http://localhost:3011/static/js/bundle.js:62852:9)
 
+Task queue tab: after restarting a task, current task duration is correct in the top section "Currently Running" but in "All Tasks", the Duration is negative. Must be comparing an outdated end vs start time from the original task run. 
+
 # Incomplete items / TODO /feature request
 test download and use of ML env from HF/GitHub release 
-
-
-
-- select subset of classes to save inference results for
-- potentially call eBird API, BirdNET meta-model, or something else to get a local species list
 
 - add "load config" button in task pane (opens new task creation panel with config settings from the job)
 
@@ -73,8 +67,6 @@ WandB integration: need to allow user to provide API key and configure group nam
 - used dipper env to run conda-pack, creating dipper_ml_env.tar.gz file
 
 test downloading/using default conda-pack env on linux! (updated conda pack env; need to rerun github runner and re-upload to onedrive)
-
-
 
 
 [requested] Task manager status message updates:

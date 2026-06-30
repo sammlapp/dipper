@@ -179,8 +179,8 @@ function SettingsTab() {
                 <Switch
                   checked={darkMode}
                   onChange={(e) => setDarkMode(e.target.checked)}
-                  icon={<LightModeIcon fontSize="small" />}
-                  checkedIcon={<DarkModeIcon fontSize="small" />}
+                // icon={<LightModeIcon fontSize="small" />}
+                // checkedIcon={<DarkModeIcon fontSize="small" />}
                 />
               }
               label={

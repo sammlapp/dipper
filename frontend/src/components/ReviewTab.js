@@ -1137,12 +1137,18 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     setFilters({
       annotation: { enabled: false, values: [] },
       labels: { enabled: false, values: [] },
-      annotation_status: { enabled: false, values: [] }
+      annotation_status: { enabled: false, values: [] },
+      bounding_box: { enabled: false, value: 'has' },
+      numeric_range: { enabled: false, column: null, min: null, max: null },
+      categorical: { enabled: false, column: null, values: [] }
     });
     setAppliedFilters({
       annotation: { enabled: false, values: [] },
       labels: { enabled: false, values: [] },
-      annotation_status: { enabled: false, values: [] }
+      annotation_status: { enabled: false, values: [] },
+      bounding_box: { enabled: false, value: 'has' },
+      numeric_range: { enabled: false, column: null, min: null, max: null },
+      categorical: { enabled: false, column: null, values: [] }
     });
     setCurrentSavePath(null);
 
