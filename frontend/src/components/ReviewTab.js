@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ReactSelect from 'react-select';
 
 const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(`--${name}`).trim();
-import { Drawer, IconButton, Modal, Box, Typography, FormControl, Select, MenuItem } from '@mui/material';
+import { Drawer, IconButton, Modal, Box, Typography, FormControl, Select, MenuItem, Slider } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import AnnotationCard from './AnnotationCard';
 import ReviewSettings from './ReviewSettings';
@@ -735,20 +735,29 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
           console.warn('Some clips failed to generate spectrograms:', failedClips);
 
           // Show helpful error message for the first failed clip
-          if (failedClips.length > 0) {
-            const firstFailedClip = failedClips[0];
-            // Find the original clip data to get the CSV file path
-            const originalClip = currentData.find(c => c.id === firstFailedClip.clip_id);
-            if (originalClip) {
-              const expectedPath = clipsToLoad.find(c => c.clip_id === firstFailedClip.clip_id)?.file_path || 'unknown';
-              const csvPath = originalClip.file;
-              const errorMessage = `Audio file(s) were not found in the expected locations. ` +
-                `First missing file: ${expectedPath}\n` +
-                `Path in CSV file: ${csvPath}\n` +
-                `Root audio folder: ${rootAudioPath || '(not set)'}\n\n` +
-                `Use the menu in the upper left to specify the Root Audio Folder that should be prepended to values of the 'file' column in the annotation CSV.`;
-              setError(errorMessage);
-            }
+          const firstFailedClip = failedClips[0];
+          const firstFailedError = firstFailedClip?.error || '';
+          const firstFailedPath = firstFailedClip?.file_path
+            || clipsToLoad.find(c => c.clip_id === firstFailedClip.clip_id)?.file_path
+            || 'unknown';
+          const originalClip = currentData.find(c => c.id === firstFailedClip.clip_id);
+          const csvPath = originalClip?.file || firstFailedPath;
+          if (firstFailedError.toLowerCase().includes('out of bounds') || firstFailedError.toLowerCase().includes('beyond the audio')) {
+            // Clip times are beyond the audio file duration
+            setError(
+              `Clip times appear to be out of bounds for the audio files.\n` +
+              `${firstFailedError}\n\n` +
+              `Make sure the 'start_time' and 'end_time' columns in your CSV are in seconds ` +
+              `relative to the start of each audio file (not absolute timestamps or milliseconds).`
+            );
+          } else {
+            setError(
+              `Audio file(s) were not found in the expected locations.\n` +
+              `First failed file: ${firstFailedPath}\n` +
+              `Path in CSV: ${csvPath}\n` +
+              `Root audio folder: ${rootAudioPath || '(not set)'}\n\n` +
+              `Use the menu in the upper left to specify the Root Audio Folder that should be prepended to values of the 'file' column in the annotation CSV.`
+            );
           }
         }
 
@@ -1054,6 +1063,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       setCurrentBinIndex(0);
     }
   }, [classifierGuidedMode.enabled]);
+
+  // Re-apply CGL order when filters are applied while CGL is already active.
+  // visibleClipIds changes on every applyFilters/clearFilters call (new Set or null),
+  // so watching it is a reliable signal that the filtered set has changed.
+  useEffect(() => {
+    if (!classifierGuidedMode.enabled) return;
+    // Only re-apply if CGL was already applied (bins or sort exist)
+    const alreadyApplied = stratifiedBins.length > 0 || cglSortedData !== null;
+    if (!alreadyApplied) return;
+    applyCglOrder();
+  }, [visibleClipIds]); // intentionally omits applyCglOrder/stratifiedBins/cglSortedData to avoid loops
 
   // Note: Manual classes are now applied via explicit button clicks in ReviewSettings
   // No automatic updates when manual_classes changes
@@ -1767,6 +1787,26 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     if (!isFinite(min)) return { min: 0, max: 1 };
     return { min, max };
   }, [filters.numeric_range.column, annotationData]);
+
+  // Density histogram bins for the selected numeric column
+  const numericDensityHistogram = useMemo(() => {
+    const col = filters.numeric_range.column;
+    if (!col || !annotationData.length) return null;
+    const { min, max } = numericRangeBounds;
+    if (min === max) return null;
+    const NUM_BINS = 40;
+    const bins = new Array(NUM_BINS).fill(0);
+    const range = max - min;
+    annotationData.forEach(clip => {
+      const v = parseFloat(clip[col]);
+      if (!isNaN(v)) {
+        const idx = Math.min(Math.floor(((v - min) / range) * NUM_BINS), NUM_BINS - 1);
+        bins[idx]++;
+      }
+    });
+    const maxCount = Math.max(...bins);
+    return { bins, maxCount, min, max };
+  }, [filters.numeric_range.column, annotationData, numericRangeBounds]);
 
   // Unique values for the selected categorical column
   const categoricalColumnValues = useMemo(() => {
@@ -3428,6 +3468,64 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                           ))}
                         </Select>
                       </FormControl>
+                      {filters.numeric_range.column && numericDensityHistogram && (
+                        (() => {
+                          const { bins, maxCount, min, max } = numericDensityHistogram;
+                          const W = 214, H = 48, PAD = 1;
+                          const binW = (W - PAD * 2) / bins.length;
+                          const activeMin = filters.numeric_range.min ?? min;
+                          const activeMax = filters.numeric_range.max ?? max;
+                          const range = max - min || 1;
+                          const toX = v => PAD + ((v - min) / range) * (W - PAD * 2);
+                          const tickCount = 5;
+                          const ticks = Array.from({ length: tickCount }, (_, i) => min + (i / (tickCount - 1)) * (max - min));
+                          const fmt = v => {
+                            const abs = Math.abs(v);
+                            if (abs === 0) return '0';
+                            if (abs >= 1000 || (abs < 0.01 && abs > 0)) return v.toExponential(1);
+                            return abs < 1 ? v.toFixed(2) : v.toFixed(1);
+                          };
+                          return (
+                            <svg width="100%" viewBox={`0 0 ${W} ${H + 16}`} preserveAspectRatio="xMidYMax meet" style={{ display: 'block', overflow: 'visible' }}>
+                              {/* bars */}
+                              {bins.map((count, i) => {
+                                const barH = maxCount > 0 ? (count / maxCount) * H : 0;
+                                const x = PAD + i * binW;
+                                const binMin = min + (i / bins.length) * range;
+                                const binMax = min + ((i + 1) / bins.length) * range;
+                                const inRange = binMax >= activeMin && binMin <= activeMax;
+                                return (
+                                  <rect
+                                    key={i}
+                                    x={x}
+                                    y={H - barH}
+                                    width={Math.max(binW - 0.5, 1)}
+                                    height={barH}
+                                    fill={inRange ? 'rgba(100,160,255,0.75)' : 'rgba(160,160,160,0.3)'}
+                                  />
+                                );
+                              })}
+                              {/* active range overlay lines */}
+                              <line x1={toX(activeMin)} y1={0} x2={toX(activeMin)} y2={H} stroke="rgba(60,120,255,0.9)" strokeWidth={1.5} />
+                              <line x1={toX(activeMax)} y1={0} x2={toX(activeMax)} y2={H} stroke="rgba(60,120,255,0.9)" strokeWidth={1.5} />
+                              {/* axis baseline */}
+                              <line x1={PAD} y1={H} x2={W - PAD} y2={H} stroke="rgba(0,0,0,0.15)" strokeWidth={1} />
+                              {/* tick labels */}
+                              {ticks.map((v, i) => (
+                                <text
+                                  key={i}
+                                  x={toX(v)}
+                                  y={H + 12}
+                                  textAnchor="middle"
+                                  fontSize="9"
+                                  fill="rgba(0,0,0,0.45)"
+                                  fontFamily="monospace"
+                                >{fmt(v)}</text>
+                              ))}
+                            </svg>
+                          );
+                        })()
+                      )}
                       {filters.numeric_range.column && (
                         <>
                           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -3455,29 +3553,18 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                               }))}
                             />
                           </div>
-                          <input
-                            type="range"
+                          <Slider
+                            size="small"
                             min={numericRangeBounds.min}
                             max={numericRangeBounds.max}
                             step={(numericRangeBounds.max - numericRangeBounds.min) / 200 || 0.01}
-                            value={filters.numeric_range.min ?? numericRangeBounds.min}
-                            style={{ width: '100%' }}
-                            onChange={(e) => setFilters(prev => ({
+                            value={[filters.numeric_range.min ?? numericRangeBounds.min, filters.numeric_range.max ?? numericRangeBounds.max]}
+                            onChange={(_, newValue) => setFilters(prev => ({
                               ...prev,
-                              numeric_range: { ...prev.numeric_range, min: parseFloat(e.target.value) }
+                              numeric_range: { ...prev.numeric_range, min: newValue[0], max: newValue[1] }
                             }))}
-                          />
-                          <input
-                            type="range"
-                            min={numericRangeBounds.min}
-                            max={numericRangeBounds.max}
-                            step={(numericRangeBounds.max - numericRangeBounds.min) / 200 || 0.01}
-                            value={filters.numeric_range.max ?? numericRangeBounds.max}
-                            style={{ width: '100%' }}
-                            onChange={(e) => setFilters(prev => ({
-                              ...prev,
-                              numeric_range: { ...prev.numeric_range, max: parseFloat(e.target.value) }
-                            }))}
+                            disableSwap
+                            sx={{ mx: 0.5, width: 'calc(100% - 8px)' }}
                           />
                         </>
                       )}
