@@ -214,6 +214,19 @@ function App() {
           } else if (state.stage === 'error') {
             setEnvStatus('missing');
             clearInterval(envPollRef.current);
+          } else if (state.stage === 'extracting' || state.stage === 'downloading') {
+            // Fallback: also directly check if the env is actually ready already,
+            // in case the background thread updated the env but the state update was missed.
+            fetch(`${backendUrl}/env/check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ env_path: null }) })
+              .then(r => r.json())
+              .then(result => {
+                if (result.status === 'ready') {
+                  setEnvInstallState({ stage: 'ready', message: 'ML environment ready', error: null });
+                  setEnvStatus('ready');
+                  clearInterval(envPollRef.current);
+                }
+              })
+              .catch(() => { });
           }
         })
         .catch(() => { });

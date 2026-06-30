@@ -423,12 +423,12 @@ def extract_environment(archive_path, extract_dir):
 
         # Check if extraction was successful
         env_check = check_environment(extract_dir)
-        if env_check["status"] in ["ready", "missing"]:
+        if env_check["status"] == "ready":
             return {"status": "success", "env_path": extract_dir}
         else:
             return {
                 "status": "error",
-                "error": f"Environment extraction failed: {env_check.get('error', 'Unknown error')}",
+                "error": f"Environment extraction failed: {env_check.get('error', env_check.get('status', 'Unknown error'))}",
             }
 
     except Exception as e:
