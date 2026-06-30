@@ -287,7 +287,7 @@ Managed through Settings tab, saved/loaded via HTTP endpoints.
 - React 18.3.1, Material-UI 5.15.0, Tauri 2.x
 
 **Backend:**
-- Python 3.11, aiohttp, PyTorch, OpenSoundscape, librosa, pandas
+- Python 3.11, aiohttp, PyTorch, OpenSoundscape, SoundFile, pandas
 
 **Build:**
 - Tauri CLI, PyInstaller, conda-pack

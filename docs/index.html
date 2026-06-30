@@ -365,19 +365,35 @@
     }
 
     /* ── Screenshots ── */
-    .screenshots-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    .screenshots-gallery {
+      display: flex;
       gap: 18px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 12px;
+      /* Hide scrollbar on most browsers but keep it functional */
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
     }
 
-    @media (max-width: 860px) {
-      .screenshots-grid {
-        grid-template-columns: 1fr;
-      }
+    .screenshots-gallery::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .screenshots-gallery::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .screenshots-gallery::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
     }
 
     .screenshot-card {
+      flex: 0 0 auto;
+      width: clamp(280px, 55vw, 700px);
+      scroll-snap-align: start;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -451,7 +467,7 @@
     <div class="badge-row">
       <span class="badge blue">macOS · Windows · Linux</span>
       <span class="badge green">Open Source · MIT</span>
-      <span class="badge">Efficient keyboard annotation</span>
+      <span class="badge blue">Efficient keyboard annotation</span>
     </div>
     <a href="https://github.com/sammlapp/dipper" style="
     display:inline-flex;align-items:center;gap:8px;
@@ -574,21 +590,33 @@
     <!-- ── Screenshots ── -->
     <section id="screenshots">
       <h2>Screenshots</h2>
-      <p class="section-sub">Annotate efficiently with fluid switching between Grid and
-        Focus layouts and keyboard-based annotation. </p>
-      <div class="screenshots-grid">
+      <div class="screenshots-gallery">
         <figure class="screenshot-card">
           <img src="img/grid_mode_screenshot.png" alt="Dipper grid mode screenshot" loading="lazy" />
-          <figcaption class="screenshot-caption">Grid Mode</figcaption>
+          <figcaption class="screenshot-caption">Review: Grid Mode</figcaption>
         </figure>
         <figure class="screenshot-card">
           <img src="img/focus_mode_screenshot.png" alt="Dipper focus mode screenshot" loading="lazy" />
-          <figcaption class="screenshot-caption">Focus Mode</figcaption>
+          <figcaption class="screenshot-caption">Review: Focus Mode</figcaption>
         </figure>
+        <figure class="screenshot-card">
+          <img src="img/extraction_screenshot.png" alt="Dipper extraction screenshot" loading="lazy" />
+          <figcaption class="screenshot-caption">Select Clips for Review</figcaption>
+        </figure>
+        <figure class="screenshot-card">
+          <img src="img/inference_config_screenshot.png" alt="Dipper ML Classification screenshot" loading="lazy" />
+          <figcaption class="screenshot-caption">Launch ML Classification</figcaption>
+        </figure>
+        <figure class="screenshot-card">
+          <img src="img/task_queue_screenshot.png" alt="Dipper task queue screenshot" loading="lazy" />
+          <figcaption class="screenshot-caption">Track ML background tasks</figcaption>
+        </figure>
+
       </div>
 
     </section>
     <!-- ── Video Tutorials ── -->
+
     <section id="tutorials">
       <h2>Video Tutorials</h2>
       <div class="info-grid">
