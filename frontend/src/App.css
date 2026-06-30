@@ -4143,6 +4143,13 @@ body.dark-mode .react-select__placeholder {
   color: var(--yes);
 }
 
+.save-status-indicator .unsaved-label {
+  font-size: 0.75rem;
+  color: #f59e0b;
+  margin-left: 0.25rem;
+  white-space: nowrap;
+}
+
 /* Bulk Annotation Controls in Toolbar */
 .toolbar-bulk-controls {
   display: flex;

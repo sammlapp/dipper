@@ -212,11 +212,11 @@ export const writeFile = async (filePath, content) => {
       body: JSON.stringify({ path: filePath, content })
     });
 
+    const result = await response.json();
     if (!response.ok) {
-      throw new Error(`Failed to write file: ${response.statusText}`);
+      throw new Error(result.error || `Failed to write file (HTTP ${response.status})`);
     }
 
-    const result = await response.json();
     return { success: result.status === 'success', error: result.error };
   }
 };

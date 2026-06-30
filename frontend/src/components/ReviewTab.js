@@ -24,6 +24,16 @@ import { useDarkMode } from '../hooks/useDarkMode';
 import { useBackendUrl } from '../hooks/useBackendUrl';
 import { dirname, basename } from 'pathe';
 
+// Tauri throws string errors; Error objects have .message. Normalize to a readable string.
+function getErrorMessage(err) {
+  const raw = (err instanceof Error ? err.message : String(err)) || 'Unknown error';
+  const lower = raw.toLowerCase();
+  if (lower.includes('permission denied') || lower.includes('access is denied') || lower.includes('operation not permitted')) {
+    return `Permission denied — you do not have write access to the selected location. Choose a different directory.`;
+  }
+  return raw;
+}
+
 function LoadDialog({ open, headers, onConfirm, onCancel }) {
   const nonDataCols = new Set(['file', 'start_time', 'end_time', 'annotation', 'labels', 'annotation_status', 'comments']);
   const annotationCandidates = headers.filter(h => !nonDataCols.has(h));
@@ -424,7 +434,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       return false;
     } catch (err) {
       console.error('Failed to save config to file:', err);
-      setError('Failed to save config: ' + err.message);
+      setError('Failed to save config: ' + getErrorMessage(err));
       return false;
     }
   };
@@ -2495,6 +2505,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       }
     } catch (err) {
       console.error('Auto-save failed:', err);
+      setError('Auto-save failed: ' + getErrorMessage(err));
     }
   };
 
@@ -2513,7 +2524,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       await handleSaveAsWithData(annotationData, settings);
     } catch (err) {
       console.error('Save failed:', err);
-      setError('Save failed: ' + err.message);
+      setError('Save failed: ' + getErrorMessage(err));
     }
   };
 
@@ -2537,7 +2548,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       await handleSaveAsWithData(annotationData, settings);
     } catch (err) {
       console.error('Save As failed:', err);
-      setError('Failed to export annotations: ' + err.message);
+      setError('Failed to export annotations: ' + getErrorMessage(err));
     }
   };
 
@@ -3656,6 +3667,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                 >
                   {hasUnsavedChanges ? 'edit' : 'check_circle'}
                 </span>
+                {hasUnsavedChanges && (
+                  <span className="unsaved-label">Unsaved Changes</span>
+                )}
               </div>
             )}
           </div>
