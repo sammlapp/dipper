@@ -28,6 +28,7 @@ dependencies:
     
     # BMZ dependencies for extended model support
     - timm>=1.0.0 # for HawkEars
+    - opencv-python # for HawkEars
     - ai-edge-litert # for BirdNET (.tflite)
     - transformers # for BirdSET
     - tensorflow>=2.20.0 # for Perch and Perch v2
