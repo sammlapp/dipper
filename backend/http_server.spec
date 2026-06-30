@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-# PyInstaller spec for lightweight_server.py
+# PyInstaller spec for app.py
 # This server handles all backend communication with the frontend
 
 import os
@@ -23,7 +23,7 @@ if os.path.exists(scripts_dir):
                 script_datas.append((src_path, rel_dir))
 
 a = Analysis(
-    ['lightweight_server.py'],
+    ['app.py'],
     pathex=[],
     binaries=[],
     datas=script_datas,  # Include all Python scripts
@@ -67,7 +67,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='lightweight_server',
+    name='dipper-backend',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

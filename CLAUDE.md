@@ -56,7 +56,7 @@ cargo --version
 cd ../backend
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements-lightweight.txt
+pip install -r requirements-backend.txt
 ```
 
 ## Quick Start Commands
@@ -75,7 +75,7 @@ npm run tauri:build:all                    # Build desktop app with PyInstaller 
 ```bash
 cd backend
 ./pyinstaller-venv-light/bin/pyinstaller --clean --noconfirm http_server.spec
-cp dist/lightweight_server ../frontend/python-dist/lightweight_server
+cp dist/dipper-backend ../frontend/python-dist/dipper-backend
 ```
 
 ### Python Scripts Location
@@ -92,7 +92,7 @@ All ML scripts are in `backend/scripts/`:
 ### Communication Flow
 1. User interacts with React UI (InferenceTab, TrainingTab, etc.)
 2. Frontend TaskManager.js sends HTTP POST/GET to localhost:8000
-3. Backend lightweight_server.py receives request
+3. Backend app.py receives request
 4. Backend spawns subprocess running ML script in conda environment
 5. Frontend polls status endpoint every 2 seconds
 6. Subprocess writes `.status` file with progress updates
@@ -111,7 +111,7 @@ dipper/
 │   ├── python-dist/                  # PyInstaller backend executable
 │   └── package.json
 ├── backend/
-│   ├── lightweight_server.py         # HTTP server (2500 lines, 30+ endpoints)
+│   ├── app.py         # HTTP server (2500 lines, 30+ endpoints)
 │   ├── scripts/                      # ML task scripts
 │   ├── build_pyinstaller.py          # Build standalone server
 │   └── http_server.spec              # PyInstaller config
@@ -221,9 +221,9 @@ Smaller app with only ReviewTab functionality. Uses `REACT_APP_REVIEW_ONLY=true`
 ## Common Development Tasks
 
 ### Modifying Backend API
-1. Edit `backend/lightweight_server.py`
+1. Edit `backend/app.py`
 2. Rebuild PyInstaller: `cd backend && python build_pyinstaller.py`
-3. Copy to frontend: `cp dist/lightweight_server ../frontend/python-dist/`
+3. Copy to frontend: `cp dist/dipper-backend ../frontend/python-dist/`
 4. Restart dev server
 
 ### Modifying ML Scripts
@@ -254,7 +254,7 @@ cd frontend && npm start
 cd frontend && npm run tauri:dev:full
 
 # Test Python backend standalone
-cd backend && python lightweight_server.py --port 8000
+cd backend && python app.py --port 8000
 ```
 
 ### Backend Health Check
@@ -275,7 +275,7 @@ Managed through Settings tab, saved/loaded via HTTP endpoints.
 ## Important Notes
 
 1. **HTTP-based communication**: Frontend communicates with backend via HTTP REST API, not Tauri commands
-2. **Two Python environments**: PyInstaller for lightweight server, conda for ML tasks
+2. **Two Python environments**: PyInstaller for backend, conda for ML tasks
 3. **Status polling**: Frontend polls every 2 seconds for job updates
 4. **Subprocess isolation**: Each job runs in separate Python process
 5. **Review-only build**: Conditional rendering based on REACT_APP_REVIEW_ONLY
@@ -333,13 +333,13 @@ See `scripts/README.md` for more details.
 **Fix**: Ensure backend is running on port 8000. Try `npm run tauri:dev:full`
 
 **Issue**: Backend API not responding
-**Fix**: Check if lightweight_server is running on port 8000: `curl http://localhost:8000/health`
+**Fix**: Check if dipper-backend is running on port 8000: `curl http://localhost:8000/health`
 
 **Issue**: ML tasks fail
 **Fix**: Check if conda environment downloaded: `~/Library/Caches/Dipper/envs/`
 
 **Issue**: PyInstaller changes not reflected in desktop build
-**Fix**: Rebuild and copy: `cd backend && python build_pyinstaller.py && cp dist/lightweight_server ../frontend/python-dist/`
+**Fix**: Rebuild and copy: `cd backend && python build_pyinstaller.py && cp dist/dipper-backend ../frontend/python-dist/`
 
 **Issue**: Status messages not showing in UI
 **Fix**: Check `.status` file exists in job folder and backend logs show file reads

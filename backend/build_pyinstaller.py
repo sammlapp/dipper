@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build PyInstaller executable for lightweight_server.py
+Build PyInstaller executable for app.py
 This replaces the JavaScript build script in frontend/build-scripts/
 """
 
@@ -76,7 +76,7 @@ def create_virtual_env():
     run_command(f'"{python_exe}" -m pip install --upgrade pip setuptools wheel')
 
     # Install requirements from file if it exists
-    requirements_file = BACKEND_DIR / "requirements-lightweight.txt"
+    requirements_file = BACKEND_DIR / "requirements-backend.txt"
     run_command(f'"{python_exe}" -m pip install -r {requirements_file}')
 
     return python_exe, pip_exe, pyinstaller_exe, venv_path
@@ -129,14 +129,14 @@ def build_with_pyinstaller(pyinstaller_exe, venv_path):
 
     # Determine source and destination paths
     if os.name == "nt":  # Windows
-        source_dist = BACKEND_DIR / "dist" / "lightweight_server.exe"
-        python_dist_file = DIST_DIR / "lightweight_server.exe"
+        source_dist = BACKEND_DIR / "dist" / "dipper-backend.exe"
+        python_dist_file = DIST_DIR / "dipper-backend.exe"
     else:  # Unix-like
-        source_dist = BACKEND_DIR / "dist" / "lightweight_server"
-        python_dist_file = DIST_DIR / "lightweight_server"
+        source_dist = BACKEND_DIR / "dist" / "dipper-backend"
+        python_dist_file = DIST_DIR / "dipper-backend"
 
     if not source_dist.exists():
-        print("[ERROR] Lightweight server executable not found in dist directory")
+        print("[ERROR] Backend executable not found in dist directory")
         print(f"   Expected location: {source_dist}")
         sys.exit(1)
 
@@ -156,9 +156,9 @@ def build_with_pyinstaller(pyinstaller_exe, venv_path):
     platform_name = get_tauri_platform_name()
     if platform_name:
         if os.name == "nt":
-            tauri_dest_file = tauri_bin_dir / f"lightweight_server-{platform_name}.exe"
+            tauri_dest_file = tauri_bin_dir / f"dipper-backend-{platform_name}.exe"
         else:
-            tauri_dest_file = tauri_bin_dir / f"lightweight_server-{platform_name}"
+            tauri_dest_file = tauri_bin_dir / f"dipper-backend-{platform_name}"
 
         shutil.copy2(source_dist, tauri_dest_file)
         # Make sure it's executable on Unix
@@ -168,7 +168,7 @@ def build_with_pyinstaller(pyinstaller_exe, venv_path):
     else:
         print("[WARNING] Skipping Tauri bin copy (unknown platform)")
 
-    print("[OK] Lightweight server executable copied successfully!")
+    print("[OK] Backend executable copied successfully!")
 
 
 def main():
@@ -202,9 +202,9 @@ def main():
 
         # Show size information
         if os.name == "nt":
-            exe_path = DIST_DIR / "lightweight_server.exe"
+            exe_path = DIST_DIR / "dipper-backend.exe"
         else:
-            exe_path = DIST_DIR / "lightweight_server"
+            exe_path = DIST_DIR / "dipper-backend"
 
         if exe_path.exists():
             # Get file size (single file, not directory)

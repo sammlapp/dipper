@@ -1,10 +1,10 @@
 This project will create a cross-platform desktop app that runs pytorch machine learning models and allows users to train models in an active learning loop. 
 
 ## claude start up prompt
-take a close look at this codebase, especially documentation markdowns such as readme.md claude.md build.md. We're going to work from plan.md but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, lightweight_server.py, scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
+take a close look at this codebase, especially documentation markdowns such as readme.md claude.md build.md. We're going to work from plan.md but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, app.py, scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
 
 # Build and release
-- lightweight python executable for GUI back-end is built with pyinstaller
+- backend python executable for GUI back-end is built with pyinstaller
 - heavy dipper ML environment is built with conda-pack (inference, train scripts); app downloads via google drive into a system-specific cache dir and extracts .tar.gz to conda env folder
 - inference, train, extraction scripts run in separate processes and are tracked by task manager
 - these run with the dipper ML conda env (downloaded on demand to application cache dir) unless the user specifies a custom python env to use
@@ -169,7 +169,7 @@ Manual server mode port specification turned out to be a hassle. The frontend an
 
 ### server mode installation
 - should skip `npm install -g serve` if serve is already installed, this will avoid unnecessary permissions error for non-sudo user
-- lightweight_server is not included when cloning the repo; should we download it from github builds/other source? build it locally? (building locally requires creating conda env with relevant packages) can't just provide built executable because won't work across platforms 
+- dipper-backend is not included when cloning the repo; should we download it from github builds/other source? build it locally? (building locally requires creating conda env with relevant packages) can't just provide built executable because won't work across platforms 
 - to launch server in dev mode, the user needs a python env with relevant packages
 
 ## Training mode in progress updates
@@ -190,7 +190,6 @@ Completed tasks in task manager should have a button for the next step in the wo
 ## next steps:
 debug/fix building conda-pack environment for Linux and Windows
 
-rename lightweight-server (pyinstaller executable) and lightweight_server.py to dipper_pybackend. Make sure this is thoroughly updated throughout the codebase, build scripts, and documentation. 
 
 test inference with custom/local models
 
@@ -323,7 +322,7 @@ The running task continues when the app quits.
   Here's what happens:
 
   1. Inference subprocess keeps running - The python inference.py process started
-  by lightweight_server.py runs independently
+  by app.py runs independently
   2. Server shuts down - The HTTP server stops, losing connection to the subprocess
   3. Task status becomes orphaned - On restart, the task gets reset to QUEUED
   status (we just fixed this)

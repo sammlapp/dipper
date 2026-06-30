@@ -108,9 +108,9 @@ jobs:
 
       - name: Verify executable
         run: |
-          if [ -f "frontend/python-dist/lightweight_server" ]; then
+          if [ -f "frontend/python-dist/dipper-backend" ]; then
             echo "[SUCCESS] PyInstaller executable built successfully"
-            ls -lh frontend/python-dist/lightweight_server
+            ls -lh frontend/python-dist/dipper-backend
           else
             echo "[ERROR] PyInstaller executable not found"
             exit 1

@@ -1,7 +1,7 @@
 {
   "name": "dipper",
   "version": "0.0.13",
-  "description": "Cross-platform desktop app for bioacoustics ML training and inference",
+  "description": "Cross-platform desktop app for analyzing passive acoustic monitoring data",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
@@ -9,15 +9,15 @@
     "build:review": "cross-env REACT_APP_REVIEW_ONLY=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "build:python-pyinstaller": "python ../backend/build_pyinstaller.py",
+    "build:backend": "python ../backend/build_pyinstaller.py",
     "build:conda-pack": "python ../backend/build_conda_pack.py",
-    "build:all": "npm run build && npm run build:python-pyinstaller",
-    "build:review-all": "npm run build:review && npm run build:python-pyinstaller",
-    "start:server": "./python-dist/lightweight_server --port 8000",
+    "build:all": "npm run build && npm run build:backend",
+    "build:review-all": "npm run build:review && npm run build:backend",
+    "start:server": "./python-dist/dipper-backend --port 8000",
     "tauri:dev": "tauri dev",
-    "tauri:dev:full": "concurrently \"python ../backend/lightweight_server.py --port 8000\" \"wait-on http://localhost:8000/health && tauri dev\"",
+    "tauri:dev:full": "concurrently \"python ../backend/app.py --port 8000\" \"wait-on http://localhost:8000/health && tauri dev\"",
     "tauri:dev:review": "cross-env REACT_APP_REVIEW_ONLY=true tauri dev",
-    "tauri:dev:review:full": "concurrently \"python ../backend/lightweight_server.py --port 8000\" \"wait-on http://localhost:8000/health && cross-env REACT_APP_REVIEW_ONLY=true tauri dev\"",
+    "tauri:dev:review:full": "concurrently \"python ../backend/app.py --port 8000\" \"wait-on http://localhost:8000/health && cross-env REACT_APP_REVIEW_ONLY=true tauri dev\"",
     "tauri:build": "node ../scripts/set-product-name.js full && npm run build && tauri build",
     "tauri:build:all": "node ../scripts/set-product-name.js full && npm run build:all && tauri build",
     "tauri:build:review": "node ../scripts/set-product-name.js review && npm run build:review && tauri build",
@@ -43,7 +43,7 @@
     "wait-on": "^7.0.1"
   },
   "homepage": "./",
-  "author": "Bioacoustics Training GUI Team",
+  "author": "Sam Lapp",
   "browserslist": {
     "production": [
       ">0.2%",

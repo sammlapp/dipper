@@ -15,9 +15,9 @@ Dipper is a cross-platform bioacoustics machine learning application with two de
 ## Architecture Diagram
 
 Key points:
-1. Backend: The python executable (lightweight_server.py) serves as the backend, providing the API to the frontend via aiohttp.
+1. Backend: The python executable (app.py) serves as the backend, providing the API to the frontend via aiohttp.
 2. Frontend: ReactJS front end is run either via Tauri (desktop mode) or launched with npx (server mode)
-3. File system operations: implemented via Tauri (desktop mode, see main.rs) or directly in lightweight_server.py (server mode)
+3. File system operations: implemented via Tauri (desktop mode, see main.rs) or directly in app.py (server mode)
 4. Background Tasks: The backend launches background ml tasks by running python scripts with a dedicated conda-pack environment. Task management is handled by task_manager.js in the React app. 
 
 
@@ -41,7 +41,7 @@ Key points:
                    │ HTTP (localhost:8000)
        ┌───────────▼──────────────────────────┐
        │   Python HTTP Server                 │
-       │   (lightweight_server - PyInstaller) │
+       │   (dipper-backend - PyInstaller) │
        │   - aiohttp web server               │
        │   - Audio processing (librosa, etc.) │
        │   - Job tracking & status            │
@@ -74,7 +74,7 @@ Key points:
          │ fetch() API calls
 ┌────────▼────────────────┐
 │  Python HTTP Server     │
-│  (lightweight_server)   │
+│  (dipper-backend)   │
 │  - Port 8001            │
 │  - CORS enabled         │
 │  - File access controls │
@@ -198,7 +198,7 @@ logging:
 
 **Purpose:** HTTP server and basic audio processing
 **Build:** PyInstaller bundles Python + dependencies into standalone executable
-**Location:** `frontend/python-dist/lightweight_server`
+**Location:** `frontend/python-dist/dipper-backend`
 **Included in:** All desktop builds
 **Size:** ~50MB
 
@@ -342,7 +342,7 @@ npm run build:server
 ```bash
 cd backend
 python build_pyinstaller.py
-cp dist/lightweight_server ../frontend/python-dist/
+cp dist/dipper-backend ../frontend/python-dist/
 ```
 
 ## Development Modes
@@ -417,7 +417,7 @@ npm run tauri:dev
 **Location:** `backend/`
 
 **Main Server:**
-- `lightweight_server.py` - aiohttp HTTP server
+- `app.py` - aiohttp HTTP server
   - Handles all HTTP endpoints (30+ routes)
   - Manages running jobs in `running_jobs` dict
   - Spawns ML task subprocesses
@@ -428,7 +428,7 @@ npm run tauri:dev
 **Build:**
 - `build_pyinstaller.py` - Builds standalone executable
 - `http_server.spec` - PyInstaller specification
-- Output: `frontend/python-dist/lightweight_server`
+- Output: `frontend/python-dist/dipper-backend`
 
 **ML Task Scripts:** `backend/scripts/`
 - `inference.py` - Run model inference

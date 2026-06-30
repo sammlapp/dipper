@@ -9,7 +9,7 @@ let cachedBackendUrl = null;
 export const CONFIGURED_BACKEND_PORT = process.env.REACT_APP_BACKEND_PORT
 
 /**
- * Get the backend server URL dynamically
+ * Get the backend URL dynamically
  * For Tauri apps, this calls the Rust backend to get the actual port
  * For browser mode, uses localhost with a configurable port (default 8000)
  */

@@ -90,7 +90,7 @@ Each build script performs the following steps:
 
 2. **Python Backend**: Packages Python dependencies using PyInstaller
    - Creates standalone executables in `python-dist/`
-   - Includes `lightweight_server` for audio processing
+   - Includes `dipper-backend` for audio processing
 
 3. **Electron Packaging**: Uses electron-builder to create platform-specific installers
    - **macOS**: DMG installer with drag-to-Applications

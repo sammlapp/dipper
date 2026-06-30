@@ -123,7 +123,7 @@ REACT_APP_MODE=server npm run build
 ```bash
 cd backend
 source venv/bin/activate
-pip install -r requirements-lightweight.txt
+pip install -r requirements-backend.txt
 ```
 
 ### Can't access from laptop

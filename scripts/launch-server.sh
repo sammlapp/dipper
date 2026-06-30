@@ -112,8 +112,8 @@ if [ ! -d "$PROJECT_ROOT/frontend/build" ]; then
 fi
 
 # Check if pyinstaller executable backend exists
-if [ ! -f "$PROJECT_ROOT/frontend/python-dist/lightweight_server" ]; then
-    echo -e "${RED}✗ Python backend not found at:$PROJECT_ROOT/frontend/python-dist/lightweight_server${NC}"
+if [ ! -f "$PROJECT_ROOT/frontend/python-dist/dipper-backend" ]; then
+    echo -e "${RED}✗ Python backend not found at:$PROJECT_ROOT/frontend/python-dist/dipper-backend${NC}"
     exit 1
 fi
 
@@ -138,7 +138,7 @@ echo ""
 echo -e "${YELLOW}[1/2] Starting Python backend...${NC}"
 # launch pyinstaller executable
 cd "$PROJECT_ROOT/frontend/python-dist/"
-./lightweight_server --config "$CONFIG_FILE" --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
+./dipper-backend --config "$CONFIG_FILE" --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend.log" 2>&1 &
 PYTHON_PID=$!
 
 # Wait a bit for Python to start

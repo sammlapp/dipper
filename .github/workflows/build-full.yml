@@ -18,11 +18,11 @@ jobs:
       matrix:
         include:
           - os: macos-latest  # ARM (macos-15)
-            artifact_name: lightweight_server-macos-arm64
+            artifact_name: dipper-backend-macos-arm64
           - os: windows-latest
-            artifact_name: lightweight_server-windows-x64
+            artifact_name: dipper-backend-windows-x64
           - os: ubuntu-latest
-            artifact_name: lightweight_server-linux-x64
+            artifact_name: dipper-backend-linux-x64
 
     steps:
       - name: Checkout code
@@ -43,7 +43,7 @@ jobs:
       - name: Verify executable exists
         shell: bash
         run: |
-          if [ -f "frontend/python-dist/lightweight_server" ] || [ -f "frontend/python-dist/lightweight_server.exe" ]; then
+          if [ -f "frontend/python-dist/dipper-backend" ] || [ -f "frontend/python-dist/dipper-backend.exe" ]; then
             echo "[SUCCESS] PyInstaller executable built successfully"
           else
             echo "[ERROR] PyInstaller executable not found"
@@ -55,7 +55,7 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: |
-            frontend/python-dist/lightweight_server*
+            frontend/python-dist/dipper-backend*
           retention-days: 7
 
   build-tauri-full:
@@ -71,15 +71,15 @@ jobs:
           - platform: macos-arm64
             os: macos-latest  # ARM (macos-15)
             rust_target: aarch64-apple-darwin
-            pyinstaller_artifact: lightweight_server-macos-arm64
+            pyinstaller_artifact: dipper-backend-macos-arm64
           - platform: windows-x64
             os: windows-latest
             rust_target: x86_64-pc-windows-msvc
-            pyinstaller_artifact: lightweight_server-windows-x64
+            pyinstaller_artifact: dipper-backend-windows-x64
           - platform: linux-x64
             os: ubuntu-latest
             rust_target: x86_64-unknown-linux-gnu
-            pyinstaller_artifact: lightweight_server-linux-x64
+            pyinstaller_artifact: dipper-backend-linux-x64
 
     steps:
       - name: Checkout code
@@ -132,8 +132,8 @@ jobs:
         run: |
           cd frontend/src-tauri/bin
           # Rename to include target triple as Tauri expects
-          mv lightweight_server lightweight_server-${{ matrix.rust_target }}
-          chmod +x lightweight_server-${{ matrix.rust_target }}
+          mv dipper-backend dipper-backend-${{ matrix.rust_target }}
+          chmod +x dipper-backend-${{ matrix.rust_target }}
           ls -lh
 
       - name: Rename and prepare PyInstaller executable (Windows)
@@ -142,7 +142,7 @@ jobs:
         run: |
           cd frontend/src-tauri/bin
           # Rename to include target triple as Tauri expects
-          mv lightweight_server.exe lightweight_server-${{ matrix.rust_target }}.exe
+          mv dipper-backend.exe dipper-backend-${{ matrix.rust_target }}.exe
           ls -lh
 
       - name: Verify artifacts

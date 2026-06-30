@@ -36,7 +36,7 @@
     },
     "resources": [],
     "externalBin": [
-      "bin/lightweight_server"
+      "bin/dipper-backend"
     ],
     "shortDescription": "Bioacoustics ML Tool",
     "targets": "all",

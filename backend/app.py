@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-Lightweight HTTP server for bioacoustics app backend.
+The backend is a pyinstaller executable that exposes an API via aiohttp
+
 This version excludes ML dependencies and uses lightweight libraries.
+
+Heavy ML Tasks are run in background processes using a separate conda-pack
+environment that is downloaded and extracted on demand.
 """
 
 import sys
@@ -1330,7 +1334,7 @@ def _get_scripts_path():
     return os.path.join(base_path, "scripts")
 
 
-class LightweightServer:
+class DipperServer:
     def __init__(self, port=8000, host="localhost"):
         self.port = port
         self.host = host
@@ -1452,14 +1456,14 @@ class LightweightServer:
 
     async def root_handler(self, request):
         """Root endpoint to handle HEAD requests from wait-on"""
-        return web.json_response({"status": "ok", "server": "lightweight_server"})
+        return web.json_response({"status": "ok", "server": "dipper-backend"})
 
     async def health_check(self, request):
         """Health check endpoint"""
         return web.json_response(
             {
                 "status": "ok",
-                "message": f"Lightweight server running on port {self.port}",
+                "message": f"Backend running on port {self.port}",
                 "port": self.port,
                 "server_type": "lightweight",
                 "capabilities": [
@@ -3026,7 +3030,7 @@ class LightweightServer:
         site = web.TCPSite(runner, self.host, self.port)
         await site.start()
 
-        logger.info(f"Lightweight server started on http://{self.host}:{self.port}")
+        logger.info(f"Backend started on http://{self.host}:{self.port}")
         return runner
 
     # ------------------------------------------------------------------ #
@@ -3232,7 +3236,10 @@ print(json.dumps(result))
             result = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: self._call_worker(
-                    db_path, "create", db_path=db_path, feature_extractor=feature_extractor
+                    db_path,
+                    "create",
+                    db_path=db_path,
+                    feature_extractor=feature_extractor,
                 ),
             )
             return self.json_response_with_nan_handling(result)
@@ -3257,7 +3264,9 @@ print(json.dumps(result))
             data = await request.json()
             db_path = data.get("db_path", "")
             if not db_path:
-                return web.json_response({"status": "error", "error": "db_path required"}, status=400)
+                return web.json_response(
+                    {"status": "error", "error": "db_path required"}, status=400
+                )
             result = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: self._call_worker(
@@ -3267,7 +3276,9 @@ print(json.dumps(result))
                     samples=data.get("samples", ""),
                     dataset_name=data.get("dataset_name", ""),
                     allow_training=data.get("allow_training", True),
-                    file_to_deployment=data.get("file_to_deployment", "parent_folder_name"),
+                    file_to_deployment=data.get(
+                        "file_to_deployment", "parent_folder_name"
+                    ),
                     embedding_exists_mode=data.get("embedding_exists_mode", "skip"),
                     bypass_augmentations=data.get("bypass_augmentations", True),
                     audio_root=data.get("audio_root") or None,
@@ -3422,7 +3433,7 @@ def main():
     logger.info(f"Server will start on {host}:{port}")
 
     if args.test:
-        print("[OK] Lightweight server test successful!")
+        print("[OK] Backend test successful!")
         print(f"Python version: {sys.version}")
         print(
             f"PyInstaller bundling: {'[OK] SUCCESS' if getattr(sys, 'frozen', False) else '[ERROR] Not bundled'}"
@@ -3430,7 +3441,7 @@ def main():
         return 0
 
     async def run_server():
-        server = LightweightServer(port=port, host=host)
+        server = DipperServer(port=port, host=host)
         runner = await server.start_server()
 
         # Get parent process ID for heartbeat monitoring

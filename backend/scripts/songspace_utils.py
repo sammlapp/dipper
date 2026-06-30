@@ -2,7 +2,7 @@
 """
 SongSpace backend utilities for Dipper.
 
-Each function is called by the lightweight_server and returns a JSON-serializable dict.
+Each function is called by the dipper-backend and returns a JSON-serializable dict.
 The SongSpace instance is kept alive in a module-level registry keyed by db_path.
 """
 

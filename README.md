@@ -24,10 +24,10 @@ dipper/
 │   ├── python-dist/       # PyInstaller backend executable
 │   └── package.json
 ├── backend/               # Python ML processing
-│   ├── lightweight_server.py  # HTTP server (aiohttp)
+│   ├── app.py  # HTTP server (aiohttp)
 │   ├── scripts/           # ML task scripts (inference, training, etc.)
 │   ├── build_pyinstaller.py   # Build standalone server
-│   └── requirements-lightweight.txt
+│   └── requirements-backend.txt
 └── .github/workflows/     # CI/CD for releases
 ```
 

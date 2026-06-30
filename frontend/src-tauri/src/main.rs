@@ -12,7 +12,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::ShellExt;
 
-// State to store the backend server port and process
+// State to store the backend port and process
 struct BackendState {
     port: Mutex<Option<u16>>,
     process: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
@@ -227,7 +227,7 @@ fn get_free_port() -> Option<u16> {
     }
 }
 
-/// Check if the Dipper backend server is running on the given port
+/// Check if the Dipper backend is running on the given port
 /// Returns true only if the server responds to /health with the expected response
 fn check_dipper_backend_running(port: u16) -> bool {
     // Build the health check URL
@@ -297,7 +297,7 @@ fn wait_for_server(port: u16, max_retries: u32) -> bool {
     false
 }
 
-/// Tauri command to get the backend server port
+/// Tauri command to get the backend port
 #[tauri::command]
 async fn get_backend_port(state: tauri::State<'_, BackendState>) -> Result<u16, String> {
     state.port.lock().unwrap()
@@ -309,14 +309,14 @@ fn start_backend_server(app: &tauri::AppHandle, port: u16) -> Option<tauri_plugi
     println!("Starting Dipper backend sidecar on port {}...", port);
 
     // Use Tauri's sidecar API to spawn the bundled executable
-    let sidecar = match app.shell().sidecar("lightweight_server") {
+    let sidecar = match app.shell().sidecar("dipper-backend") {
         Ok(cmd) => {
             println!("  Sidecar command created successfully");
             cmd
         }
         Err(e) => {
             eprintln!("✗ Failed to create sidecar command: {}", e);
-            eprintln!("  Make sure the binary exists in src-tauri/bin/lightweight_server-*");
+            eprintln!("  Make sure the binary exists in src-tauri/bin/dipper-backend-*");
             return None;
         }
     };
@@ -492,7 +492,7 @@ fn main() {
                 let child = start_backend_server(&app.handle(), free_port);
 
                 if child.is_none() {
-                    eprintln!("✗ Failed to start backend server on port {}", free_port);
+                    eprintln!("✗ Failed to start backend on port {}", free_port);
                     eprintln!("  Check that the sidecar binary exists in src-tauri/bin/");
                     // Continue anyway - app will show connection error
                 } else {
@@ -511,9 +511,9 @@ fn main() {
             let main_window_clone = main_window.clone();
             let splash_window_clone = splash_window.clone();
 
-            // Wait for backend server in background thread
+            // Wait for backend in background thread
             thread::spawn(move || {
-                println!("Waiting for backend server to be ready on port {}...", port);
+                println!("Waiting for backend to be ready on port {}...", port);
                 if wait_for_server(port, 30) {
                     println!("✓ Backend server is ready!");
                     // Show main window and close splash
@@ -538,7 +538,7 @@ fn main() {
                     let state: tauri::State<BackendState> = app.state();
                     let mut guard = state.process.lock().unwrap();
                     if let Some(child) = guard.take() {
-                        println!("Killing backend server on window close...");
+                        println!("Killing backend on window close...");
                         let _ = child.kill();
                         println!("✓ Backend server terminated");
                     } else {
@@ -573,7 +573,7 @@ fn main() {
                 let state: tauri::State<BackendState> = app_handle.state();
                 let mut guard = state.process.lock().unwrap();
                 if let Some(child) = guard.take() {
-                    println!("Killing backend server on app exit...");
+                    println!("Killing backend on app exit...");
                     let _ = child.kill();
                     println!("✓ Backend server terminated");
                 } else {

@@ -85,7 +85,7 @@ echo ""
 # config loading fails in the backend.
 
 # Check if Python backend exists
-if [ ! -f "$PROJECT_ROOT/backend/lightweight_server.py" ]; then
+if [ ! -f "$PROJECT_ROOT/backend/app.py" ]; then
     echo -e "${RED}✗ Python backend not found${NC}"
     exit 1
 fi
@@ -108,7 +108,7 @@ echo ""
 # Start Python backend from SOURCE
 echo -e "${YELLOW}[1/2] Starting Python backend from source...${NC}"
 cd "$PROJECT_ROOT/backend"
-$PYTHON_CMD lightweight_server.py --config "$CONFIG_FILE" --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend-dev.log" 2>&1 &
+$PYTHON_CMD app.py --config "$CONFIG_FILE" --host "$HOST" --port "$PYTHON_PORT" > "$PROJECT_ROOT/python-backend-dev.log" 2>&1 &
 PYTHON_PID=$!
 sleep 2
 

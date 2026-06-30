@@ -224,7 +224,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
       // Fallback: show estimated count message
       setFileCount('? (Server not available)');
       setFirstFile('');
-      console.log('Cannot count files - backend server not available. Files will be counted during inference.');
+      console.log('Cannot count files - backend not available. Files will be counted during inference.');
     } finally {
       setIsCountingFiles(false);
     }
@@ -259,7 +259,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
       // Fallback: show estimated count message
       setFileCount('? (Server not available)');
       setFirstFile('');
-      console.log('Cannot count files - backend server not available. Files will be counted during inference.');
+      console.log('Cannot count files - backend not available. Files will be counted during inference.');
     } finally {
       setIsCountingFiles(false);
     }

@@ -20,8 +20,8 @@ console.log('========================');
 function runCommand(command, cwd = PROJECT_ROOT, options = {}) {
     console.log(`Running: ${command}`);
     try {
-        const result = execSync(command, { 
-            stdio: options.silent ? 'pipe' : 'inherit', 
+        const result = execSync(command, {
+            stdio: options.silent ? 'pipe' : 'inherit',
             cwd: cwd,
             encoding: 'utf8',
             env: { ...process.env }
@@ -49,47 +49,47 @@ function checkFileExists(filePath, description) {
 function testPyInstallerBuild() {
     console.log('\n📦 Testing PyInstaller Build');
     console.log('-----------------------------');
-    
+
     // Check if PyInstaller environment exists
     const pyinstallerVenv = path.join(BACKEND_DIR, 'pyinstaller-venv-light');
     if (!checkFileExists(pyinstallerVenv, 'PyInstaller virtual environment')) {
         console.log('Creating PyInstaller environment...');
-        const result = runCommand('npm run build:python-pyinstaller', FRONTEND_DIR);
+        const result = runCommand('npm run build:backend', FRONTEND_DIR);
         if (!result.success) {
             return false;
         }
     }
-    
-    // Check for built lightweight server
+
+    // Check for built backend
     const pythonDist = path.join(FRONTEND_DIR, 'python-dist');
-    const serverPath = path.join(pythonDist, 'lightweight_server', 'lightweight_server');
-    
-    let allPresent = checkFileExists(serverPath, 'Lightweight server executable');
-    
+    const serverPath = path.join(pythonDist, 'dipper-backend', 'dipper-backend');
+
+    let allPresent = checkFileExists(serverPath, 'Backend executable');
+
     return allPresent;
 }
 
 function testCondaPackBuild() {
     console.log('\n🐍 Testing Conda-Pack Environment Build');
     console.log('---------------------------------------');
-    
+
     // Check if conda is available
     const condaCheck = runCommand('conda --version', PROJECT_ROOT, { silent: true });
     if (!condaCheck.success) {
         console.log('❌ Conda not available - skipping conda-pack tests');
         return false;
     }
-    
+
     // Check if environment file exists
     const envFile = path.join(BACKEND_DIR, 'dipper_pytorch_env.yml');
     if (!checkFileExists(envFile, 'Environment file')) {
         return false;
     }
-    
+
     // Check if conda-pack archive exists
     const envDir = path.join(PROJECT_ROOT, 'environments');
     const archivePath = path.join(envDir, 'dipper_pytorch_env.tar.gz');
-    
+
     if (!fs.existsSync(archivePath)) {
         console.log('Building conda-pack environment...');
         const result = runCommand('npm run build:conda-pack', FRONTEND_DIR);
@@ -97,25 +97,25 @@ function testCondaPackBuild() {
             return false;
         }
     }
-    
+
     return checkFileExists(archivePath, 'Conda-pack archive');
 }
 
-function testLightweightServer() {
-    console.log('\n⚙️  Testing Lightweight Server');
+function testBackend() {
+    console.log('\n⚙️  Testing Backend');
     console.log('-----------------------------');
-    
-    const pythonDist = path.join(FRONTEND_DIR, 'python-dist', 'lightweight_server');
-    
+
+    const pythonDist = path.join(FRONTEND_DIR, 'python-dist', 'dipper-backend');
+
     if (!fs.existsSync(pythonDist)) {
-        console.log('❌ Lightweight server not built');
+        console.log('❌ Backend not built');
         return false;
     }
-    
+
     // Test server starts and responds
-    console.log('Testing lightweight server startup...');
-    const serverExe = path.join(pythonDist, 'lightweight_server');
-    
+    console.log('Testing backend startup...');
+    const serverExe = path.join(pythonDist, 'dipper-backend');
+
     try {
         // Test with --test flag
         const testResult = runCommand(
@@ -123,16 +123,16 @@ function testLightweightServer() {
             PROJECT_ROOT,
             { silent: true }
         );
-        
-        if (testResult.success && testResult.output.includes('Lightweight server test successful!')) {
+
+        if (testResult.success && testResult.output.includes('Backend test successful!')) {
             console.log('✅ Server test mode passed');
-            
+
             if (testResult.output.includes('PyInstaller bundling: ✅ SUCCESS')) {
                 console.log('✅ PyInstaller bundling confirmed');
             } else {
                 console.log('⚠️  PyInstaller bundling not confirmed (might be running from source)');
             }
-            
+
             return true;
         } else {
             console.log('❌ Server test failed');
@@ -148,20 +148,20 @@ function testLightweightServer() {
 function testIntegration() {
     console.log('\n🔄 Testing Integration');
     console.log('---------------------');
-    
+
     // Test that all required files are in place for distribution
     const requiredFiles = [
-        'frontend/python-dist/lightweight_server/lightweight_server',
-        'backend/lightweight_server.py',
+        'frontend/python-dist/dipper-backend/dipper-backend',
+        'backend/app.py',
         'backend/scripts/inference.py',
         'backend/dipper_pytorch_env.yml'
     ];
-    
+
     // Optional files (check if they exist but don't fail if missing)
     const optionalFiles = [
         'environments/dipper_pytorch_env.tar.gz'
     ];
-    
+
     let allPresent = true;
     for (const file of requiredFiles) {
         const filePath = path.join(PROJECT_ROOT, file);
@@ -169,7 +169,7 @@ function testIntegration() {
             allPresent = false;
         }
     }
-    
+
     // Check optional files (informational only)
     for (const file of optionalFiles) {
         const filePath = path.join(PROJECT_ROOT, file);
@@ -179,11 +179,11 @@ function testIntegration() {
             console.log(`ℹ️  Optional file missing: ${file} (will be built as needed)`);
         }
     }
-    
+
     if (allPresent) {
         console.log('✅ All required files present for distribution');
     }
-    
+
     return allPresent;
 }
 
@@ -191,17 +191,17 @@ function main() {
     console.log(`Platform: ${os.platform()}`);
     console.log(`Architecture: ${os.arch()}`);
     console.log(`Node.js: ${process.version}`);
-    
+
     let allTestsPassed = true;
-    
+
     // Test each component
     const tests = [
         { name: 'PyInstaller Build', fn: testPyInstallerBuild },
         { name: 'Conda-Pack Build', fn: testCondaPackBuild },
-        { name: 'Lightweight Server', fn: testLightweightServer },
+        { name: 'Lightweight Server', fn: testBackend },
         { name: 'Integration', fn: testIntegration }
     ];
-    
+
     for (const test of tests) {
         try {
             const result = test.fn();
@@ -216,10 +216,10 @@ function main() {
             allTestsPassed = false;
         }
     }
-    
+
     console.log('\n🏁 Test Summary');
     console.log('================');
-    
+
     if (allTestsPassed) {
         console.log('🎉 All tests passed! Build pipeline is working correctly.');
         console.log('\n📝 Next steps:');

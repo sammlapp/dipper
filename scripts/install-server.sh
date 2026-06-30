@@ -71,8 +71,8 @@ echo ""
 echo -e "${BLUE}[1/3] Installing Python dependencies...${NC}"
 cd "$PROJECT_ROOT/backend"
 
-if [ ! -f "requirements-lightweight.txt" ]; then
-    echo -e "${RED}✗ requirements-lightweight.txt not found${NC}"
+if [ ! -f "requirements-backend.txt" ]; then
+    echo -e "${RED}✗ requirements-backend.txt not found${NC}"
     exit 1
 fi
 
@@ -82,9 +82,9 @@ $PYTHON_CMD -m venv venv
 echo "  Activating virtual environment..."
 source venv/bin/activate
 
-echo "  Installing packages from requirements-lightweight.txt..."
+echo "  Installing packages from requirements-backend.txt..."
 pip install --upgrade pip
-pip install -r requirements-lightweight.txt
+pip install -r requirements-backend.txt
 
 echo -e "${GREEN}  ✓ Python dependencies installed${NC}"
 echo ""

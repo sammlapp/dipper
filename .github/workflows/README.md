@@ -214,9 +214,9 @@ You can manually trigger builds from the GitHub Actions tab:
 ### Review-Only Build
 ```
 artifacts/
-├── lightweight_server-macos-arm64/
-├── lightweight_server-windows-x64/
-├── lightweight_server-linux-x64/
+├── dipper-backend-macos-arm64/
+├── dipper-backend-windows-x64/
+├── dipper-backend-linux-x64/
 ├── dipper-review-macos-arm64-dmg/
 ├── dipper-review-windows-x64-installer/
 └── dipper-review-linux-x64-appimage/
@@ -225,9 +225,9 @@ artifacts/
 ### Full App Build
 ```
 artifacts/
-├── lightweight_server-macos-arm64/
-├── lightweight_server-windows-x64/
-├── lightweight_server-linux-x64/
+├── dipper-backend-macos-arm64/
+├── dipper-backend-windows-x64/
+├── dipper-backend-linux-x64/
 ├── conda-env-macos-x64/
 │   ├── dipper_pytorch_env.tar.gz
 │   ├── extract_and_test_env.sh
