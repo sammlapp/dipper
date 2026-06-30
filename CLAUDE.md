@@ -153,10 +153,10 @@ Backend reads these files and returns via status endpoints. Frontend displays in
 ```
 
 ### Environment Management
-- **Lightweight env**: PyInstaller executable (bundled with app, ~50MB)
+- **Backend env**: PyInstaller executable (bundled with app, ~50MB)
 - **Heavy env**: Conda environment with PyTorch (auto-downloaded on first use, ~700MB)
-- **Download**: From Google Drive to system cache (`appdirs.user_cache_dir("Dipper")`)
-- **Location**: `~/Library/Caches/Dipper/envs/dipper_pytorch_env` (macOS)
+- **Download**: From GitHub/HuggingFace to system cache (`appdirs.user_cache_dir("Dipper")`)
+- **Location**: `~/Library/Caches/Dipper/envs/dipper_ml_env` (macOS)
 
 ## Development Modes
 

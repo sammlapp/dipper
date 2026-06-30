@@ -1227,7 +1227,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                 Use Custom Python Environment <HelpIcon section="inference-python-env" />
               </label>
               <div style={{ fontSize: '0.8rem', color: 'var(--medium-gray)', marginTop: '4px' }}>
-                Use a custom Python environment instead of the default dipper_pytorch_env
+                Use a custom Python environment instead of the default dipper_ml_env
               </div>
               {config.use_custom_python_env && (
                 <div className="file-selection" style={{ marginTop: '8px', marginLeft: '24px' }}>

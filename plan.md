@@ -37,6 +37,17 @@ TypeError: Cannot read properties of undefined (reading 'column')
 # Incomplete items / TODO /feature request
 test download and use of ML env from HF/GitHub release 
 
+
+
+- select subset of classes to save inference results for
+- potentially call eBird API, BirdNET meta-model, or something else to get a local species list
+
+- add "load config" button in task pane (opens new task creation panel with config settings from the job)
+
+keep a persistent background python task so that ML processes can launch quickly
+try adding onnx and huggingface_hub to the backend exe so that we can run BirdNET GeoModel
+if we have onnx, could also potentially do lightweight Perch2 embedding tasks on backend...
+
 "collections": create and browse clip collections (folders of clips that can be browsed as a group) from Collections tab. When creating new collection, choose where to store it (default is in app cache dir, but can be a folder anywhere) and whether to copy audio clips or just store references. Creates a folder and csv of file path, start/end time, notes. Right click on a clip in review or explore tab to add it to a collection.
 
 custom classifiers during inference
@@ -50,19 +61,16 @@ test the various permutations of training
 During model training, create an html page (live updates) with progress bar + run time & eta, some example labels,  loss vs training step, and performance metrics on training and validation sets
 The html page is stored in the job folder. A button on the task panel in the task queue renders this html in a pop-up window. 
 
-- support  stereo audio
+- support stereo audio
 
 - when pasting a path to navigate to in server mode file browser and hitting Enter/Return: if its a file path instead of a folder, navigate to the folder and activate that file as the 'selected' file
-
-- select subset of classes to save inference results for
-- potentially call eBird API, BirdNET meta-model, or something else to get a local species list
 
 If create task or create and run task buttons are disabled, hovering over them should inform the user which required fields have not been filled in. 
 
 WandB integration: need to allow user to provide API key and configure group name and project name for a run. Run name should match the dipper run name. 
 
 - made a working env on Windows: needed to make edits to the windows env yml, then uninstall soundfile and force-reinstall with pip
-- used dipper env to run conda-pack, creating dipper_pytorch_env.tar.gz file
+- used dipper env to run conda-pack, creating dipper_ml_env.tar.gz file
 
 test downloading/using default conda-pack env on linux! (updated conda pack env; need to rerun github runner and re-upload to onedrive)
 

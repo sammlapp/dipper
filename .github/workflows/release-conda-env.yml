@@ -70,7 +70,7 @@ jobs:
           import os, sys
           from huggingface_hub import HfApi
 
-          src = "artifacts/conda-env-linux-x64/dipper_pytorch_env-linux-x64.tar.gz"
+          src = "artifacts/conda-env-linux-x64/dipper_ml_env-linux-x64.tar.gz"
           if not os.path.exists(src):
               print(f"[ERROR] Linux artifact not found at {src}")
               sys.exit(1)
@@ -78,7 +78,7 @@ jobs:
           api = HfApi()
           api.upload_file(
               path_or_fileobj=src,
-              path_in_repo="dipper_pytorch_env-linux-x64.tar.gz",
+              path_in_repo="dipper_ml_env-linux-x64.tar.gz",
               repo_id="sammlapp/dipper-envs",
               repo_type="dataset",
               token=os.environ["HF_TOKEN"],
@@ -124,9 +124,9 @@ jobs:
 
             ### Manual installation
             Download the archive for your platform and place it at:
-            - **macOS:** `~/Library/Caches/Dipper/archives/dipper_pytorch_env.tar.gz`
-            - **Windows:** `%LOCALAPPDATA%\BioacousticsApp\Dipper\Cache\archives\dipper_pytorch_env.tar.gz`
-            - **Linux:** `~/.cache/Dipper/archives/dipper_pytorch_env.tar.gz`
+            - **macOS:** `~/Library/Caches/Dipper/archives/dipper_ml_env.tar.gz`
+            - **Windows:** `%LOCALAPPDATA%\BioacousticsApp\Dipper\Cache\archives\dipper_ml_env.tar.gz`
+            - **Linux:** `~/.cache/Dipper/archives/dipper_ml_env.tar.gz`
 
             Then launch Dipper and run any ML task — it will extract automatically.
 

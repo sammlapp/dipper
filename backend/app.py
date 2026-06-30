@@ -27,14 +27,13 @@ from aiohttp import web, web_request
 from aiohttp_cors import setup as cors_setup, ResourceOptions
 import pandas as pd
 import numpy as np
-import librosa
+import soundfile as sf
 import scipy.signal
 from PIL import Image
 import soundfile as sf
 from io import BytesIO
 
 from scripts import scan_folder
-from scripts import get_sample_detections
 from scripts import load_scores
 from scripts import clip_extraction
 
@@ -52,9 +51,9 @@ HF_REPO = "sammlapp/dipper-envs"
 # source "github": fetched from the latest conda-env-* GitHub release asset
 # source "hf":     fetched directly from Hugging Face (no size limit)
 PYTORCH_ENV_ASSET = {
-    "Darwin": {"source": "github", "name": "dipper_pytorch_env-macos-arm64.tar.gz"},
-    "Windows": {"source": "github", "name": "dipper_pytorch_env-windows-x64.tar.gz"},
-    "Linux": {"source": "hf", "name": "dipper_pytorch_env-linux-x64.tar.gz"},
+    "Darwin": {"source": "github", "name": "dipper_ml_env-macos-arm64.tar.gz"},
+    "Windows": {"source": "github", "name": "dipper_ml_env-windows-x64.tar.gz"},
+    "Linux": {"source": "hf", "name": "dipper_ml_env-linux-x64.tar.gz"},
 }
 
 
@@ -233,7 +232,7 @@ def validate_audio_files(file_list):
 def get_default_env_path():
     """Get the default environment path in system-specific cache directory"""
     cache_dir = get_default_env_cache_dir()
-    env_path = os.path.join(cache_dir, "envs/dipper_pytorch_env")
+    env_path = os.path.join(cache_dir, "envs/dipper_ml_env")
     return env_path
     # # Fallback to local directory # No fallback!
     # return os.path.join(os.path.expanduser("~"), ".dipper", "env")
@@ -242,7 +241,7 @@ def get_default_env_path():
 def get_default_env_archive_path():
     """Get the default environment archive path in system-specific cache directory"""
     cache_dir = get_default_env_cache_dir()
-    env_path = os.path.join(cache_dir, "archives/dipper_pytorch_env.tar.gz")
+    env_path = os.path.join(cache_dir, "archives/dipper_ml_env.tar.gz")
     return env_path
 
 
@@ -1185,16 +1184,30 @@ def spec_to_image(spectrogram, range=None, colormap=None, channels=3, shape=None
     return img_array
 
 
+def load_audio(file_path, sr=None, offset=0.0, duration=None):
+    """Load audio file segment with soundfile and return samples and sample rate"""
+    with sf.SoundFile(file_path) as f:
+        sr = f.samplerate
+        start_frame = int(offset * sr)
+        num_frames = int(duration * sr)
+        f.seek(start_frame)
+        samples = f.read(num_frames, dtype="float32", always_2d=False)
+
+    if samples.ndim > 1:
+        samples = samples.mean(axis=1)
+
+    return samples, sr
+
+
 def process_single_clip(clip_data, settings):
     """Process a single clip with optimized performance (adapted from create_audio_clips_batch.py)"""
     try:
         file_path = clip_data["file_path"]
         start_time = clip_data["start_time"]
         end_time = clip_data["end_time"]
-
-        # Load audio
         duration = end_time - start_time
-        samples, sr = librosa.load(
+
+        samples, sr = load_audio(
             file_path, sr=None, offset=start_time, duration=duration
         )
 
@@ -1389,7 +1402,6 @@ class DipperServer:
         self.app.router.add_get("/", self.root_handler)
         self.app.router.add_get("/health", self.health_check)
         self.app.router.add_post("/scan_folder", self.scan_folder)
-        self.app.router.add_post("/get_sample_detections", self.get_sample_detections)
         self.app.router.add_post("/load_scores", self.load_scores)
         self.app.router.add_get("/clip", self.clip_single)
         self.app.router.add_post("/clips/batch", self.clips_batch)
@@ -1468,7 +1480,6 @@ class DipperServer:
                 "server_type": "lightweight",
                 "capabilities": [
                     "scan_folder",
-                    "get_sample_detections",
                     "load_scores",
                     "load_extraction_task",
                     "config_management",
@@ -1506,26 +1517,6 @@ class DipperServer:
         except Exception as e:
             logger.error(f"Error scanning folder: {e}")
             return web.json_response({"error": str(e), "files": []}, status=500)
-
-    async def get_sample_detections(self, request):
-        """Get sample detections using lightweight approach"""
-        try:
-            data = await request.json()
-            score_data = data.get("score_data")
-            species = data.get("species")
-            score_range = data.get("score_range")
-            num_samples = data.get("num_samples", 12)
-
-            # Call function
-            samples = get_sample_detections.get_sample_detections(
-                score_data, species, score_range, num_samples
-            )
-
-            return web.json_response(samples)
-
-        except Exception as e:
-            logger.error(f"Error getting sample detections: {e}")
-            return web.json_response({"error": str(e), "samples": []}, status=500)
 
     async def load_scores(self, request):
         """Load scores from file"""

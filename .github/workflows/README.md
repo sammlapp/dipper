@@ -90,7 +90,7 @@ This directory contains automated build workflows for Dipper across multiple pla
 - ~700MB compressed archive per platform
 
 **Artifacts:**
-- Platform-specific `dipper_pytorch_env.tar.gz` files
+- Platform-specific `dipper_ml_env.tar.gz` files
 - Extraction scripts (`extract_and_test_env.sh`)
 - Test scripts (`test_environment.py`)
 - Creates a timestamped GitHub release (e.g., `conda-env-20250102-143022`)
@@ -99,7 +99,7 @@ This directory contains automated build workflows for Dipper across multiple pla
 **Use this for:** Building ML environments when dependencies change
 
 **When to run:**
-- After updating `backend/dipper_pytorch_env.yml`
+- After updating `backend/dipper_ml_env.yml`
 - Before major releases
 - When PyTorch or ML dependencies are updated
 
@@ -229,7 +229,7 @@ artifacts/
 ├── dipper-backend-windows-x64/
 ├── dipper-backend-linux-x64/
 ├── conda-env-macos-x64/
-│   ├── dipper_pytorch_env.tar.gz
+│   ├── dipper_ml_env.tar.gz
 │   ├── extract_and_test_env.sh
 │   └── test_environment.py
 ├── conda-env-macos-arm64/
@@ -266,7 +266,7 @@ Approximate build times on GitHub-hosted runners:
 ### Conda-pack Build Fails
 
 **Problem:** Environment creation timeout
-**Solution:** Check `backend/dipper_pytorch_env.yml` for package conflicts. Consider using mamba instead of conda for faster resolution.
+**Solution:** Check `backend/dipper_ml_env.yml` for package conflicts. Consider using mamba instead of conda for faster resolution.
 
 ### Tauri Build Can't Find PyInstaller Executable
 

@@ -14,7 +14,7 @@ from pathlib import Path
 # Project paths
 PROJECT_ROOT = Path(__file__).parent.parent
 BACKEND_DIR = Path(__file__).parent
-ENV_NAME = "dipper_pytorch_env"
+ENV_NAME = "dipper_ml_env"
 OUTPUT_DIR = PROJECT_ROOT / "environments"
 
 
@@ -65,7 +65,7 @@ def create_conda_environment():
     run_command(f"conda remove -n {ENV_NAME} --all -y", ignore_errors=True)
 
     # Create environment from yml file
-    yml_path = BACKEND_DIR / "dipper_pytorch_env.yml"
+    yml_path = BACKEND_DIR / "dipper_ml_env.yml"
     if not yml_path.exists():
         print(f"[ERROR] Environment file not found: {yml_path}")
         sys.exit(1)
@@ -91,7 +91,8 @@ def install_conda_pack():
         print("[WARNING] Failed to install conda-pack via conda, trying pip...")
         try:
             run_command(
-                "python -m pip install conda-pack", description="Installing conda-pack via pip"
+                "python -m pip install conda-pack",
+                description="Installing conda-pack via pip",
             )
         except:
             print("[ERROR] Failed to install conda-pack. Please install it manually:")

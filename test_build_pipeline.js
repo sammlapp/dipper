@@ -81,14 +81,14 @@ function testCondaPackBuild() {
     }
 
     // Check if environment file exists
-    const envFile = path.join(BACKEND_DIR, 'dipper_pytorch_env.yml');
+    const envFile = path.join(BACKEND_DIR, 'dipper_ml_env.yml');
     if (!checkFileExists(envFile, 'Environment file')) {
         return false;
     }
 
     // Check if conda-pack archive exists
     const envDir = path.join(PROJECT_ROOT, 'environments');
-    const archivePath = path.join(envDir, 'dipper_pytorch_env.tar.gz');
+    const archivePath = path.join(envDir, 'dipper_ml_env.tar.gz');
 
     if (!fs.existsSync(archivePath)) {
         console.log('Building conda-pack environment...');
@@ -154,12 +154,12 @@ function testIntegration() {
         'frontend/python-dist/dipper-backend/dipper-backend',
         'backend/app.py',
         'backend/scripts/inference.py',
-        'backend/dipper_pytorch_env.yml'
+        'backend/dipper_ml_env.yml'
     ];
 
     // Optional files (check if they exist but don't fail if missing)
     const optionalFiles = [
-        'environments/dipper_pytorch_env.tar.gz'
+        'environments/dipper_ml_env.tar.gz'
     ];
 
     let allPresent = true;

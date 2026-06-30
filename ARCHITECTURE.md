@@ -33,7 +33,7 @@ Key points:
 │  └───────────────┬───────────────────────┘  │
 │                  │ fetch() HTTP calls        │
 │  ┌───────────────▼───────────────────────┐  │
-│  │   Tauri Core (Rust)                   │  │
+│  │   Tauri Core (Rust: main.rs)          │  │
 │  │   - Window management                 │  │
 │  │   - Native file dialogs               │  │
 │  └───────────────────────────────────────┘  │
@@ -74,7 +74,7 @@ Key points:
          │ fetch() API calls
 ┌────────▼────────────────┐
 │  Python HTTP Server     │
-│  (dipper-backend)   │
+│  (dipper-backend)       │
 │  - Port 8001            │
 │  - CORS enabled         │
 │  - File access controls │
@@ -135,7 +135,6 @@ logging:
 - `GET /clip` - Get audio clip with spectrogram
   - Query params: `file`, `start_time`, `end_time`, `sr`, `spec_height`
 - `POST /clips/batch` - Get multiple clips
-- `POST /get_sample_detections` - Sample detections from predictions
 - `POST /load_scores` - Load prediction scores
 
 ### Configuration
@@ -194,7 +193,7 @@ logging:
 
 ## Python Environment Strategy
 
-### Lightweight Environment (PyInstaller)
+### Backend Environment (PyInstaller)
 
 **Purpose:** HTTP server and basic audio processing
 **Build:** PyInstaller bundles Python + dependencies into standalone executable
@@ -214,9 +213,9 @@ logging:
 **Build:** conda-pack creates portable conda environment
 **Download:** Auto-downloaded from Google Drive on first use
 **Location:** System cache directory via `appdirs.user_cache_dir("Dipper")`
-- macOS: `~/Library/Caches/Dipper/envs/dipper_pytorch_env`
-- Linux: `~/.cache/Dipper/envs/dipper_pytorch_env`
-- Windows: `C:\Users\<user>\AppData\Local\BioacousticsApp\Dipper\Cache\envs\dipper_pytorch_env`
+- macOS: `~/Library/Caches/Dipper/envs/dipper_ml_env`
+- Linux: `~/.cache/Dipper/envs/dipper_ml_env`
+- Windows: `C:\Users\<user>\AppData\Local\BioacousticsApp\Dipper\Cache\envs\dipper_ml_env`
 
 **Size:** ~700MB compressed, ~2GB extracted
 
@@ -451,7 +450,7 @@ npm run tauri:dev
 - aiohttp (HTTP server)
 - PyTorch (ML framework)
 - OpenSoundscape (bioacoustics)
-- librosa (audio processing)
+- SoundFile
 - pandas, numpy (data processing)
 - PyYAML (config files)
 - gdown (Google Drive downloads)
