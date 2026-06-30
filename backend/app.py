@@ -36,6 +36,7 @@ from io import BytesIO
 from scripts import scan_folder
 from scripts import load_scores
 from scripts import clip_extraction
+from scripts import geomodel
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -1421,6 +1422,8 @@ class DipperServer:
         self.app.router.add_post("/inference/run", self.run_inference)
         self.app.router.add_get("/inference/status/{job_id}", self.get_inference_status)
         self.app.router.add_post("/inference/cancel/{job_id}", self.cancel_inference)
+        self.app.router.add_post("/geomodel/species_list", self.get_geomodel_species_list)
+        self.app.router.add_post("/geomodel/classifier_labels", self.get_classifier_labels)
 
         # Training routes
         self.app.router.add_post("/training/run", self.run_training)
@@ -2221,6 +2224,57 @@ class DipperServer:
 
         except Exception as e:
             logger.error(f"Error in cancel_inference: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def get_geomodel_species_list(self, request):
+        """Get species list from BirdNET geomodel for a given lat/lon/week, filtered to classifier classes."""
+        try:
+            data = await request.json()
+            lat = data.get("lat")
+            lon = data.get("lon")
+            week = data.get("week")
+            min_probability = data.get("min_probability", 0.05)
+            classifier = data.get("classifier")
+
+            if lat is None or lon is None or week is None or not classifier:
+                return web.json_response(
+                    {"status": "error", "error": "lat, lon, week, and classifier are required"},
+                    status=400,
+                )
+
+            logger.info(f"Running geomodel: lat={lat}, lon={lon}, week={week}, classifier={classifier}")
+
+            geo = geomodel.BirdNETGeomodel()
+            sp_df = geo(lat, lon, week, min_probability)
+
+            try:
+                sp_df = geomodel.subset_classifier_labels(classifier, sp_df)
+            except ValueError as e:
+                return web.json_response({"status": "error", "error": str(e)}, status=400)
+
+            records = sp_df[["ebird_code", "scientific_name", "common_name", "probability"]].to_dict(orient="records")
+            for r in records:
+                r["probability"] = round(float(r["probability"]), 4)
+
+            return web.json_response({"status": "success", "species": records})
+
+        except Exception as e:
+            logger.error(f"Error in get_geomodel_species_list: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def get_classifier_labels(self, request):
+        """Return the list of scientific names for a given classifier."""
+        try:
+            data = await request.json()
+            classifier = data.get("classifier")
+            if not classifier:
+                return web.json_response({"status": "error", "error": "classifier is required"}, status=400)
+            labels = geomodel.get_classifier_labels(classifier)
+            return web.json_response({"status": "success", "labels": labels})
+        except ValueError as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=400)
+        except Exception as e:
+            logger.error(f"Error in get_classifier_labels: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     # Training Process Management Routes

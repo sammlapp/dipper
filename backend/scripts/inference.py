@@ -91,6 +91,17 @@ def run_inference(files, model, config_data):
                 )
             else:
                 predictions = model.predict(files, **config_data["inference_settings"])
+                # subset classes if species_filter is enabled
+                if config_data.get("species_filter", {}).get("enabled", False):
+                    selected_species = config_data["species_filter"].get(
+                        "selected_species", []
+                    )
+                    if selected_species:
+                        # subset columns to only include selected species
+                        class_subset = list(
+                            set(selected_species).intersection(predictions.columns)
+                        )
+                        predictions = predictions[class_subset]
 
         logger.info(f"Progress: 100% ({total_files}/{total_files})")
         logger.info(f"Predictions generated with shape: {predictions.shape}")
@@ -273,7 +284,11 @@ def _run_cwt(files, config_data):
             )
             if det_df is not None and len(det_df) > 0:
                 out = det_df[["seq_start_time", "seq_end_time", "seq_len"]].rename(
-                    columns={"seq_start_time": "start_time", "seq_end_time": "end_time", "seq_len": class_name}
+                    columns={
+                        "seq_start_time": "start_time",
+                        "seq_end_time": "end_time",
+                        "seq_len": class_name,
+                    }
                 )
                 out.insert(0, "file", path)
                 frames.append(out)

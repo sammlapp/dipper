@@ -372,6 +372,7 @@ class TaskManager {
         },
         ribbit_settings: config.ribbit_settings || null,
         cwt_settings: config.cwt_settings || null,
+        species_filter: config.species_filter || null,
       };
 
       // Save temporary config file using HTTP API

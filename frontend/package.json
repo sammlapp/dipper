@@ -30,9 +30,11 @@
     "@mui/icons-material": "^5.15.0",
     "@mui/material": "^5.15.0",
     "@tauri-apps/api": "^2.1.1",
+    "leaflet": "^1.9.4",
     "pathe": "^2.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1",
     "react-scripts": "^5.0.1",
     "react-select": "^5.10.1"
   },

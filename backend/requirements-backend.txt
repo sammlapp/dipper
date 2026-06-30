@@ -14,6 +14,10 @@ scipy>=1.7.0
 soundfile>=0.10.0
 resampy>=0.3.0
 
+# GeoModel species occurrence
+huggingface_hub
+onnxruntime
+
 # Image processing
 Pillow>=8.0.0
 

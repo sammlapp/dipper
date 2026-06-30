@@ -42,6 +42,8 @@ a = Analysis(
         'get_sample_detections',
         'load_scores',
         'clip_extraction',
+        'geomodel',
+        'onnxruntime',
     ],
     hookspath=[],
     hooksconfig={},

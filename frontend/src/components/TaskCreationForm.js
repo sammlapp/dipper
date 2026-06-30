@@ -1,9 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { basename } from 'pathe';
 import { FormControl, Select, MenuItem, Tabs, Tab, Box, Checkbox, Menu } from '@mui/material';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import HelpIcon from './HelpIcon';
-import { selectFiles, selectFolder, selectTextFiles, selectModelFiles, saveFile, selectJSONFiles } from '../utils/fileOperations';
+import { selectFiles, selectFolder, selectTextFiles, selectModelFiles, saveFile, selectJSONFiles, writeFile, readFile } from '../utils/fileOperations';
 import { getBackendUrl } from '../utils/backendConfig';
+
+// Fix leaflet default marker icon (broken by webpack)
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
+  iconUrl: require('leaflet/dist/images/marker-icon.png'),
+  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+});
+
+
+function MapClickHandler({ onMapClick }) {
+  useMapEvents({ click: (e) => onMapClick(e.latlng.lat, e.latlng.lng) });
+  return null;
+}
+
+// Which field in a species object is the class label string for each classifier (mirrors geomodel.MODEL_CLASS_COL)
+const MODEL_CLASS_COL = {
+  'BirdNET_V3.0.3':        'scientific_name',
+  'Perch2':                'scientific_name',
+  'Perch2LiteRT':          'scientific_name',
+  'Perch2ONNX':            'scientific_name',
+  'Perch':                 'ebird_code',
+  'BirdSetConvNeXT':       'ebird_code',
+  'BirdSetEfficientNetB1': 'ebird_code',
+  'HawkEars_v010':         'common_name',
+  'HawkEars':              'common_name',
+};
+
+// Flatten a selected_species object array to a string[] of class labels for the given model
+function flattenSpeciesForConfig(selected_species, model) {
+  const col = MODEL_CLASS_COL[model] || 'scientific_name';
+  return selected_species.map(s => s[col] || s.scientific_name);
+}
 
 // Default values for inference form
 const DEFAULT_VALUES = {
@@ -29,6 +65,10 @@ const DEFAULT_VALUES = {
     custom_python_env_path: '',
     testing_mode_enabled: false,
     subset_size: 10,
+    species_filter: {
+      enabled: false,
+      selected_species: [], // [{ebird_code, scientific_name, common_name, probability}]
+    },
     ribbit_settings: {
       class_name: '',
       signal_band: [1000, 2000],
@@ -96,6 +136,170 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
   const [selectedExtensions, setSelectedExtensions] = useState(DEFAULT_VALUES.selectedExtensions);
 
   const [config, setConfig] = useState(DEFAULT_VALUES.config);
+
+  // Species filter UI state (not persisted to config)
+  const [geoLat, setGeoLat] = useState('');
+  const [geoLon, setGeoLon] = useState('');
+  const [geoWeek, setGeoWeek] = useState(1);
+  const [geoMinProb, setGeoMinProb] = useState(0.05);
+  const [speciesLoading, setSpeciesLoading] = useState(false);
+  const [speciesError, setSpeciesError] = useState('');
+  const [speciesSortKey, setSpeciesSortKey] = useState('probability');
+  const [speciesSortAsc, setSpeciesSortAsc] = useState(false);
+  const [classifierLabels, setClassifierLabels] = useState([]); // full label list for the selected classifier
+  const [addSearchInput, setAddSearchInput] = useState('');
+  const addSearchRef = useRef(null);
+
+  // Fetch classifier label list whenever the model changes (and species filter is supported)
+  useEffect(() => {
+    const classifierKey = config.model;
+    if (!classifierKey) { setClassifierLabels([]); return; }
+    let cancelled = false;
+    getBackendUrl().then(backendUrl =>
+      fetch(`${backendUrl}/geomodel/classifier_labels`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classifier: classifierKey }),
+      })
+    ).then(r => r.json()).then(result => {
+      if (!cancelled && result.status === 'success') setClassifierLabels(result.labels);
+    }).catch(() => { });
+    return () => { cancelled = true; };
+  }, [config.model]);
+
+  const handleMapClick = useCallback((lat, lon) => {
+    setGeoLat(lat.toFixed(5));
+    setGeoLon(lon.toFixed(5));
+  }, []);
+
+  const handleLoadSpecies = async () => {
+    const lat = parseFloat(geoLat);
+    const lon = parseFloat(geoLon);
+    const week = parseInt(geoWeek);
+    if (isNaN(lat) || isNaN(lon) || isNaN(week)) {
+      setSpeciesError('Please enter valid lat, lon, and week values.');
+      return;
+    }
+    const classifierKey = config.model;
+    if (!classifierKey) {
+      setSpeciesError('Selected model does not support species filtering.');
+      return;
+    }
+    setSpeciesLoading(true);
+    setSpeciesError('');
+    try {
+      const backendUrl = await getBackendUrl();
+      const response = await fetch(`${backendUrl}/geomodel/species_list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lon, week, min_probability: geoMinProb, classifier: classifierKey }),
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setConfig(prev => ({ ...prev, species_filter: { ...prev.species_filter, selected_species: result.species } }));
+      } else {
+        setSpeciesError(result.error || 'Failed to load species list.');
+      }
+    } catch (err) {
+      setSpeciesError('Error contacting backend: ' + err.message);
+    } finally {
+      setSpeciesLoading(false);
+    }
+  };
+
+  const handleRemoveSpecies = (key) => {
+    setConfig(prev => ({
+      ...prev,
+      species_filter: {
+        ...prev.species_filter,
+        selected_species: prev.species_filter.selected_species.filter(
+          s => (s.ebird_code || s.scientific_name) !== key
+        ),
+      },
+    }));
+  };
+
+  const handleAddSpecies = (scientificName) => {
+    if (!scientificName) return;
+    if (config.species_filter.selected_species.some(s => s.scientific_name === scientificName)) {
+      setAddSearchInput('');
+      return;
+    }
+    setConfig(prev => ({
+      ...prev,
+      species_filter: {
+        ...prev.species_filter,
+        selected_species: [
+          { ebird_code: '', scientific_name: scientificName, common_name: scientificName, probability: null },
+          ...prev.species_filter.selected_species,
+        ],
+      },
+    }));
+    setAddSearchInput('');
+  };
+
+  const handleClearAllSpecies = () => {
+    setConfig(prev => ({ ...prev, species_filter: { ...prev.species_filter, selected_species: [] } }));
+  };
+
+  const handleUseAllClasses = () => {
+    const all = classifierLabels.map(label => ({
+      ebird_code: label, scientific_name: label, common_name: label, probability: null,
+    }));
+    setConfig(prev => ({ ...prev, species_filter: { ...prev.species_filter, selected_species: all } }));
+  };
+
+  const handleSaveSpeciesList = async () => {
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const defaultName = `species_list_${timestamp}.txt`;
+      const filePath = await saveFile(defaultName);
+      if (!filePath) return;
+      const lines = config.species_filter.selected_species.map(s => s.scientific_name).join('\n');
+      await writeFile(filePath, lines);
+      console.log(`Species list saved to: ${basename(filePath)}`);
+    } catch (err) {
+      console.error('Failed to save species list: ' + err.message);
+    }
+  };
+
+  const handleLoadSpeciesList = async () => {
+    try {
+      const files = await selectTextFiles();
+      if (!files || files.length === 0) return;
+      const content = await readFile(files[0]);
+      const loaded = content.split('\n').map(l => l.trim()).filter(Boolean)
+        .map(name => ({ ebird_code: '', scientific_name: name, common_name: name, probability: null }));
+      setConfig(prev => ({ ...prev, species_filter: { ...prev.species_filter, selected_species: loaded } }));
+      console.log(`Loaded ${loaded.length} species from ${basename(files[0])}`);
+    } catch (err) {
+      console.error('Failed to load species list: ' + err.message);
+    }
+  };
+
+  const getSortedSelectedSpecies = () => {
+    const list = [...config.species_filter.selected_species];
+    list.sort((a, b) => {
+      let aVal = a[speciesSortKey] ?? '';
+      let bVal = b[speciesSortKey] ?? '';
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return speciesSortAsc ? aVal - bVal : bVal - aVal;
+      }
+      return speciesSortAsc
+        ? String(aVal).localeCompare(String(bVal))
+        : String(bVal).localeCompare(String(aVal));
+    });
+    return list;
+  };
+
+  const handleSpeciesSort = (key) => {
+    if (speciesSortKey === key) {
+      setSpeciesSortAsc(prev => !prev);
+    } else {
+      setSpeciesSortKey(key);
+      setSpeciesSortAsc(key === 'probability' ? false : true);
+    }
+  };
 
   const handleExtensionChange = (ext, checked) => {
     if (checked) {
@@ -337,6 +541,11 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
       // Signal-processing method settings (passed through as-is)
       ribbit_settings: config.ribbit_settings,
       cwt_settings: config.cwt_settings,
+      // Species filter: flatten to string[] for the inference pipeline
+      species_filter: {
+        enabled: config.species_filter.enabled,
+        selected_species: flattenSpeciesForConfig(config.species_filter.selected_species, config.model),
+      },
     };
     const finalTaskName = taskName.trim() || null; // Let TaskManager generate name if empty
 
@@ -359,7 +568,14 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
       ...DEFAULT_VALUES.config,
       ribbit_settings: { ...DEFAULT_VALUES.config.ribbit_settings, noise_bands: [[0, 200]] },
       cwt_settings: { ...DEFAULT_VALUES.config.cwt_settings },
+      species_filter: { ...DEFAULT_VALUES.config.species_filter },
     });
+    setGeoLat('');
+    setGeoLon('');
+    setGeoWeek(1);
+    setGeoMinProb(0.05);
+    setSpeciesError('');
+    setAddSearchInput('');
   };
 
   const saveInferenceConfig = async () => {
@@ -400,6 +616,10 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
           },
           ribbit_settings: config.ribbit_settings,
           cwt_settings: config.cwt_settings,
+          species_filter: {
+            enabled: config.species_filter.enabled,
+            selected_species: flattenSpeciesForConfig(config.species_filter.selected_species, config.model),
+          },
         };
 
         // Use HTTP API to save config
@@ -471,6 +691,9 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
             subset_size: configData.testing_mode?.subset_size || 10,
             ribbit_settings: configData.ribbit_settings || DEFAULT_VALUES.config.ribbit_settings,
             cwt_settings: configData.cwt_settings || DEFAULT_VALUES.config.cwt_settings,
+            species_filter: configData.species_filter
+              ? { enabled: configData.species_filter.enabled || false, selected_species: configData.species_filter.selected_species || [] }
+              : { ...DEFAULT_VALUES.config.species_filter },
           }));
 
           // Update file count based on loaded config
@@ -822,6 +1045,245 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                     <MenuItem value="BirdSetConvNeXT">BirdSet-ConvNeXT Global bird classifier </MenuItem>
                   </Select>
                 </FormControl>
+              </div>
+            )}
+
+            {/* Species filter panel — shown for bmz and local_file */}
+            {(config.model_source === 'bmz' || config.model_source === 'local_file') && (
+              <div className="form-group full-width">
+                <label>
+                  <Checkbox
+                    size="small"
+                    checked={config.species_filter.enabled}
+                    onChange={(e) => setConfig(prev => ({ ...prev, species_filter: { ...prev.species_filter, enabled: e.target.checked } }))}
+                    sx={{ p: 0.25, mr: 0.5 }}
+                  />
+                  Filter output to a species list
+                </label>
+                <small style={{ display: 'block', marginTop: 2, color: 'var(--medium-gray)' }}>
+                  Only retain scores for selected species in the output CSV
+                </small>
+
+                {config.species_filter.enabled && (
+                  <div style={{ marginTop: 12, marginLeft: 4, display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+                    {/* Geo location picker */}
+                    {config.model_source === 'bmz' && config.model ? (
+                      <>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                          Load species list by location &amp; week
+                        </div>
+
+                        {/* Map */}
+                        <div style={{ height: 220, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                          <MapContainer
+                            center={[geoLat || 40, geoLon || -95]}
+                            zoom={3}
+                            style={{ height: '100%', width: '100%' }}
+                          >
+                            <TileLayer
+                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                            />
+                            <MapClickHandler onMapClick={handleMapClick} />
+                            {geoLat !== '' && geoLon !== '' && (
+                              <Marker position={[parseFloat(geoLat), parseFloat(geoLon)]} />
+                            )}
+                          </MapContainer>
+                        </div>
+
+                        {/* Lat/lon/week/prob inputs */}
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '0.8rem' }}>Latitude</label>
+                            <input
+                              className="compact-input"
+                              type="number"
+                              min="-90" max="90" step="0.0001"
+                              value={geoLat}
+                              onChange={(e) => setGeoLat(e.target.value)}
+                              placeholder="e.g. 40.71"
+                              style={{ width: 100 }}
+                            />
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '0.8rem' }}>Longitude</label>
+                            <input
+                              className="compact-input"
+                              type="number"
+                              min="-180" max="180" step="0.0001"
+                              value={geoLon}
+                              onChange={(e) => setGeoLon(e.target.value)}
+                              placeholder="e.g. -74.01"
+                              style={{ width: 100 }}
+                            />
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '0.8rem' }}>Week of year (1–52)</label>
+                            <input
+                              className="compact-input"
+                              type="number"
+                              min="1" max="52"
+                              value={geoWeek}
+                              onChange={(e) => setGeoWeek(parseInt(e.target.value))}
+                              style={{ width: 60 }}
+                            />
+                          </div>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '0.8rem' }}>Min occurrence probability</label>
+                            <input
+                              className="compact-input"
+                              type="number"
+                              min="0" max="1" step="0.01"
+                              value={geoMinProb}
+                              onChange={(e) => setGeoMinProb(parseFloat(e.target.value))}
+                              style={{ width: 70 }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleLoadSpecies}
+                            disabled={speciesLoading}
+                            style={{ alignSelf: 'flex-end', marginBottom: 1 }}
+                          >
+                            {speciesLoading ? 'Loading…' : 'Get Species List'}
+                          </button>
+                        </div>
+
+                        {speciesError && (
+                          <div style={{ fontSize: '0.8rem', color: 'var(--error-color, #c00)' }}>{speciesError}</div>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--medium-gray)' }}>
+                        Geographic species list generation is not currently supported for this model. You can still load a species list from a .txt file below.
+                      </div>
+                    )}
+
+                    {/* Save / Load / Clear controls */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button type="button" className="button-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={handleSaveSpeciesList}>
+                        Save List (.txt)
+                      </button>
+                      <button type="button" className="button-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={handleLoadSpeciesList}>
+                        Load List (.txt)
+                      </button>
+                      <button type="button" className="button-clear" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={handleClearAllSpecies}>
+                        Clear All
+                      </button>
+                      {classifierLabels.length > 0 && (
+                        <button type="button" className="button-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px' }} onClick={handleUseAllClasses}>
+                          Use All Available Classes
+                        </button>
+                      )}
+                      <span style={{ fontSize: '0.8rem', color: 'var(--medium-gray)' }}>
+                        {config.species_filter.selected_species.length} species selected
+                      </span>
+                    </div>
+
+                    {/* Type-to-search add from classifier labels */}
+                    {classifierLabels.length > 0 && (() => {
+                      const selectedSciNames = new Set(config.species_filter.selected_species.map(s => s.scientific_name));
+                      const filtered = addSearchInput.trim().length > 0
+                        ? classifierLabels.filter(name =>
+                          !selectedSciNames.has(name) &&
+                          name.toLowerCase().includes(addSearchInput.toLowerCase())
+                        ).slice(0, 50)
+                        : [];
+                      return (
+                        <div style={{ position: 'relative' }} ref={addSearchRef}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <input
+                              type="text"
+                              value={addSearchInput}
+                              onChange={(e) => setAddSearchInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') setAddSearchInput('');
+                                if (e.key === 'Enter' && filtered.length > 0) { handleAddSpecies(filtered[0]); }
+                              }}
+                              placeholder="Search to add species…"
+                              style={{ flex: 1, maxWidth: 320 }}
+                            />
+                          </div>
+                          {filtered.length > 0 && (
+                            <div style={{
+                              position: 'absolute', zIndex: 100, background: 'var(--surface, #fff)',
+                              border: '1px solid var(--border-color)', borderRadius: 4,
+                              maxHeight: 200, overflowY: 'auto', width: '100%', maxWidth: 320,
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            }}>
+                              {filtered.map(name => (
+                                <div
+                                  key={name}
+                                  onClick={() => handleAddSpecies(name)}
+                                  style={{
+                                    padding: '5px 10px', cursor: 'pointer', fontSize: '0.8rem',
+                                    fontStyle: 'italic',
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg, #f0f0f0)'}
+                                  onMouseLeave={e => e.currentTarget.style.background = ''}
+                                >
+                                  {name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Species table */}
+                    {config.species_filter.selected_species.length > 0 && (
+                      <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 4 }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                          <thead>
+                            <tr style={{ background: 'var(--surface-secondary, #f5f5f5)', position: 'sticky', top: 0 }}>
+                              {[
+                                { key: 'common_name', label: 'Common Name' },
+                                { key: 'scientific_name', label: 'Scientific Name' },
+                                { key: 'ebird_code', label: 'eBird Code' },
+                                { key: 'probability', label: 'Prob.' },
+                              ].map(col => (
+                                <th
+                                  key={col.key}
+                                  onClick={() => handleSpeciesSort(col.key)}
+                                  style={{ padding: '4px 8px', textAlign: 'left', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                                >
+                                  {col.label}
+                                  {speciesSortKey === col.key ? (speciesSortAsc ? ' ▲' : ' ▼') : ''}
+                                </th>
+                              ))}
+                              <th style={{ padding: '4px 10px', width: 36 }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {getSortedSelectedSpecies().map((sp) => (
+                              <tr key={sp.ebird_code || sp.scientific_name} style={{ borderTop: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '3px 8px' }}>{sp.common_name}</td>
+                                <td style={{ padding: '3px 8px', fontStyle: 'italic' }}>{sp.scientific_name}</td>
+                                <td style={{ padding: '3px 8px', color: 'var(--medium-gray)' }}>{sp.ebird_code || '—'}</td>
+                                <td style={{ padding: '3px 8px', color: 'var(--medium-gray)' }}>
+                                  {sp.probability != null ? sp.probability.toFixed(3) : '—'}
+                                </td>
+                                <td style={{ padding: '3px 10px', textAlign: 'center' }}>
+                                  <button
+                                    type="button"
+                                    className="button-clear"
+                                    onClick={() => handleRemoveSpecies(sp.ebird_code || sp.scientific_name)}
+                                    style={{ padding: '1px 6px', fontSize: '0.85rem', lineHeight: 1 }}
+                                    title="Remove"
+                                  >
+                                    −
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
