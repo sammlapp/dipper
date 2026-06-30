@@ -24,15 +24,15 @@ function MapClickHandler({ onMapClick }) {
 
 // Which field in a species object is the class label string for each classifier (mirrors geomodel.MODEL_CLASS_COL)
 const MODEL_CLASS_COL = {
-  'BirdNET_V3.0.3':        'scientific_name',
-  'Perch2':                'scientific_name',
-  'Perch2LiteRT':          'scientific_name',
-  'Perch2ONNX':            'scientific_name',
-  'Perch':                 'ebird_code',
-  'BirdSetConvNeXT':       'ebird_code',
+  'BirdNET_V3.0.3': 'scientific_name',
+  'Perch2': 'scientific_name',
+  'Perch2LiteRT': 'scientific_name',
+  'Perch2ONNX': 'scientific_name',
+  'Perch': 'ebird_code',
+  'BirdSetConvNeXT': 'ebird_code',
   'BirdSetEfficientNetB1': 'ebird_code',
-  'HawkEars_v010':         'common_name',
-  'HawkEars':              'common_name',
+  'HawkEars_v010': 'common_name',
+  'HawkEars': 'common_name',
 };
 
 // Flatten a selected_species object array to a string[] of class labels for the given model
@@ -53,7 +53,7 @@ const DEFAULT_VALUES = {
     file_globbing_patterns: [],
     file_list: '',
     model_source: 'bmz',
-    model: 'BirdSetEfficientNetB1',
+    model: 'Perch2',
     overlap: 0.0,
     batch_size: 1,
     worker_count: 1,
@@ -674,7 +674,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
           setConfig(prev => ({
             ...prev,
             model_source: configData.model_source || 'bmz',
-            model: configData.model || 'PerchV2',
+            model: configData.model || 'Perch2',
             files: configData.files || [],
             file_globbing_patterns: configData.file_globbing_patterns || [],
             file_list: configData.file_list || '',
@@ -996,7 +996,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                 <button
                   type="button"
                   className={`segment ${config.model_source === 'bmz' ? 'active' : ''}`}
-                  onClick={() => setConfig(prev => ({ ...prev, model_source: 'bmz', model: 'BirdSetEfficientNetB1' }))}
+                  onClick={() => setConfig(prev => ({ ...prev, model_source: 'bmz', model: 'Perch2' }))}
                 >
                   Bioacoustics Model Zoo
                 </button>
@@ -1063,6 +1063,11 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                 <small style={{ display: 'block', marginTop: 2, color: 'var(--medium-gray)' }}>
                   Only retain scores for selected species in the output CSV
                 </small>
+                <small style={{ display: 'block', marginTop: 2, color: 'var(--medium-gray)' }}>
+                  powered by BirdNET GeoModel
+                </small>
+
+
 
                 {config.species_filter.enabled && (
                   <div style={{ marginTop: 12, marginLeft: 4, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1075,7 +1080,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                         </div>
 
                         {/* Map */}
-                        <div style={{ height: 220, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                        <div style={{ height: 220, maxWidth: '700px', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
                           <MapContainer
                             center={[geoLat || 40, geoLon || -95]}
                             zoom={3}
@@ -1090,6 +1095,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                               <Marker position={[parseFloat(geoLat), parseFloat(geoLon)]} />
                             )}
                           </MapContainer>
+
                         </div>
 
                         {/* Lat/lon/week/prob inputs */}
@@ -1234,7 +1240,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
 
                     {/* Species table */}
                     {config.species_filter.selected_species.length > 0 && (
-                      <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 4 }}>
+                      <div style={{ maxHeight: 300, maxWidth: '800px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 4 }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                           <thead>
                             <tr style={{ background: 'var(--surface-secondary, #f5f5f5)', position: 'sticky', top: 0 }}>
@@ -1265,7 +1271,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
                                 <td style={{ padding: '3px 8px', color: 'var(--medium-gray)' }}>
                                   {sp.probability != null ? sp.probability.toFixed(3) : '—'}
                                 </td>
-                                <td style={{ padding: '3px 10px', textAlign: 'center' }}>
+                                <td style={{ padding: '3px 20px 3px 10px', textAlign: 'center' }}>
                                   <button
                                     type="button"
                                     className="button-clear"

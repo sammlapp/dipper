@@ -35,7 +35,7 @@ def get_classifier_labels(classifier_name):
             for line in f:  # format is sci name_common name
                 parts = line.strip().split("_")
                 labels.append(parts[0])  # scientific name
-    if classifier_name == "BirdNET_V3.0.3":
+    elif classifier_name == "BirdNET_V3.0.3":
         labels_path = huggingface_hub.hf_hub_download(
             repo_id="sammlapp/BirdNET_GeoModel",
             filename="BirdNET+_Geomodel_V3.0.3_Global_12K_Labels.txt",
@@ -110,6 +110,7 @@ MODEL_CLASS_COL = {
     "BirdSetEfficientNetB1": "ebird_code",
     "HawkEars_v010": "common_name",
     "HawkEars": "common_name",
+    "BirdNET": "scientific_name",
 }
 
 

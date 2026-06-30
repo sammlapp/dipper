@@ -1926,7 +1926,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
 
     const completedCount = stratifiedBins.filter(bin => {
       return isBinComplete(
-        bin.clips,
+        resolveLiveClips(bin.clips),
         settings.review_mode,
         {
           strategy: classifierGuidedMode.completionStrategy,
@@ -1938,7 +1938,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     }).length;
 
     return { completed: completedCount, total: stratifiedBins.length };
-  }, [classifierGuidedMode, stratifiedBins, settings.review_mode]);
+  }, [classifierGuidedMode, stratifiedBins, settings.review_mode, settings.annotation_column, resolveLiveClips]);
 
   // Get the active clip index within the current bin (1-based for display)
   const getActiveClipIndexInBin = useCallback((binIndex, clipId) => {
@@ -1963,7 +1963,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     for (let i = currentBinIndex + 1; i < stratifiedBins.length; i++) {
       const bin = stratifiedBins[i];
       const binCompleteStatus = isBinComplete(
-        bin.clips,
+        resolveLiveClips(bin.clips),
         settings.review_mode,
         {
           strategy: classifierGuidedMode.completionStrategy,
@@ -2001,7 +2001,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     for (let i = 0; i < currentBinIndex; i++) {
       const bin = stratifiedBins[i];
       const binCompleteStatus = isBinComplete(
-        bin.clips,
+        resolveLiveClips(bin.clips),
         settings.review_mode,
         {
           strategy: classifierGuidedMode.completionStrategy,
@@ -2104,6 +2104,19 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
           setSelectedClipIndices(new Set([activeClipIndexOnPage]));
         } else {
           setIsFocusMode(prev => !prev);
+        }
+        return;
+      }
+
+      // handle Next incomplete bin / next page with N key
+      if (event.key === 'n') {
+        event.preventDefault();
+        if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
+          handleJumpToNextIncompleteBin();
+        }
+        // otherwise N just means next page
+        else if (!isFocusMode && currentPage < totalPages - 1) {
+          setCurrentPage(prev => prev + 1);
         }
         return;
       }
@@ -2255,6 +2268,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
         }
 
         // Navigation <shortcuts: >j/k to move active clip
+        // see above for N = next page/bin, handled globally
         switch (event.key.toLowerCase()) {
           case 'j':
             // J: Move active clip to previous clip on page
@@ -2633,13 +2647,14 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       ? stratifiedBins[currentBinIndex]
       : null;
     const isBinCompleteStatus = currentBin ? isBinComplete(
-      currentBin.clips,
+      resolveLiveClips(currentBin.clips),
       settings.review_mode,
       {
         strategy: classifierGuidedMode.completionStrategy,
         targetCount: classifierGuidedMode.completionTargetCount,
         targetLabels: classifierGuidedMode.completionTargetLabels
-      }
+      },
+      settings.annotation_column
     ) : false;
 
     // Get bin completion stats
@@ -3061,6 +3076,10 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                   <div className="shortcut-item">
                     <kbd>Ctrl/Cmd</kbd> + <kbd>K</kbd>
                     <span>Next page/bin</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>N</kbd>
+                    <span>{classifierGuidedMode.enabled && stratifiedBins.length > 0 ? 'Jump to next incomplete bin (CGL mode)' : 'Next page'}</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd>
@@ -3930,13 +3949,14 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                       focusBinIndex = binIdx;
                       focusBin = stratifiedBins[binIdx];
                       isFocusBinComplete = isBinComplete(
-                        focusBin.clips,
+                        resolveLiveClips(focusBin.clips),
                         settings.review_mode,
                         {
                           strategy: classifierGuidedMode.completionStrategy,
                           targetCount: classifierGuidedMode.completionTargetCount,
                           targetLabels: classifierGuidedMode.completionTargetLabels
-                        }
+                        },
+                        settings.annotation_column
                       );
                     }
                   }
