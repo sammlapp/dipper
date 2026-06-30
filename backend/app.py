@@ -1191,6 +1191,13 @@ def load_audio(file_path, sr=None, offset=0.0, duration=None):
         sr = f.samplerate
         start_frame = int(offset * sr)
         num_frames = int(duration * sr)
+        file_duration = f.frames / f.samplerate
+        if start_frame >= f.frames:
+            raise ValueError(
+                f"Clip time out of bounds: start_time={offset:.3f}s is beyond the audio file "
+                f"duration ({file_duration:.3f}s). Check that the 'start_time' and 'end_time' "
+                f"columns in your CSV are in seconds relative to the start of each audio file."
+            )
         f.seek(start_frame)
         samples = f.read(num_frames, dtype="float32", always_2d=False)
 
@@ -1422,8 +1429,12 @@ class DipperServer:
         self.app.router.add_post("/inference/run", self.run_inference)
         self.app.router.add_get("/inference/status/{job_id}", self.get_inference_status)
         self.app.router.add_post("/inference/cancel/{job_id}", self.cancel_inference)
-        self.app.router.add_post("/geomodel/species_list", self.get_geomodel_species_list)
-        self.app.router.add_post("/geomodel/classifier_labels", self.get_classifier_labels)
+        self.app.router.add_post(
+            "/geomodel/species_list", self.get_geomodel_species_list
+        )
+        self.app.router.add_post(
+            "/geomodel/classifier_labels", self.get_classifier_labels
+        )
 
         # Training routes
         self.app.router.add_post("/training/run", self.run_training)
@@ -2238,11 +2249,16 @@ class DipperServer:
 
             if lat is None or lon is None or week is None or not classifier:
                 return web.json_response(
-                    {"status": "error", "error": "lat, lon, week, and classifier are required"},
+                    {
+                        "status": "error",
+                        "error": "lat, lon, week, and classifier are required",
+                    },
                     status=400,
                 )
 
-            logger.info(f"Running geomodel: lat={lat}, lon={lon}, week={week}, classifier={classifier}")
+            logger.info(
+                f"Running geomodel: lat={lat}, lon={lon}, week={week}, classifier={classifier}"
+            )
 
             geo = geomodel.BirdNETGeomodel()
             sp_df = geo(lat, lon, week, min_probability)
@@ -2250,9 +2266,13 @@ class DipperServer:
             try:
                 sp_df = geomodel.subset_classifier_labels(classifier, sp_df)
             except ValueError as e:
-                return web.json_response({"status": "error", "error": str(e)}, status=400)
+                return web.json_response(
+                    {"status": "error", "error": str(e)}, status=400
+                )
 
-            records = sp_df[["ebird_code", "scientific_name", "common_name", "probability"]].to_dict(orient="records")
+            records = sp_df[
+                ["ebird_code", "scientific_name", "common_name", "probability"]
+            ].to_dict(orient="records")
             for r in records:
                 r["probability"] = round(float(r["probability"]), 4)
 
@@ -2268,7 +2288,9 @@ class DipperServer:
             data = await request.json()
             classifier = data.get("classifier")
             if not classifier:
-                return web.json_response({"status": "error", "error": "classifier is required"}, status=400)
+                return web.json_response(
+                    {"status": "error", "error": "classifier is required"}, status=400
+                )
             labels = geomodel.get_classifier_labels(classifier)
             return web.json_response({"status": "success", "labels": labels})
         except ValueError as e:

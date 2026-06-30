@@ -742,20 +742,33 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
             || 'unknown';
           const originalClip = currentData.find(c => c.id === firstFailedClip.clip_id);
           const csvPath = originalClip?.file || firstFailedPath;
-          if (firstFailedError.toLowerCase().includes('out of bounds') || firstFailedError.toLowerCase().includes('beyond the audio')) {
+          console.warn('First failed clip:', { firstFailedClip, firstFailedError, firstFailedPath });
+          const isOutOfBounds = firstFailedError.toLowerCase().includes('out of bounds')
+            || firstFailedError.toLowerCase().includes('beyond the audio');
+          // Treat as out-of-bounds if the file path resolved successfully (file was found)
+          // but the clip still failed — most likely cause is time beyond file duration
+          const filePathResolved = firstFailedPath !== 'unknown' && firstFailedPath.length > 0;
+          const isFileMissing = firstFailedError.toLowerCase().includes('no such file')
+            || firstFailedError.toLowerCase().includes('error opening')
+            || firstFailedError.toLowerCase().includes('not found')
+            || (!isOutOfBounds && !filePathResolved);
+          if (isOutOfBounds || (filePathResolved && !isFileMissing && firstFailedError === '')) {
             // Clip times are beyond the audio file duration
             setError(
               `Clip times appear to be out of bounds for the audio files.\n` +
-              `${firstFailedError}\n\n` +
+              (firstFailedError ? `${firstFailedError}\n\n` : `File: ${firstFailedPath}\n\n`) +
               `Make sure the 'start_time' and 'end_time' columns in your CSV are in seconds ` +
-              `relative to the start of each audio file (not absolute timestamps or milliseconds).`
+              `relative to the start of each audio file (not absolute timestamps or milliseconds). ` +
+              `Often this means start_time and end_time are relative to an original, ` +
+              `longer audio file but the file column points to a shorter extracted clip. In this case you may ` +
+              `simply want to edit the csv and enter 0 in the start_time column for all rows.`
             );
           } else {
             setError(
               `Audio file(s) were not found in the expected locations.\n` +
               `First failed file: ${firstFailedPath}\n` +
               `Path in CSV: ${csvPath}\n` +
-              `Root audio folder: ${rootAudioPath || '(not set)'}\n\n` +
+              `Root audio folder: ${rootAudioPath || '(not set)'} \n\n` +
               `Use the menu in the upper left to specify the Root Audio Folder that should be prepended to values of the 'file' column in the annotation CSV.`
             );
           }
@@ -1272,7 +1285,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       localStorage.setItem('review_settings', JSON.stringify(newSettings));
 
       // Use HTTP endpoint to load CSV file
-      const response = await fetch(`${backendUrl}/review/load-task`, {
+      const response = await fetch(`${backendUrl} /review/load - task`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1288,7 +1301,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        throw new Error(errorData.error || `HTTP error! status: ${response.status} `);
       }
 
       const data = await response.json();
@@ -1371,7 +1384,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       console.error('Error stack:', err.stack);
 
       // Try to write error to a log file for debugging
-      const errorLog = `Error loading annotation task at ${new Date().toISOString()}:\n${err.message}\n${err.stack}\n\n`;
+      const errorLog = `Error loading annotation task at ${new Date().toISOString()}: \n${err.message} \n${err.stack} \n\n`;
       try {
         await writeFile('/tmp/annotation_errors.log', errorLog);
       } catch (logErr) {
@@ -1404,7 +1417,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     const requiredColumns = ['file', 'start_time'];
     const missingColumns = requiredColumns.filter(col => !headers.includes(col));
     if (missingColumns.length > 0) {
-      throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
+      throw new Error(`Missing required columns: ${missingColumns.join(', ')} `);
     }
 
     // Store CSV columns for annotation column selector
@@ -1435,7 +1448,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
 
       if (values.length !== headers.length) {
-        console.warn(`Row ${index + 2} has ${values.length} values but expected ${headers.length}`);
+        console.warn(`Row ${index + 2} has ${values.length} values but expected ${headers.length} `);
         return;
       }
 
@@ -1656,16 +1669,16 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       // Update bounding box fields (null to clear)
       const updates = boundingBox
         ? {
-          [`${col}_start_time`]: boundingBox.start_time,
-          [`${col}_end_time`]: boundingBox.end_time,
-          [`${col}_low_freq`]: boundingBox.low_freq,
-          [`${col}_high_freq`]: boundingBox.high_freq
+          [`${col} _start_time`]: boundingBox.start_time,
+          [`${col} _end_time`]: boundingBox.end_time,
+          [`${col} _low_freq`]: boundingBox.low_freq,
+          [`${col} _high_freq`]: boundingBox.high_freq
         }
         : {
-          [`${col}_start_time`]: null,
-          [`${col}_end_time`]: null,
-          [`${col}_low_freq`]: null,
-          [`${col}_high_freq`]: null
+          [`${col} _start_time`]: null,
+          [`${col} _end_time`]: null,
+          [`${col} _low_freq`]: null,
+          [`${col} _high_freq`]: null
         };
 
       // Check if anything actually changed
@@ -1755,7 +1768,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
   const hasBboxColumns = useMemo(() => {
     if (!annotationData || annotationData.length === 0) return false;
     const col = settings.annotation_column || 'annotation';
-    return `${col}_start_time` in annotationData[0];
+    return `${col} _start_time` in annotationData[0];
   }, [annotationData, settings.annotation_column]);
 
   // Get all columns in the data that aren't internal/system columns
@@ -1886,7 +1899,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
           }
           // Filter by bounding box presence
           if (filters.bounding_box.enabled) {
-            const bboxKey = `${settings.annotation_column}_start_time`;
+            const bboxKey = `${settings.annotation_column} _start_time`;
             const bboxVal = clip[bboxKey];
             const hasBbox = bboxVal !== null && bboxVal !== undefined && !isNaN(parseFloat(bboxVal));
             if (filters.bounding_box.value === 'has' && !hasBbox) return false;
@@ -2060,7 +2073,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
             const clipIndexInFullData = filteredAnnotationData.findIndex(clip => clip.id === firstClipOfBin.id);
             if (clipIndexInFullData !== -1) {
               setFocusClipIndex(clipIndexInFullData);
-              console.log(`Jumped to incomplete bin ${i + 1}, clip index ${clipIndexInFullData}`);
+              console.log(`Jumped to incomplete bin ${i + 1}, clip index ${clipIndexInFullData} `);
             } else {
               console.warn('Could not find first clip of bin in filtered data');
             }
@@ -2098,7 +2111,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
             const clipIndexInFullData = filteredAnnotationData.findIndex(clip => clip.id === firstClipOfBin.id);
             if (clipIndexInFullData !== -1) {
               setFocusClipIndex(clipIndexInFullData);
-              console.log(`Jumped to incomplete bin ${i + 1}, clip index ${clipIndexInFullData}`);
+              console.log(`Jumped to incomplete bin ${i + 1}, clip index ${clipIndexInFullData} `);
             } else {
               console.warn('Could not find first clip of bin in filtered data');
             }
