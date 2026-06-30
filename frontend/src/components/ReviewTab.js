@@ -1285,7 +1285,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       localStorage.setItem('review_settings', JSON.stringify(newSettings));
 
       // Use HTTP endpoint to load CSV file
-      const response = await fetch(`${backendUrl} /review/load - task`, {
+      const response = await fetch(`${backendUrl}/review/load-task`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1301,7 +1301,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status} `);
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
