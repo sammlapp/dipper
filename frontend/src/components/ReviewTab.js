@@ -1788,25 +1788,32 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     return { min, max };
   }, [filters.numeric_range.column, annotationData]);
 
-  // Density histogram bins for the selected numeric column
+  // Density histogram bins for the selected numeric column, stratified by annotation label
   const numericDensityHistogram = useMemo(() => {
     const col = filters.numeric_range.column;
     if (!col || !annotationData.length) return null;
     const { min, max } = numericRangeBounds;
     if (min === max) return null;
     const NUM_BINS = 40;
-    const bins = new Array(NUM_BINS).fill(0);
+    const LABELS = ['yes', 'no', 'uncertain', 'unlabeled'];
+    const binsByLabel = {};
+    LABELS.forEach(l => { binsByLabel[l] = new Array(NUM_BINS).fill(0); });
     const range = max - min;
+    const annCol = settings.annotation_column;
     annotationData.forEach(clip => {
       const v = parseFloat(clip[col]);
       if (!isNaN(v)) {
         const idx = Math.min(Math.floor(((v - min) / range) * NUM_BINS), NUM_BINS - 1);
-        bins[idx]++;
+        const label = (annCol && clip[annCol]) ? clip[annCol] : 'unlabeled';
+        const key = LABELS.includes(label) ? label : 'unlabeled';
+        binsByLabel[key][idx]++;
       }
     });
-    const maxCount = Math.max(...bins);
-    return { bins, maxCount, min, max };
-  }, [filters.numeric_range.column, annotationData, numericRangeBounds]);
+    const totals = new Array(NUM_BINS).fill(0);
+    LABELS.forEach(l => binsByLabel[l].forEach((c, i) => { totals[i] += c; }));
+    const maxCount = Math.max(...totals);
+    return { binsByLabel, totals, maxCount, min, max, LABELS };
+  }, [filters.numeric_range.column, annotationData, numericRangeBounds, settings.annotation_column]);
 
   // Unique values for the selected categorical column
   const categoricalColumnValues = useMemo(() => {
@@ -3470,9 +3477,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                       </FormControl>
                       {filters.numeric_range.column && numericDensityHistogram && (
                         (() => {
-                          const { bins, maxCount, min, max } = numericDensityHistogram;
-                          const W = 214, H = 48, PAD = 1;
-                          const binW = (W - PAD * 2) / bins.length;
+                          const { binsByLabel, totals, maxCount, min, max, LABELS } = numericDensityHistogram;
+                          const W = 214, H = 52, PAD = 1;
+                          const binW = (W - PAD * 2) / totals.length;
                           const activeMin = filters.numeric_range.min ?? min;
                           const activeMax = filters.numeric_range.max ?? max;
                           const range = max - min || 1;
@@ -3485,29 +3492,40 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                             if (abs >= 1000 || (abs < 0.01 && abs > 0)) return v.toExponential(1);
                             return abs < 1 ? v.toFixed(2) : v.toFixed(1);
                           };
+                          const cssVars = { yes: 'var(--yes)', no: 'var(--no)', uncertain: 'var(--uncertain)', unlabeled: 'var(--unlabeled)' };
                           return (
                             <svg width="100%" viewBox={`0 0 ${W} ${H + 16}`} preserveAspectRatio="xMidYMax meet" style={{ display: 'block', overflow: 'visible' }}>
-                              {/* bars */}
-                              {bins.map((count, i) => {
-                                const barH = maxCount > 0 ? (count / maxCount) * H : 0;
+                              {totals.map((_, i) => {
                                 const x = PAD + i * binW;
-                                const binMin = min + (i / bins.length) * range;
-                                const binMax = min + ((i + 1) / bins.length) * range;
+                                const barW = Math.max(binW - 0.5, 1);
+                                const binMin = min + (i / totals.length) * range;
+                                const binMax = min + ((i + 1) / totals.length) * range;
                                 const inRange = binMax >= activeMin && binMin <= activeMax;
-                                return (
-                                  <rect
-                                    key={i}
-                                    x={x}
-                                    y={H - barH}
-                                    width={Math.max(binW - 0.5, 1)}
-                                    height={barH}
-                                    fill={inRange ? 'rgba(100,160,255,0.75)' : 'rgba(160,160,160,0.3)'}
-                                  />
-                                );
+                                const opacity = inRange ? 1 : 0.25;
+                                // stack from bottom: unlabeled, uncertain, no, yes
+                                const stackOrder = ['unlabeled', 'uncertain', 'no', 'yes'];
+                                let yBottom = H;
+                                return stackOrder.map(label => {
+                                  const count = binsByLabel[label][i];
+                                  if (count === 0) return null;
+                                  const barH = maxCount > 0 ? (count / maxCount) * H : 0;
+                                  yBottom -= barH;
+                                  return (
+                                    <rect
+                                      key={label}
+                                      x={x}
+                                      y={yBottom}
+                                      width={barW}
+                                      height={barH}
+                                      fill={cssVars[label]}
+                                      opacity={opacity}
+                                    />
+                                  );
+                                });
                               })}
                               {/* active range overlay lines */}
-                              <line x1={toX(activeMin)} y1={0} x2={toX(activeMin)} y2={H} stroke="rgba(60,120,255,0.9)" strokeWidth={1.5} />
-                              <line x1={toX(activeMax)} y1={0} x2={toX(activeMax)} y2={H} stroke="rgba(60,120,255,0.9)" strokeWidth={1.5} />
+                              <line x1={toX(activeMin)} y1={0} x2={toX(activeMin)} y2={H} stroke="rgba(60,120,255,0.85)" strokeWidth={1.5} />
+                              <line x1={toX(activeMax)} y1={0} x2={toX(activeMax)} y2={H} stroke="rgba(60,120,255,0.85)" strokeWidth={1.5} />
                               {/* axis baseline */}
                               <line x1={PAD} y1={H} x2={W - PAD} y2={H} stroke="rgba(0,0,0,0.15)" strokeWidth={1} />
                               {/* tick labels */}
