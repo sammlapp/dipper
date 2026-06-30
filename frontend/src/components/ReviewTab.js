@@ -973,13 +973,23 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
           handleSave();
         }
       }
+
+      // Ctrl/Cmd+= or Ctrl/Cmd++ to decrease columns; Ctrl/Cmd+- to increase columns (grid mode only)
+      if (!isFocusMode && (event.ctrlKey || event.metaKey) && (event.key === '=' || event.key === '+' || event.key === '-')) {
+        event.preventDefault();
+        const delta = event.key === '-' ? 1 : -1;
+        const newCols = Math.max(1, Math.min(10, settings.grid_columns + delta));
+        if (newCols !== settings.grid_columns) {
+          handleSettingsChange({ ...settings, grid_columns: newCols });
+        }
+      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [annotationData.length, currentSavePath]);
+  }, [annotationData.length, currentSavePath, isFocusMode, settings, handleSettingsChange]);
 
   // Note: currentDataVersion is now incremented directly in the file loading functions
   // (loadAndProcessCSV and loadAndProcessCSVFromFile) to ensure spectrograms load
@@ -3097,6 +3107,14 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                   <div className="shortcut-item">
                     <kbd>N</kbd>
                     <span>{classifierGuidedMode.enabled && stratifiedBins.length > 0 ? 'Jump to next incomplete bin (CGL mode)' : 'Next page'}</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Ctrl/Cmd</kbd> + <kbd>+</kbd>
+                    <span>Decrease columns by 1 ("zoom in")</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Ctrl/Cmd</kbd> + <kbd>-</kbd>
+                    <span>Increase columns by 1 ("zoom out")</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd>
