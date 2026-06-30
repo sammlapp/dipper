@@ -3430,7 +3430,7 @@ body.dark-mode .react-select__placeholder {
 }
 
 .focus-axis-outside-label {
-  color: #111;
+  color: var(--dark);
   font-size: 0.78rem;
   line-height: 1;
   white-space: nowrap;

@@ -2689,7 +2689,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                 title={allBinsComplete ? "All bins complete" : "Jump to next incomplete bin (⌘⇧K)"}
               >
                 <span className="material-symbols-outlined">fast_forward</span>
-                Next Incomplete
+                Next Incomplete (N)
               </button>
             </div>
             <div className="bin-stratification-values">
