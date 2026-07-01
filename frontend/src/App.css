@@ -3569,9 +3569,9 @@ body.dark-mode .react-select__placeholder {
   position: absolute;
   top: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.10);
-  border-left: 2px solid rgba(255, 255, 255, 0.45);
-  border-right: 2px solid rgba(255, 255, 255, 0.45);
+  background: rgb(from var(--dark-accent) r g b / 0.1);
+  border-left: 2px solid rgb(from var(--medium-gray) r g b / 0.3);
+  border-right: 2px solid rgb(from var(--medium-gray) r g b / 0.3);
   pointer-events: none;
   z-index: 1;
 }
