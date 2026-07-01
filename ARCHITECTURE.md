@@ -1,6 +1,6 @@
 # Dipper - Application Architecture
 
-**Last Updated:** January 2026
+**Last Updated:** July 2026
 
 ## Overview
 
@@ -18,7 +18,7 @@ Key points:
 1. Backend: The python executable (app.py) serves as the backend, providing the API to the frontend via aiohttp.
 2. Frontend: ReactJS front end is run either via Tauri (desktop mode) or launched with npx (server mode)
 3. File system operations: implemented via Tauri (desktop mode, see main.rs) or directly in app.py (server mode)
-4. Background Tasks: The backend launches background ml tasks by running python scripts with a dedicated conda-pack environment. Task management is handled by task_manager.js in the React app. 
+4. Background Tasks: The backend launches background ml tasks by running python scripts with a dedicated conda-pack environment. Task management is handled by TaskManager.js in the React app.
 
 
 ### Desktop Mode
@@ -181,6 +181,8 @@ logging:
   - Body: `{csv_file, data: [{...}, ...]}`
 - `POST /annotation/export` - Export annotations
 - `POST /annotation/stats` - Get annotation statistics
+
+The `/clip` endpoint supports arbitrary `start_time`/`end_time` ranges. Focus mode uses this to load a configurable context window (default ±4 s) around each annotation clip. `FocusView` receives both the extended window bounds (`start_time`/`end_time`) and the original clip bounds (`clip_start_time`/`clip_end_time`), and renders a highlight overlay on the spectrogram with the audio cursor starting at the annotation clip's position within the wider window.
 
 ### File Management (Server Mode)
 
@@ -399,10 +401,21 @@ npm run tauri:dev
 **React Components:**
 - `InferenceTab.js` - Model inference UI
 - `TrainingTab.js` - Model training UI
-- `ExtractionTab.js` - Clip extraction/annotation task creation
+- `ExtractionTab.js` - Clip extraction/annotation task creation (`ExtractionTaskCreationForm.js`)
 - `ExploreTab.js` - Results exploration and visualization
-- `ReviewTab.js` - Audio clip annotation interface
+- `ReviewTab.js` - Audio clip annotation interface (grid + focus mode)
+- `FocusView.js` - Single-clip focus mode with context audio window and spectrogram highlight
+- `ReviewSettings.js` - Settings panel for ReviewTab (visualization, focus mode, annotation)
+- `AnnotationCard.js` - Grid-mode annotation card component
+- `BoundingBoxOverlay.js` - Bounding box drawing overlay for spectrograms
+- `SpectrogramContextMenu.js` - Right-click context menu on spectrograms
+- `HttpAudioLoader.js` - Hook for fetching audio clips and spectrograms from backend
+- `ClassifierGuidedPanel.js` - Classifier-guided annotation mode UI
 - `TaskMonitor.js` - Task queue and status display
+- `TaskCreationForm.js` / `TrainingTaskCreationForm.js` - Job configuration forms
+- `SettingsTab.js` - App-wide settings
+- `HelpTab.js` - In-app help
+- `SongSpaceTab.js` - Song space exploration
 - `ServerFileBrowser.js` - Server-side file browsing (server mode)
 - `utils/TaskManager.js` - Task orchestration and HTTP communication
 

@@ -78,6 +78,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     // Focus mode settings
     focus_mode_autoplay: true,
     focus_size: 'medium', // 'small', 'medium', 'large'
+    focus_context_seconds: 4, // seconds of context audio before/after clip
 
     // Keyboard shortcuts
     keyboard_shortcuts_enabled: true,
@@ -572,6 +573,21 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
                 <MenuItem value="large">Large (full width)</MenuItem>
               </Select>
             </FormControl>
+          </label>
+        </div>
+
+        <div className="focus-size-settings">
+          <label>
+            Focus mode: context (seconds):
+            <input
+              type="number"
+              min="0"
+              max="30"
+              step="0.5"
+              value={settings.focus_context_seconds ?? 4}
+              onChange={(e) => handleSettingChange('focus_context_seconds', parseFloat(e.target.value) || 0)}
+              style={{ width: 70, marginLeft: 8 }}
+            />
           </label>
         </div>
       </div>

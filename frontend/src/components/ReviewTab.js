@@ -305,6 +305,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     image_height: 200,
     focus_mode_autoplay: false,
     focus_size: 'medium',
+    focus_context_seconds: 4,
     keyboard_shortcuts_enabled: true,
     manual_classes: '',
     clip_duration: 3.0,
@@ -2461,6 +2462,11 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     }
   }, [isFocusMode, focusClipIndex, annotationData, loadedPageData]);
 
+  // Clear loaded clip cache when context window size or image dimensions change
+  useEffect(() => {
+    setLoadedPageData([]);
+  }, [settings.focus_context_seconds, settings.focus_size]);
+
   // Function to load spectrogram for a specific clip in focus mode
   const loadFocusClipSpectrogram = useCallback(async (clip) => {
     try {
@@ -2473,11 +2479,20 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
         fullFilePath = `${currentRootAudioPath}/${clip.file}`;
       }
 
+      const contextSeconds = settings.focus_context_seconds ?? 4;
+      const clipStartTime = clip.start_time;
+      const clipEndTime = clip.end_time || clip.start_time + 3;
+      const extStart = Math.max(0, clipStartTime - contextSeconds);
+      const extEnd = clipEndTime + contextSeconds;
+
       const clipToLoad = {
         file_path: fullFilePath,
-        start_time: clip.start_time,
-        end_time: clip.end_time || clip.start_time + 3,
-        clip_id: clip.id
+        start_time: extStart,
+        end_time: extEnd,
+        clip_id: clip.id,
+        // Pass original clip bounds so FocusView can draw the highlight
+        clip_start_time: clipStartTime,
+        clip_end_time: clipEndTime,
       };
 
       // Get visualization settings
@@ -2518,9 +2533,12 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
 
       if (loadedClip && loadedClip.length > 0) {
         setLoadedPageData(prev => {
-          // Remove any existing data for this clip and add the new data
           const filtered = prev.filter(loaded => loaded.clip_id !== clip.id);
-          return [...filtered, loadedClip[0]];
+          return [...filtered, {
+            ...loadedClip[0],
+            clip_start_time: clipStartTime,
+            clip_end_time: clipEndTime,
+          }];
         });
         // Mark this clip as rendered now that it's loaded
         setLastRenderedFocusClipIndex(focusClipIndex);
@@ -2531,7 +2549,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       // Don't set transitioning state - no overlay shown
       // setIsPageTransitioning(false);
     }
-  }, [rootAudioPath, httpLoader]);
+  }, [rootAudioPath, httpLoader, settings.focus_context_seconds, settings.focus_size]);
 
   const handleSelectRootAudioPath = async () => {
     try {

@@ -105,7 +105,7 @@ dipper/
 ├── frontend/
 │   ├── src/
 │   │   ├── App.js                    # Main React app
-│   │   ├── components/               # React tabs (Inference, Training, etc.)
+│   │   ├── components/               # React components (tabs, FocusView, ReviewSettings, etc.)
 │   │   └── utils/TaskManager.js      # Task orchestration
 │   ├── src-tauri/                    # Tauri Rust backend (desktop builds)
 │   ├── python-dist/                  # PyInstaller backend executable
@@ -123,7 +123,8 @@ dipper/
 - `GET /inference/status/{job_id}` - Check job status
 - `POST /training/run` - Start training job
 - `POST /extraction/run` - Start extraction job
-- `GET /clip` - Get audio clip/spectrogram
+- `GET /clip` - Get audio clip/spectrogram (supports arbitrary start/end for context windows)
+- `POST /clips/batch` - Get multiple clips in one request
 - `POST /annotation/load` - Load annotation task (ReviewTab)
 
 ## Important Patterns
@@ -151,6 +152,9 @@ Backend reads these files and returns via status endpoints. Frontend displays in
 ├── predictions.csv       # Inference results
 └── model.pt              # Training results
 ```
+
+### Focus Mode Context Window (ReviewTab)
+Focus mode loads a configurable amount of audio before and after each annotation clip (default ±4 s, set via "Focus mode: context (seconds)" in ReviewSettings). `loadFocusClipSpectrogram` in ReviewTab expands `start_time`/`end_time` and passes the original clip bounds as `clip_start_time`/`clip_end_time`. `FocusView` uses these to draw a highlight overlay on the spectrogram, position the playback cursor at the annotation clip start, and display original clip times in the info row. No backend changes are needed — `/clip` already accepts arbitrary time windows.
 
 ### Environment Management
 - **Backend env**: PyInstaller executable (bundled with app, ~50MB)

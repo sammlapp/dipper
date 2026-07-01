@@ -25,6 +25,7 @@ function FocusView({
   const [audioUrl, setAudioUrl] = useState(null);
   const audioRef = useRef(null);
   const hasAutoPlayedRef = useRef(false);
+  const spectrogramRef = useRef(null);
 
   const {
     file = '',
@@ -37,7 +38,18 @@ function FocusView({
     spectrogram_base64 = null,
     frequency_range = null,
     time_range = null,
+    clip_start_time = null,
+    clip_end_time = null,
   } = clipData || {};
+
+  // Context window: start_time/end_time are the loaded (extended) window.
+  // clip_start_time/clip_end_time are the original annotation clip bounds.
+  const hasContext = clip_start_time != null && clip_end_time != null;
+  const extDuration = end_time > start_time ? end_time - start_time : 0;
+  const highlightLeft  = hasContext && extDuration > 0 ? (clip_start_time - start_time) / extDuration : 0;
+  const highlightWidth = hasContext && extDuration > 0 ? (clip_end_time - clip_start_time) / extDuration : 1;
+  // Offset into the loaded WAV where the annotation clip begins
+  const clipOffsetSeconds = hasContext ? clip_start_time - start_time : 0;
 
   // Read annotation and bbox from dynamic column keys based on annotationColumn prop
   const annotation = (clipData && clipData[annotationColumn]) ?? '';
@@ -95,9 +107,10 @@ function FocusView({
     // Always pause any currently playing audio when clip changes
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+      // Position cursor at start of annotation clip within the context window
+      audioRef.current.currentTime = clipOffsetSeconds;
       setIsPlaying(false);
-      setCurrentTime(0);
+      setCurrentTime(clipOffsetSeconds);
     }
 
     // Reset auto-play flag for new clip
@@ -181,11 +194,11 @@ function FocusView({
     }
   }, []);
 
-  // Restart audio function
+  // Restart audio function — seeks to clip start within context window
   const handleRestart = useCallback(() => {
     if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      setCurrentTime(0);
+      audioRef.current.currentTime = clipOffsetSeconds;
+      setCurrentTime(clipOffsetSeconds);
       if (isPlaying) {
         audioRef.current.play();
       }
@@ -244,8 +257,8 @@ function FocusView({
       const link = document.createElement('a');
       link.href = `data:audio/wav;base64,${audio_base64}`;
 
-      const start = Number.isFinite(start_time) ? start_time.toFixed(2) : 'start';
-      const end = Number.isFinite(end_time) ? end_time.toFixed(2) : 'end';
+      const start = Number.isFinite(hasContext ? clip_start_time : start_time) ? (hasContext ? clip_start_time : start_time).toFixed(2) : 'start';
+      const end = Number.isFinite(hasContext ? clip_end_time : end_time) ? (hasContext ? clip_end_time : end_time).toFixed(2) : 'end';
       const stem = file ? basename(file).replace(/\.[^/.]+$/, '') : 'clip';
       link.download = `${stem}_${start}s_${end}s.wav`;
 
@@ -409,10 +422,15 @@ function FocusView({
     };
   }, [reviewMode, handleAnnotationChangeWithAdvance, onNavigate, togglePlayPause]);
 
-  // Handle spectrogram click
-  const handleSpectrogramClick = useCallback(() => {
-    togglePlayPause();
-  }, [togglePlayPause]);
+  // Handle spectrogram click — seek to clicked position within the loaded audio
+  const handleSpectrogramClick = useCallback((e) => {
+    if (!audioRef.current || !spectrogramRef.current) return;
+    const rect = spectrogramRef.current.getBoundingClientRect();
+    const fraction = (e.clientX - rect.left) / rect.width;
+    const seekTime = fraction * (audioRef.current.duration || 0);
+    audioRef.current.currentTime = seekTime;
+    setCurrentTime(seekTime);
+  }, []);
 
   const [contextMenu, setContextMenu] = useState(null);
   const handleSpectrogramContextMenu = useCallback((e) => {
@@ -456,11 +474,12 @@ function FocusView({
             </div>
 
             <div
+              ref={spectrogramRef}
               className="focus-spectrogram"
               onClick={handleSpectrogramClick}
               onContextMenu={handleSpectrogramContextMenu}
-              title={audioUrl ? (isPlaying ? 'Click to pause audio' : 'Click to play audio') : 'Audio not available'}
-              style={{ position: 'relative' }}
+              title={audioUrl ? 'Click to seek' : 'Audio not available'}
+              style={{ position: 'relative', cursor: audioUrl ? 'crosshair' : 'default' }}
             >
               {spectrogram_base64 ? (
                 <img
@@ -473,6 +492,24 @@ function FocusView({
                   <img src="/icon.svg" alt="Loading" className="placeholder-icon app-icon" />
                   <div className="placeholder-text">Loading spectrogram...</div>
                 </div>
+              )}
+
+              {/* Clip region highlight — shows where the annotation clip sits within the context window */}
+              {hasContext && spectrogram_base64 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    left: `${highlightLeft * 100}%`,
+                    width: `${highlightWidth * 100}%`,
+                    background: 'rgba(255, 255, 255, 0.10)',
+                    borderLeft: '2px solid rgba(255, 255, 255, 0.45)',
+                    borderRight: '2px solid rgba(255, 255, 255, 0.45)',
+                    pointerEvents: 'none',
+                    zIndex: 1,
+                  }}
+                />
               )}
 
               {/* Bounding box overlay for drawing annotations */}
@@ -716,15 +753,15 @@ function FocusView({
 
 
 
-          {/* File info row */}
+          {/* File info row — always shows original annotation clip times */}
           <div className="focus-info-row">
             <div className="focus-file-name">{file ? basename(file) : 'Unknown file'}</div>
             <div className="focus-time-info">
-              {start_time !== undefined && (
-                <span>{start_time.toFixed(1)}s</span>
+              {(hasContext ? clip_start_time : start_time) !== undefined && (
+                <span>{(hasContext ? clip_start_time : start_time).toFixed(1)}s</span>
               )}
-              {end_time && end_time !== start_time && (
-                <span> - {end_time.toFixed(1)}s</span>
+              {(hasContext ? clip_end_time : end_time) && (hasContext ? clip_end_time !== clip_start_time : end_time !== start_time) && (
+                <span> - {(hasContext ? clip_end_time : end_time).toFixed(1)}s</span>
               )}
             </div>
           </div>

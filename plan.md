@@ -14,7 +14,6 @@ take a close look at this codebase, especially documentation markdowns such as r
 ## for songspace release
 - persistent background task for the open SongSpace allows rapid query/interaction; need proper IPC
 
-
 # Bugs
 
 Task queue tab: after restarting a task, current task duration is correct in the top section "Currently Running" but in "All Tasks", the Duration is negative. Must be comparing an outdated end vs start time from the original task run. 
@@ -32,11 +31,9 @@ Switch annotation saving format to always "long" - no multi-class rows, just one
 - annotation box = 1 per annotation, corresponds to a specific class, works well
 - store as sqlite on disk, pd.DF in python backend
 
-- add "load config" button in task pane (opens new task creation panel with config settings from the job)
+- add "load config" button on task panels in task queue (opens new task creation panel in the relevant tab with config settings from the job)
 
-keep a persistent background python task so that ML processes can launch quickly
-try adding onnx and huggingface_hub to the backend exe so that we can run BirdNET GeoModel
-if we have onnx, could also potentially do lightweight Perch2 embedding tasks on backend...
+keep a persistent background python task so that ML processes can launch quickly?
 
 "collections": create and browse clip collections (folders of clips that can be browsed as a group) from Collections tab. When creating new collection, choose where to store it (default is in app cache dir, but can be a folder anywhere) and whether to copy audio clips or just store references. Creates a folder and csv of file path, start/end time, notes. Right click on a clip in review or explore tab to add it to a collection.
 
