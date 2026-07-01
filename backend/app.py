@@ -1499,6 +1499,7 @@ class DipperServer:
 
         self.app.router.add_get("/xeno-canto/search", self.xeno_canto_search)
         self.app.router.add_get("/xeno-canto/clip", self.xeno_canto_clip)
+        self.app.router.add_get("/memory", self.memory_stats)
 
     async def xeno_canto_search(self, request):
         """Proxy Xeno-Canto API v3 search."""
@@ -2054,11 +2055,41 @@ class DipperServer:
             return web.json_response({"error": str(e)}, status=500)
 
     async def clear_cache(self, request):
-        """Clear server cache (lightweight server doesn't really cache, so just return success)"""
+        """Purge completed/failed jobs from running_jobs to free memory."""
         try:
-            return web.json_response({"status": "success", "message": "Cache cleared"})
+            before = len(self.running_jobs)
+            done_keys = [k for k, v in self.running_jobs.items()
+                         if v.get("status") in ("completed", "failed", "cancelled")]
+            for k in done_keys:
+                del self.running_jobs[k]
+            after = len(self.running_jobs)
+            return web.json_response({
+                "status": "success",
+                "message": f"Removed {before - after} completed jobs ({after} active remaining)"
+            })
         except Exception as e:
             logger.error(f"Error clearing cache: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def memory_stats(self, request):
+        """Return process memory usage and running_jobs breakdown."""
+        try:
+            import psutil, os
+            proc = psutil.Process(os.getpid())
+            mem = proc.memory_info()
+            job_counts = {}
+            for v in self.running_jobs.values():
+                s = v.get("status", "unknown")
+                job_counts[s] = job_counts.get(s, 0) + 1
+            return web.json_response({
+                "rss_mb": round(mem.rss / 1024 / 1024, 1),
+                "vms_mb": round(mem.vms / 1024 / 1024, 1),
+                "running_jobs_total": len(self.running_jobs),
+                "running_jobs_by_status": job_counts,
+            })
+        except ImportError:
+            return web.json_response({"error": "psutil not installed; run: pip install psutil"}, status=501)
+        except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
 
     # Config Management Routes
@@ -3783,6 +3814,23 @@ def main():
         monitor_task = asyncio.create_task(
             monitor_parent_process(parent_pid, graceful_shutdown, check_interval=2.0)
         )
+
+        async def cleanup_completed_jobs():
+            """Periodically remove completed/failed jobs older than 5 minutes."""
+            while not shutdown_event.is_set():
+                await asyncio.sleep(300)
+                cutoff = asyncio.get_event_loop().time() - 300
+                stale = [
+                    k for k, v in server.running_jobs.items()
+                    if v.get("status") in ("completed", "failed", "cancelled")
+                    and v.get("last_checked", 0) < cutoff
+                ]
+                for k in stale:
+                    del server.running_jobs[k]
+                if stale:
+                    logger.info(f"Cleaned up {len(stale)} stale jobs from running_jobs")
+
+        asyncio.create_task(cleanup_completed_jobs())
 
         try:
             # Keep server running until shutdown event is triggered

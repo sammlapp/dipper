@@ -10,6 +10,8 @@ function FocusView({
   onCommentChange,
   onBoundingBoxChange,
   onNavigate,
+  onContextPage,
+  viewOffset = 0,
   settings,
   annotationColumn = 'annotation',
   reviewMode = 'binary',
@@ -46,9 +48,11 @@ function FocusView({
   // clip_start_time/clip_end_time are the original annotation clip bounds.
   const hasContext = clip_start_time != null && clip_end_time != null;
   const extDuration = end_time > start_time ? end_time - start_time : 0;
-  const highlightLeft  = hasContext && extDuration > 0 ? (clip_start_time - start_time) / extDuration : 0;
-  const highlightWidth = hasContext && extDuration > 0 ? (clip_end_time - clip_start_time) / extDuration : 1;
-  // Offset into the loaded WAV where the annotation clip begins
+  // Clip is visible only when its time range overlaps the current loaded window
+  const clipVisibleInWindow = hasContext && clip_start_time < end_time && clip_end_time > start_time;
+  const highlightLeft  = clipVisibleInWindow && extDuration > 0 ? (clip_start_time - start_time) / extDuration : 0;
+  const highlightWidth = clipVisibleInWindow && extDuration > 0 ? (clip_end_time - clip_start_time) / extDuration : 1;
+  // Offset into the loaded WAV where the annotation clip begins (for cursor positioning)
   const clipOffsetSeconds = hasContext ? clip_start_time - start_time : 0;
 
   // Read annotation and bbox from dynamic column keys based on annotationColumn prop
@@ -422,7 +426,7 @@ function FocusView({
     };
   }, [reviewMode, handleAnnotationChangeWithAdvance, onNavigate, togglePlayPause]);
 
-  // Handle spectrogram click — seek to clicked position within the loaded audio
+  // Single click — seek to clicked position within the loaded audio
   const handleSpectrogramClick = useCallback((e) => {
     if (!audioRef.current || !spectrogramRef.current) return;
     const rect = spectrogramRef.current.getBoundingClientRect();
@@ -431,6 +435,12 @@ function FocusView({
     audioRef.current.currentTime = seekTime;
     setCurrentTime(seekTime);
   }, []);
+
+  // Double click — toggle play/pause
+  const handleSpectrogramDoubleClick = useCallback((e) => {
+    e.preventDefault();
+    togglePlayPause();
+  }, [togglePlayPause]);
 
   const [contextMenu, setContextMenu] = useState(null);
   const handleSpectrogramContextMenu = useCallback((e) => {
@@ -477,8 +487,9 @@ function FocusView({
               ref={spectrogramRef}
               className="focus-spectrogram"
               onClick={handleSpectrogramClick}
+              onDoubleClick={handleSpectrogramDoubleClick}
               onContextMenu={handleSpectrogramContextMenu}
-              title={audioUrl ? 'Click to seek' : 'Audio not available'}
+              title={audioUrl ? 'Click to seek · Double-click to play/pause' : 'Audio not available'}
               style={{ position: 'relative', cursor: audioUrl ? 'crosshair' : 'default' }}
             >
               {spectrogram_base64 ? (
@@ -494,20 +505,13 @@ function FocusView({
                 </div>
               )}
 
-              {/* Clip region highlight — shows where the annotation clip sits within the context window */}
-              {hasContext && spectrogram_base64 && (
+              {/* Clip region highlight — only shown when the annotation clip is within the current view window */}
+              {clipVisibleInWindow && spectrogram_base64 && (
                 <div
+                  className="focus-clip-highlight"
                   style={{
-                    position: 'absolute',
-                    top: 0,
-                    bottom: 0,
                     left: `${highlightLeft * 100}%`,
                     width: `${highlightWidth * 100}%`,
-                    background: 'rgba(255, 255, 255, 0.10)',
-                    borderLeft: '2px solid rgba(255, 255, 255, 0.45)',
-                    borderRight: '2px solid rgba(255, 255, 255, 0.45)',
-                    pointerEvents: 'none',
-                    zIndex: 1,
                   }}
                 />
               )}
@@ -639,6 +643,36 @@ function FocusView({
               <div className="audio-time-compact">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </div>
+              {onContextPage && (
+                <div className="focus-context-page-controls">
+                  <button
+                    className="audio-btn"
+                    onClick={() => onContextPage(-1)}
+                    title="Page backward in audio"
+                  >
+                    <span className="material-symbols-outlined">chevron_left</span>
+                  </button>
+                  <span className="focus-context-page-label">
+                    {viewOffset !== 0 ? `${viewOffset > 0 ? '+' : ''}${viewOffset.toFixed(1)}s` : 'clip'}
+                  </span>
+                  <button
+                    className="audio-btn"
+                    onClick={() => onContextPage(1)}
+                    title="Page forward in audio"
+                  >
+                    <span className="material-symbols-outlined">chevron_right</span>
+                  </button>
+                  {viewOffset !== 0 && (
+                    <button
+                      className="audio-btn"
+                      onClick={() => onContextPage(null)}
+                      title="Re-center on clip"
+                    >
+                      <span className="material-symbols-outlined">filter_center_focus</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

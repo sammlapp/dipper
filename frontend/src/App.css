@@ -3528,6 +3528,31 @@ body.dark-mode .react-select__placeholder {
   transition: width 0.1s ease;
 }
 
+.focus-clip-highlight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.10);
+  border-left: 2px solid rgba(255, 255, 255, 0.45);
+  border-right: 2px solid rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.focus-context-page-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 8px;
+}
+
+.focus-context-page-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  min-width: 42px;
+  text-align: center;
+}
+
 .focus-play-overlay {
   position: absolute;
   top: 50%;

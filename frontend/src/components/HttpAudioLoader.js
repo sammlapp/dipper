@@ -11,23 +11,28 @@ export const useHttpAudioLoader = (serverUrl) => {
   const [performanceData, setPerformanceData] = useState([]);
 
   const addDebug = useCallback((message, data = null) => {
-    const debugEntry = {
-      timestamp: new Date().toISOString(),
-      message,
-      data: data ? JSON.stringify(data, null, 2) : null
-    };
-    setDebugInfo(prev => [...prev, debugEntry]);
+    // Strip large base64 fields before storing to avoid memory accumulation
+    let safeData = null;
+    if (data) {
+      const { audio_base64, spectrogram_base64, ...rest } = data;
+      safeData = JSON.stringify(rest, null, 2);
+    }
+    const debugEntry = { timestamp: new Date().toISOString(), message, data: safeData };
+    setDebugInfo(prev => {
+      const next = [...prev, debugEntry];
+      return next.length > 100 ? next.slice(-100) : next; // cap at 100 entries
+    });
     console.log('HttpAudioLoader DEBUG:', message, data);
   }, []);
 
   const addPerformance = useCallback((operation, duration, metadata = {}) => {
-    const perfEntry = {
-      operation,
-      duration,
-      timestamp: new Date().toISOString(),
-      metadata
-    };
-    setPerformanceData(prev => [...prev, perfEntry]);
+    // Strip large fields from metadata
+    const { audio_base64, spectrogram_base64, ...safeMeta } = metadata;
+    const perfEntry = { operation, duration, timestamp: new Date().toISOString(), metadata: safeMeta };
+    setPerformanceData(prev => {
+      const next = [...prev, perfEntry];
+      return next.length > 200 ? next.slice(-200) : next; // cap at 200 entries
+    });
   }, []);
 
   const checkServerHealth = useCallback(async () => {

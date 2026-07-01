@@ -314,16 +314,19 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
   const [availableClasses, setAvailableClasses] = useState([]);
   const [csvColumns, setCsvColumns] = useState([]);  // Store CSV column headers
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [loadedPageData, setLoadedPageData] = useState([]);
+  const [loadedPageData, setLoadedPageData] = useState([]);  // grid-mode spectrogram cache
+  const [focusClipData, setFocusClipData] = useState(null);  // focus-mode: single clip with context window
   const [lastRenderedPage, setLastRenderedPage] = useState(0); // Track which page we last rendered to prevent flashing
   const [lastRenderedBinIndex, setLastRenderedBinIndex] = useState(0); // Track which bin we last rendered in classifier-guided mode
   const [lastRenderedFocusClipIndex, setLastRenderedFocusClipIndex] = useState(0); // Track which focus clip we last rendered
+  const [lastRenderedFocusClipData, setLastRenderedFocusClipData] = useState(null); // Last good focus clip data — shown while next clip loads
   const [isPageTransitioning, setIsPageTransitioning] = useState(false);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [isXCPanelOpen, setIsXCPanelOpen] = useState(false);
   const [rootAudioPath, setRootAudioPath] = useState('');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [focusClipIndex, setFocusClipIndex] = useState(0);
+  const [focusViewOffset, setFocusViewOffset] = useState(0); // seconds shifted from default context window (paging)
   const [activeClipIndexOnPage, setActiveClipIndexOnPage] = useState(0); // Index of active clip within current page (0 to itemsPerPage-1)
   const [selectedClipIndices, setSelectedClipIndices] = useState(new Set([0])); // Set of selected clip indices (multi-select)
   const [isModifierHeld, setIsModifierHeld] = useState(false); // true when shift/ctrl/cmd is held (for cursor change)
@@ -631,6 +634,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
 
   // Load spectrograms for current page
   const loadCurrentPageSpectrograms = useCallback(async () => {
+    // Focus mode has its own dedicated loader (loadFocusClipSpectrogram) that fetches
+    // an extended context window. Never let the grid page loader overwrite it.
+    if (isFocusMode) return;
     const currentData = getCurrentPageData();
     if (currentData.length > 0) {
       try {
@@ -860,7 +866,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     if (annotationData.length > 0) {
       loadCurrentPageSpectrograms();
     }
-  }, [currentPage, currentBinIndex, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled, stratifiedBins.length, cglSortedData, isFocusMode]);
+  }, [currentPage, currentBinIndex, currentDataVersion, rootAudioPath, filteredAnnotationData.length, settings.grid_rows, settings.grid_columns, classifierGuidedMode.enabled, stratifiedBins.length, cglSortedData]);
 
   // Reset active clip to first clip when page or bin changes (unless it's a layout change)
   useEffect(() => {
@@ -2449,30 +2455,48 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     setSelectedClipIndices(new Set([activeClipIndexOnPage]));
   }, [selectedClipIndices, currentPageData, handleAnnotationChange, activeClipIndexOnPage]);
 
-  // Load current focus clip spectrogram when in focus mode
+  // Load current focus clip spectrogram when in focus mode.
+  // Uses focusClipData (separate from grid's loadedPageData) to avoid any cross-contamination.
   useEffect(() => {
     if (isFocusMode && annotationData.length > 0) {
       const currentClip = annotationData[focusClipIndex];
-      const hasLoadedData = loadedPageData.find(loaded => loaded.clip_id === currentClip?.id);
-
-      if (currentClip && !hasLoadedData) {
-        // Load the current clip if it's not already loaded
+      const alreadyLoaded = focusClipData?.clip_id === currentClip?.id && focusClipData?.clip_start_time != null;
+      if (currentClip && !alreadyLoaded) {
         loadFocusClipSpectrogram(currentClip);
       }
     }
-  }, [isFocusMode, focusClipIndex, annotationData, loadedPageData]);
+  }, [isFocusMode, focusClipIndex, annotationData]);
 
-  // Clear loaded clip cache when context window size or image dimensions change
+  // Reset view offset when navigating to a different clip
   useEffect(() => {
+    setFocusViewOffset(0);
+  }, [focusClipIndex]);
+
+  // When leaving focus mode, grid spectrograms may be stale — reload them
+  const prevIsFocusModeRef = useRef(false);
+  useEffect(() => {
+    if (prevIsFocusModeRef.current && !isFocusMode) {
+      loadCurrentPageSpectrograms();
+    }
+    prevIsFocusModeRef.current = isFocusMode;
+  }, [isFocusMode]);
+
+  // Re-fetch focus clip when context seconds changes (window size changed).
+  // Null focusClipData to bust the cache check; lastRenderedFocusClipData keeps old content visible.
+  useEffect(() => {
+    setFocusClipData(null);
+  }, [settings.focus_context_seconds]);
+
+  // Re-fetch focus clip when image dimensions change; also clear grid cache.
+  useEffect(() => {
+    setFocusClipData(null);
     setLoadedPageData([]);
-  }, [settings.focus_context_seconds, settings.focus_size]);
+  }, [settings.focus_size]);
 
   // Function to load spectrogram for a specific clip in focus mode
-  const loadFocusClipSpectrogram = useCallback(async (clip) => {
+  // viewOffsetSeconds: additional time shift applied on top of the default context window (for paging)
+  const loadFocusClipSpectrogram = useCallback(async (clip, viewOffsetSeconds = 0) => {
     try {
-      // Don't set transitioning state - keep old content visible until new content is ready
-      // setIsPageTransitioning(true);
-
       const currentRootAudioPath = rootAudioPath || '';
       let fullFilePath = clip.file;
       if (currentRootAudioPath && !clip.file.startsWith('/') && !clip.file.match(/^[A-Za-z]:\\\\/)) {
@@ -2482,8 +2506,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       const contextSeconds = settings.focus_context_seconds ?? 4;
       const clipStartTime = clip.start_time;
       const clipEndTime = clip.end_time || clip.start_time + 3;
-      const extStart = Math.max(0, clipStartTime - contextSeconds);
-      const extEnd = clipEndTime + contextSeconds;
+      const windowSize = (clipEndTime - clipStartTime) + 2 * contextSeconds;
+      const extStart = Math.max(0, clipStartTime - contextSeconds + viewOffsetSeconds);
+      const extEnd = extStart + windowSize;
 
       const clipToLoad = {
         file_path: fullFilePath,
@@ -2532,15 +2557,13 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       const loadedClip = await httpLoader.loadClipsBatch([clipToLoad], visualizationSettings);
 
       if (loadedClip && loadedClip.length > 0) {
-        setLoadedPageData(prev => {
-          const filtered = prev.filter(loaded => loaded.clip_id !== clip.id);
-          return [...filtered, {
-            ...loadedClip[0],
-            clip_start_time: clipStartTime,
-            clip_end_time: clipEndTime,
-          }];
-        });
-        // Mark this clip as rendered now that it's loaded
+        const newData = {
+          ...loadedClip[0],
+          clip_start_time: clipStartTime,
+          clip_end_time: clipEndTime,
+        };
+        setFocusClipData(newData);
+        setLastRenderedFocusClipData(newData);
         setLastRenderedFocusClipIndex(focusClipIndex);
       }
     } catch (error) {
@@ -2550,6 +2573,21 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       // setIsPageTransitioning(false);
     }
   }, [rootAudioPath, httpLoader, settings.focus_context_seconds, settings.focus_size]);
+
+  // Page the context view forward or backward along the audio file
+  const handleContextPage = useCallback((direction) => {
+    const currentClip = annotationData[focusClipIndex];
+    if (!currentClip) return;
+    // direction === null means recenter on the clip
+    const newOffset = direction === null ? 0 : (() => {
+      const contextSeconds = settings.focus_context_seconds ?? 4;
+      const clipDuration = (currentClip.end_time || currentClip.start_time + 3) - currentClip.start_time;
+      const windowSize = clipDuration + 2 * contextSeconds;
+      return focusViewOffset + direction * windowSize;
+    })();
+    setFocusViewOffset(newOffset);
+    loadFocusClipSpectrogram(currentClip, newOffset);
+  }, [annotationData, focusClipIndex, focusViewOffset, settings.focus_context_seconds, loadFocusClipSpectrogram]);
 
   const handleSelectRootAudioPath = async () => {
     try {
@@ -4120,7 +4158,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                   // Determine which clip to show - use same logic as grid mode
                   const isOnNewClip = focusClipIndex !== lastRenderedFocusClipIndex;
                   const currentClip = filteredAnnotationData[focusClipIndex];
-                  const hasLoadedNewClip = loadedPageData.some(loaded => loaded.clip_id === currentClip?.id);
+                  const hasLoadedNewClip = focusClipData?.clip_id === currentClip?.id && focusClipData?.clip_start_time != null;
 
                   // Show old clip if we've navigated but new clip hasn't loaded yet
                   const clipIndexToShow = (isOnNewClip && !hasLoadedNewClip) ? lastRenderedFocusClipIndex : focusClipIndex;
@@ -4203,13 +4241,18 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                       <FocusView
                         clipData={{
                           ...clipToShow,
-                          // Find loaded spectrogram data for the clip we're showing
-                          ...loadedPageData.find(loaded => loaded.clip_id === clipToShow?.id) || {}
+                          // Use current focus data if ready; fall back to last rendered data to avoid
+                          // showing the loading placeholder while the next clip/page is fetching.
+                          ...(focusClipData?.clip_id === clipToShow?.id
+                            ? focusClipData
+                            : lastRenderedFocusClipData || {})
                         }}
                         onAnnotationChange={handleFocusAnnotationChange}
                         onCommentChange={handleFocusCommentChange}
                         onBoundingBoxChange={settings.enable_bounding_boxes ? (boundingBox) => handleBoundingBoxChange(clipToShow?.id, boundingBox) : undefined}
                         onNavigate={handleFocusNavigation}
+                        onContextPage={handleContextPage}
+                        viewOffset={focusViewOffset}
                         settings={settings}
                         annotationColumn={settings.annotation_column}
                         reviewMode={settings.review_mode}
