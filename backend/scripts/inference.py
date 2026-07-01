@@ -146,6 +146,14 @@ def save_results(predictions, output_file, config_data):
                 message=f"Saving predictions to {os.path.basename(output_file)}",
             )
 
+            # save a plain text class list to avoid needing to load the sparse df just to get the class names
+            # only need to do this once per inference task
+            class_list_file = Path(job_folder) / ("predicted_classes.txt")
+            with open(class_list_file, "w") as f:
+                for class_name in predictions.columns:
+                    f.write(f"{class_name}\n")
+            logger.info(f"Class list saved to: {class_list_file}")
+
             if not sparse_enabled:
                 # save all scores for all classes and clips
                 predictions.to_csv(output_file)
@@ -390,12 +398,22 @@ def run_classification(model, files, config_data):
                 )
 
         # Create summary of all subfolder results
+        failed_results = [r for r in all_results if r.get("status") == "error"]
+        succeeded_results = [r for r in all_results if r.get("status") == "success"]
+        overall_status = "failed" if failed_results else "success"
+        if failed_results:
+            logger.error(
+                f"{len(failed_results)} of {len(all_results)} subfolders failed: "
+                + ", ".join(r["subfolder"] for r in failed_results)
+            )
         summary.update(
             {
-                "status": "success",
-                "files_processed": len(files),
+                "status": overall_status,
+                "files_processed": sum(r["file_count"] for r in succeeded_results),
                 "split_by_subfolder": True,
                 "subfolders_processed": len(subfolder_groups),
+                "subfolders_succeeded": len(succeeded_results),
+                "subfolders_failed": len(failed_results),
                 "output_files": output_files,
                 "total_files": len(files),
                 "subfolder_results": all_results,
@@ -455,15 +473,27 @@ def run_classification(model, files, config_data):
             }
         )
 
-    logger.info("Inference completed successfully")
-
-    update_status(
-        job_folder,
-        "completed",
-        stage="finished",
-        progress=100,
-        message="Inference completed successfully",
-    )
+    if summary.get("status") == "failed":
+        n_ok = summary.get("subfolders_succeeded", 0)
+        n_fail = summary.get("subfolders_failed", 0)
+        msg = f"Inference failed: {n_fail} of {n_ok + n_fail} subfolders failed"
+        logger.error(msg)
+        update_status(
+            job_folder,
+            "failed",
+            stage="finished",
+            progress=100,
+            message=msg,
+        )
+    else:
+        logger.info("Inference completed successfully")
+        update_status(
+            job_folder,
+            "completed",
+            stage="finished",
+            progress=100,
+            message="Inference completed successfully",
+        )
 
     print(json.dumps(summary))
 

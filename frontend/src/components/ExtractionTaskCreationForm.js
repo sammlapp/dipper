@@ -34,12 +34,13 @@ const DEFAULT_VALUES = {
     export_audio_clips: false,
     clip_duration: 5.0,
     extraction_mode: 'binary', // 'binary' or 'multiclass'
+    separate_files_per_class: true, // binary mode only: one CSV per class vs one combined CSV
     use_custom_python_env: false,
     custom_python_env_path: ''
   }
 };
 
-function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, initialPredictionsFolder }) {
+function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, onTaskCreateAndRunInline, initialPredictionsFolder }) {
   const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
   const [settingsTab, setSettingsTab] = useState(0);
   const [config, setConfig] = useState(DEFAULT_VALUES.config);
@@ -181,15 +182,16 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, initialP
       }
     }
 
-    const taskConfig = {
-      ...config,
-      task_type: 'extraction'
-    };
     const finalTaskName = taskName.trim() || null;
 
-    if (createAndRun) {
+    if (createAndRun === 'inline') {
+      const taskConfig = { ...config, task_type: 'extraction_inline' };
+      onTaskCreateAndRunInline(taskConfig, finalTaskName);
+    } else if (createAndRun) {
+      const taskConfig = { ...config, task_type: 'extraction' };
       onTaskCreateAndRun(taskConfig, finalTaskName);
     } else {
+      const taskConfig = { ...config, task_type: 'extraction' };
       onTaskCreate(taskConfig, finalTaskName);
     }
   };
@@ -372,15 +374,27 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, initialP
 
             {availableClasses.length > 0 && (
               <div className="form-group full-width">
-                <label>Select Classes <HelpIcon section="extraction-class-selection" /></label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  Select Classes <HelpIcon section="extraction-class-selection" />
+                  <button type="button" className="inline-text-btn" onClick={() => handleClassListChange(classOptions)}>Select All</button>
+                  <button type="button" className="inline-text-btn" onClick={() => handleClassListChange([])}>Clear</button>
+                </label>
                 <Select
                   isMulti
                   options={classOptions}
                   value={selectedClassOptions}
                   onChange={handleClassListChange}
                   placeholder="Select classes to create extraction tasks for..."
-                  className="multiclass-select extraction-class-select-narrow"
+                  className="multiclass-select"
                   classNamePrefix="select"
+                  styles={{
+                    valueContainer: (base) => ({
+                      ...base,
+                      maxHeight: '500px',
+                      maxWidth: '100%',
+                      overflowY: 'auto',
+                    }),
+                  }}
                 />
               </div>
             )}
@@ -593,9 +607,25 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, initialP
               </div>
               <div className="help-text">
                 {config.extraction_mode === 'binary'
-                  ? 'Will create one CSV file per species for yes/no annotation'
+                  ? 'Will create CSV file(s) for yes/no annotation per species'
                   : 'Will create one CSV file for all species with multi-label annotation'}
               </div>
+              {config.extraction_mode === 'binary' && (
+                <label style={{ marginTop: '8px', display: 'flex', alignItems: 'center' }}>
+                  <Checkbox
+                    size="small"
+                    checked={config.separate_files_per_class}
+                    onChange={(e) => setConfig(prev => ({ ...prev, separate_files_per_class: e.target.checked }))}
+                    sx={{ p: 0.25, mr: 0.5 }}
+                  />
+                  Separate file per class
+                  <span className="help-text" style={{ marginLeft: '8px' }}>
+                    {config.separate_files_per_class
+                      ? 'One CSV per species'
+                      : 'One combined CSV with a "class" column'}
+                  </span>
+                </label>
+              )}
             </div>
           </div>
         )}
@@ -730,8 +760,8 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, initialP
                     <input
                       className="compact-input"
                       type="number"
-                      min="0"
-                      max="1"
+                      // min="-100"
+                      // max="100"
                       step="0.1"
                       value={config.filtering.score_threshold}
                       onChange={(e) => setConfig(prev => ({
@@ -823,11 +853,21 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, initialP
           </button>
           <button
             className="button-primary"
+            onClick={() => handleSubmit('inline')}
+            disabled={!config.predictions_folder || config.class_list.length === 0 || !config.output_dir || config.export_audio_clips}
+            style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+            title={config.export_audio_clips ? "Run is unavailable when Export Audio Clips is enabled — use Run in background task instead" : "Run extraction directly in the backend process (faster startup)"}
+          >
+            Run
+          </button>
+          <button
+            className="button-secondary"
             onClick={() => handleSubmit(true)}
             disabled={!config.predictions_folder || config.class_list.length === 0 || !config.output_dir}
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+            title="Run extraction as a background subprocess task"
           >
-            Create and Run Task
+            Run in background task
           </button>
           <HelpIcon section="extraction-tasks" />
         </div>

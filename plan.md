@@ -16,25 +16,21 @@ take a close look at this codebase, especially documentation markdowns such as r
 
 
 # Bugs
-after using 'Close Task' button in Review Tab: 
-ERROR
-Cannot read properties of undefined (reading 'column')
-TypeError: Cannot read properties of undefined (reading 'column')
-    at ReviewTab (http://localhost:3011/static/js/bundle.js:102294:29)
-    at renderWithHooks (http://localhost:3011/static/js/bundle.js:53425:22)
-    at updateFunctionComponent (http://localhost:3011/static/js/bundle.js:56993:24)
-    at beginWork (http://localhost:3011/static/js/bundle.js:58712:20)
-    at HTMLUnknownElement.callCallback (http://localhost:3011/static/js/bundle.js:43681:18)
-    at Object.invokeGuardedCallbackDev (http://localhost:3011/static/js/bundle.js:43725:20)
-    at invokeGuardedCallback (http://localhost:3011/static/js/bundle.js:43782:35)
-    at beginWork$1 (http://localhost:3011/static/js/bundle.js:63681:11)
-    at performUnitOfWork (http://localhost:3011/static/js/bundle.js:62929:16)
-    at workLoopSync (http://localhost:3011/static/js/bundle.js:62852:9)
 
 Task queue tab: after restarting a task, current task duration is correct in the top section "Currently Running" but in "All Tasks", the Duration is negative. Must be comparing an outdated end vs start time from the original task run. 
 
 # Incomplete items / TODO /feature request
 test download and use of ML env from HF/GitHub release 
+
+Switch annotation saving format to always "long" - no multi-class rows, just one row per annotation (like a database entry in HopLite) indexed by F,S,E,class
+- dropdown/type to select for current class (eg species) viewed
+- display annotations of other classes on the same clip as bubble
+- allow user to add/remove annotation of other class (switch to multi-class annotation view?)
+- labels can be yes/no/uncertain, and contain f,s,e,class,provenance
+- binary annotation and multi-class have the same save format: long table / df
+- binary annotation just means selecting one class you are currently annotating; multi-class remains the same
+- annotation box = 1 per annotation, corresponds to a specific class, works well
+- store as sqlite on disk, pd.DF in python backend
 
 - add "load config" button in task pane (opens new task creation panel with config settings from the job)
 
@@ -92,11 +88,73 @@ Settings panel, implement buttons for:
 
 
 ### User feature requests
+Extraction (binary): creating separate files per species should be optional. If not checked, creates the 'class' column as in Multi-class extraction and concatenates the annotation csvs into one. 
+
+add pre/post seconds in review mode
+
+better community review mode:
+- if clip has been annotated for another species, show it on the clip panel
+- allow annotating other species even when in "binary" mode
+- unify label formats across binary/multi class annotation
 
 - search/filter for clip by name
 
+#### Community review mode: 
+
+1 page per species? 
+
+Reference clips:
+Easy version: link to Macaulay / XC pages
+https://search.macaulaylibrary.org/catalog?taxonCode=towhee&behaviors=s&mediaType=a
+Xeno Canto species page?
+
+
+XC API call: 
+- provide paged audio-spectrogram grid, e.g. 5 examples with next page to see more
+- default filter to high quality
+- allow filter to call/song/etc
+- can we have something similar with Macaulay? I don't think so but maybe? It's essentially what's already on the website
+
+see britekit for examples; requires user to enter API key;
+also see how Chirpity pulls example clips
+
+#### Training
+1. Collect audio:
+Training data:
+- Use BriteKit to pull clips for species from XC, iNat
+- user provided positives
+- user provided negatives!
+- user provided unlabeled data (can be used as weak negatives, strong negative, or as a set to annotate)
+- diverse random negatives set with noise, biotic sounds
+- annotate as needed
+(default: annotate first 20 seconds of each XC/iNat file)
+
+2. Create eval set
+random sample of field data; or targeted random sample of subset for rare sp or existing labeled set or subset of training data
+
+3. Iterate on classifier
+- active learning loop on unlabeled data
+- label cleaning (AL on labeled data)
+- try different embedding models? 
+- preprocessing tweaks
+- ensembles
+
+4. Finalize
+- Save classifier 
+- produce evaluation metrics and plots
+- calibrate / save classifier calibration
+- document sound class trained
+- optionally share the classifier! and labeled clips! (or just the Perch2 embedding + label) to CommonPAM
+- carefully document which classes are annotated for which clips
+- ebird labels for consistent taxonomy? 
+
+Empirical q: does flipping the sign or zeroing of spatial embedding values outside bandpass range improve TL classification?
+
+#### User feature requests
+
 Jeff Larkin: 
 - ecological inference, basics like map, modelled occupancy in two treatment groups 
+- creating a report
 
 JT Larkin:
 - CGL stopping criterion for number of negative clips in bin

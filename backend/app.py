@@ -30,13 +30,11 @@ import numpy as np
 import soundfile as sf
 import scipy.signal
 from PIL import Image
-import soundfile as sf
 from io import BytesIO
 
 from scripts import scan_folder
 from scripts import load_scores
 from scripts import clip_extraction
-from scripts import geomodel
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -1447,6 +1445,7 @@ class DipperServer:
         )
         self.app.router.add_post("/review/load-task", self.load_review_task)
         self.app.router.add_post("/extraction/run", self.run_extraction)
+        self.app.router.add_post("/extraction/run-inline", self.run_extraction_inline)
         self.app.router.add_get(
             "/extraction/status/{job_id}", self.get_extraction_status
         )
@@ -2239,6 +2238,8 @@ class DipperServer:
 
     async def get_geomodel_species_list(self, request):
         """Get species list from BirdNET geomodel for a given lat/lon/week, filtered to classifier classes."""
+        from scripts import geomodel
+
         try:
             data = await request.json()
             lat = data.get("lat")
@@ -2284,6 +2285,8 @@ class DipperServer:
 
     async def get_classifier_labels(self, request):
         """Return the list of scientific names for a given classifier."""
+        from scripts import geomodel
+
         try:
             data = await request.json()
             classifier = data.get("classifier")
@@ -2551,6 +2554,63 @@ class DipperServer:
 
         except Exception as e:
             logger.error(f"Error starting extraction: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def run_extraction_inline(self, request):
+        """Run extraction synchronously in the backend thread (no subprocess).
+        Faster for small jobs since it skips Python startup and library import time."""
+        try:
+            data = await request.json()
+            config_path = data.get("config_path")
+
+            if not config_path:
+                return web.json_response({"error": "config_path required"}, status=400)
+
+            config_path = resolve_path(config_path)
+            if not os.path.exists(config_path):
+                return web.json_response(
+                    {"error": f"Config file not found: {config_path}"}, status=400
+                )
+
+            logger.info(f"Running extraction inline from config: {config_path}")
+
+            # Ensure job folder exists before extract_clips tries to write into it
+            import json as _json
+
+            with open(config_path, "r") as _f:
+                _cfg = _json.load(_f)
+            job_folder = _cfg.get("job_folder")
+            if job_folder:
+                os.makedirs(job_folder, exist_ok=True)
+
+            # Run in a thread pool so we don't block the event loop
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None, clip_extraction.extract_clips, config_path
+            )
+
+            if result.get("status") == "success":
+                return web.json_response(
+                    {
+                        "status": "completed",
+                        "extraction_files": result.get("extraction_files", []),
+                        "total_clips": result.get("total_clips", 0),
+                        "summary_file": result.get("summary_file", ""),
+                    }
+                )
+            else:
+                logger.error(f"Inline extraction failed: {result.get('error')}")
+                return web.json_response(
+                    {"status": "error", "error": result.get("error", "Unknown error")},
+                    status=500,
+                )
+
+        except Exception as e:
+            import traceback
+
+            logger.error(
+                f"Error running inline extraction: {e}\n{traceback.format_exc()}"
+            )
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def get_extraction_status(self, request):

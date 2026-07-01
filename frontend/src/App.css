@@ -2784,6 +2784,21 @@ button:disabled {
   width: 100%;
 }
 
+.inline-text-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--medium-accent);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+  font-weight: 400;
+}
+
+.inline-text-btn:hover {
+  color: var(--dark-accent);
+}
+
 .multiclass-select {
   font-size: 0.9rem;
 }

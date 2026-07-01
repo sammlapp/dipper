@@ -25,20 +25,10 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Any, Optional
 import pickle
-import random
-from datetime import datetime
 from aru_metadata_parser.parse import ARUFileTimestampParser
 
 # Add the backend path to import opensoundscape if available
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
-try:
-    import opensoundscape as opso
-
-    HAS_OPENSOUNDSCAPE = True
-except ImportError:
-    print("Warning: opensoundscape not available - audio extraction will be disabled")
-    HAS_OPENSOUNDSCAPE = False
+# sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 
 def setup_logging(log_file_path: Optional[str] = None):
@@ -71,42 +61,49 @@ def scan_predictions_folder(folder_path: str) -> Dict[str, Any]:
 
     # Find prediction files
     prediction_files = []
-    for ext in ["*.csv", "*.pkl"]:
+    for ext in ["*predictions.csv", "*sparse_preds.pkl"]:
         # prediction_files.extend(list(folder_path.glob(ext)))
         prediction_files.extend(list(folder_path.rglob(ext)))  # Recursive search
 
     if not prediction_files:
         return {"available_classes": [], "file_count": 0, "files": []}
 
-    # Extract classes from first file
+    # Extract classes — prefer predicted_classes.txt written by inference.py (fast, format-agnostic)
     available_classes = []
-    first_file = prediction_files[0]
+    classes_txt = folder_path / "predicted_classes.txt"
 
-    try:
-        if first_file.suffix == ".csv":
-            # Read just the header to get column names
-            df_header = pd.read_csv(first_file, nrows=0)
-            columns = df_header.columns.tolist()
+    if classes_txt.exists():
+        try:
+            available_classes = [
+                line.strip()
+                for line in classes_txt.read_text().splitlines()
+                if line.strip()
+            ]
+        except Exception as e:
+            logging.warning(f"Could not read {classes_txt}: {e}")
 
-            # Skip standard columns (file, start_time, end_time)
-            skip_cols = ["file", "start_time", "end_time"]
-            available_classes = [col for col in columns if col not in skip_cols]
-
-        elif first_file.suffix == ".pkl":
-            # For pickle files, load and inspect structure
-            with open(first_file, "rb") as f:
-                data = pickle.load(f)
-
-            if isinstance(data, pd.DataFrame):
-                columns = data.columns.tolist()
+    if not available_classes:
+        # Fall back to reading the first prediction file directly
+        first_file = prediction_files[0]
+        try:
+            if first_file.suffix == ".csv":
+                df_header = pd.read_csv(first_file, nrows=0)
                 skip_cols = ["file", "start_time", "end_time"]
-                available_classes = [col for col in columns if col not in skip_cols]
-            else:
-                available_classes = []  # Unknown pickle format
+                available_classes = [
+                    col for col in df_header.columns if col not in skip_cols
+                ]
 
-    except Exception as e:
-        logging.warning(f"Could not extract classes from {first_file}: {e}")
-        available_classes = []
+            elif first_file.suffix == ".pkl":
+                with open(first_file, "rb") as f:
+                    data = pickle.load(f)
+                if isinstance(data, pd.DataFrame):
+                    skip_cols = ["file", "start_time", "end_time"]
+                    available_classes = [
+                        col for col in data.columns if col not in skip_cols
+                    ]
+
+        except Exception as e:
+            logging.warning(f"Could not extract classes from {first_file}: {e}")
 
     return {
         "available_classes": available_classes,
@@ -147,10 +144,23 @@ def load_prediction_files(file_paths: List[str]) -> pd.DataFrame:
             continue
 
     if not dfs:
+        # Re-raise with detail about what went wrong for the first file
+        if file_paths:
+            try:
+                pd.read_pickle(Path(file_paths[0])).reset_index()
+            except Exception as first_err:
+                raise ValueError(
+                    f"No prediction files could be loaded. "
+                    f"First file error ({Path(file_paths[0]).name}): {first_err}"
+                )
         raise ValueError("No prediction files could be loaded")
 
     # Combine all dataframes
     combined_df = pd.concat(dfs, ignore_index=True)
+
+    # drop duplicates based on file, start_time, end_time
+    combined_df = combined_df.drop_duplicates(subset=["file", "start_time", "end_time"])
+
     logging.info(f"Loaded {len(combined_df)} predictions from {len(dfs)} files")
 
     return combined_df
@@ -313,7 +323,7 @@ def apply_filtering(
 
     # Apply score threshold filtering
     if filtering.get("score_threshold_enabled", False):
-        threshold = filtering.get("score_threshold", 0.0)
+        threshold = filtering.get("score_threshold")
 
         # For each selected class, keep rows where at least one class exceeds threshold
         if class_list:
@@ -357,8 +367,8 @@ def extract_random_clips(
 ) -> List[Dict]:
     """Extract random N clips across all classes (for multiclass) or per class (for binary)"""
     extraction_config = config["extraction"]["random_clips"]
-    count = extraction_config.get("count", 10)
-    extraction_mode = config.get("extraction_mode", "binary")
+    count = extraction_config.get("count")
+    extraction_mode = config.get("extraction_mode")
 
     selected_clips = []
 
@@ -422,10 +432,8 @@ def extract_score_bin_stratified(
 ) -> List[Dict]:
     """Extract N clips for each score percentile bin"""
     extraction_config = config["extraction"]["score_bin_stratified"]
-    count_per_bin = extraction_config.get("count_per_bin", 5)
-    percentile_bins_str = extraction_config.get(
-        "percentile_bins", "[[0,75],[75,90],[90,95],[95,100]]"
-    )
+    count_per_bin = extraction_config.get("count_per_bin")
+    percentile_bins_str = extraction_config.get("percentile_bins")
     extraction_mode = config.get("extraction_mode", "binary")
 
     try:
@@ -486,8 +494,8 @@ def extract_highest_scoring(
 ) -> List[Dict]:
     """Extract highest scoring N clips for each class"""
     extraction_config = config["extraction"]["highest_scoring"]
-    count = extraction_config.get("count", 10)
-    extraction_mode = config.get("extraction_mode", "binary")
+    count = extraction_config.get("count")
+    extraction_mode = config.get("extraction_mode")
 
     selected_clips = []
 
@@ -496,15 +504,11 @@ def extract_highest_scoring(
             continue
 
         # Get all predictions for this class, sorted by score descending
-        class_predictions = group_df[group_df[class_name] > -np.inf].copy()
-        class_predictions = class_predictions.sort_values(class_name, ascending=False)
-
-        if len(class_predictions) == 0:
+        # class_predictions = group_df[group_df[class_name] > -np.inf].copy()
+        n_sample = min(count, sum(group_df[class_name] > -np.inf))
+        if n_sample == 0:
             continue
-
-        # Take top N
-        n_sample = min(count, len(class_predictions))
-        top_clips = class_predictions.head(n_sample)
+        top_clips = group_df.nlargest(n_sample, class_name)
         selected_clips.extend(
             _format_sampled_clips(
                 top_clips,
@@ -603,11 +607,14 @@ def extract_audio_clips(
     Returns:
         Dictionary mapping original clip info to extracted clip filenames
     """
-    if not HAS_OPENSOUNDSCAPE:
-        logging.error("opensoundscape not available - cannot extract audio clips")
-        return {}
 
     if not config.get("export_audio_clips", False):
+        return {}
+
+    try:
+        import opensoundscape as opso
+    except ImportError:
+        logging.error("opensoundscape not available - cannot extract audio clips")
         return {}
 
     clip_duration = config.get("clip_duration")
@@ -648,7 +655,6 @@ def extract_audio_clips(
             continue
 
         try:
-            # Extract audio clip
             audio = opso.Audio.from_file(
                 file_path, offset=extract_start, duration=extract_duration
             )
@@ -686,7 +692,9 @@ def create_extraction_csvs(
     created_files = []
 
     if extraction_mode == "binary":
-        # Create one CSV per class
+        separate_files = config.get("separate_files_per_class", True)
+
+        # Group clips by class
         class_clips = {}
         for i in range(len(selected_clips)):
             clip = selected_clips.iloc[i]
@@ -694,6 +702,62 @@ def create_extraction_csvs(
             if class_name not in class_clips:
                 class_clips[class_name] = []
             class_clips[class_name].append(clip)
+
+        if not separate_files:
+            # Combine all classes into one CSV with a "class" column
+            all_csv_data = []
+            for class_name, clips in class_clips.items():
+                for clip in clips:
+                    original_key = (
+                        f"{clip['file']}_{clip['start_time']}_{clip['end_time']}"
+                    )
+                    extracted_clip_info = clip.to_dict()
+                    extracted_clip_info["annotation"] = ""
+                    if (
+                        config.get("export_audio_clips", False)
+                        and original_key in audio_clip_mapping
+                    ):
+                        detection_center = (clip["start_time"] + clip["end_time"]) / 2
+                        clip_duration = config.get("clip_duration")
+                        clip_start = max(
+                            0,
+                            clip_duration / 2 - (detection_center - clip["start_time"]),
+                        )
+                        clip_end = min(
+                            clip_duration,
+                            clip_duration / 2 + (clip["end_time"] - detection_center),
+                        )
+                        extracted_clip_info.update(
+                            {
+                                "file": f"clips/{audio_clip_mapping[original_key]}",
+                                "start_time": clip_start,
+                                "end_time": clip_end,
+                                "original_file": clip["file"],
+                                "original_start_time": clip["start_time"],
+                                "original_end_time": clip["end_time"],
+                            }
+                        )
+                    strat = config.get("stratification", {})
+                    if (
+                        strat.get("filepath_grouping", "none") != "none"
+                        or strat.get("date_grouping", "none") != "none"
+                        or strat.get("by_subfolder", False)
+                    ):
+                        extracted_clip_info["audio_file_group"] = clip.get(
+                            "audio_file_group", ""
+                        )
+                        extracted_clip_info["date_group"] = clip.get("date_group", "")
+                    all_csv_data.append(extracted_clip_info)
+
+            csv_filename = "selected_clips.csv"
+            csv_path = save_dir / csv_filename
+            df = pd.DataFrame(all_csv_data)
+            df.to_csv(csv_path, index=False)
+            created_files.append(str(csv_path))
+            logging.info(
+                f"Created combined binary extraction CSV: {csv_filename} with {len(df)} clips"
+            )
+            return created_files
 
         for class_name, clips in class_clips.items():
             csv_filename = f"{class_name}_selected_clips.csv"
@@ -882,6 +946,15 @@ def extract_clips(config_path: str):
         # Scan predictions folder to get file list
         scan_result = scan_predictions_folder(config["predictions_folder"])
         prediction_files = scan_result["files"]
+
+        # Exclude any files that live inside the job output folder (e.g. from a
+        # previous run or from the folder we just created for this job)
+        job_folder_str = str(save_dir.resolve())
+        prediction_files = [
+            f
+            for f in prediction_files
+            if not str(Path(f).resolve()).startswith(job_folder_str)
+        ]
 
         if not prediction_files:
             raise ValueError(

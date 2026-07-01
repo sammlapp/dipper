@@ -411,6 +411,7 @@ function App() {
           <ExtractionTaskCreationForm
             onTaskCreate={handleTaskCreate}
             onTaskCreateAndRun={handleTaskCreateAndRun}
+            onTaskCreateAndRunInline={handleTaskCreateAndRun}
             initialPredictionsFolder={extractionPredictionsFolder}
           />
         </div>

@@ -1669,16 +1669,16 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
       // Update bounding box fields (null to clear)
       const updates = boundingBox
         ? {
-          [`${col} _start_time`]: boundingBox.start_time,
-          [`${col} _end_time`]: boundingBox.end_time,
-          [`${col} _low_freq`]: boundingBox.low_freq,
-          [`${col} _high_freq`]: boundingBox.high_freq
+          [`${col}_start_time`]: boundingBox.start_time,
+          [`${col}_end_time`]: boundingBox.end_time,
+          [`${col}_low_freq`]: boundingBox.low_freq,
+          [`${col}_high_freq`]: boundingBox.high_freq
         }
         : {
-          [`${col} _start_time`]: null,
-          [`${col} _end_time`]: null,
-          [`${col} _low_freq`]: null,
-          [`${col} _high_freq`]: null
+          [`${col}_start_time`]: null,
+          [`${col}_end_time`]: null,
+          [`${col}_low_freq`]: null,
+          [`${col}_high_freq`]: null
         };
 
       // Check if anything actually changed

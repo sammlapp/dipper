@@ -19,7 +19,8 @@ export const TASK_STATUS = {
 export const TASK_TYPE = {
   INFERENCE: 'inference',
   TRAINING: 'training',
-  EXTRACTION: 'extraction'
+  EXTRACTION: 'extraction',
+  EXTRACTION_INLINE: 'extraction_inline'
 };
 
 class TaskManager {
@@ -110,6 +111,9 @@ class TaskManager {
 
   determineTaskType(config) {
     // Check task type from config
+    if (config.task_type === 'extraction_inline') {
+      return TASK_TYPE.EXTRACTION_INLINE;
+    }
     if (config.task_type === 'extraction') {
       return TASK_TYPE.EXTRACTION;
     }
@@ -245,6 +249,8 @@ class TaskManager {
         result = await this.runTraining(task);
       } else if (task.type === TASK_TYPE.EXTRACTION) {
         result = await this.runExtraction(task);
+      } else if (task.type === TASK_TYPE.EXTRACTION_INLINE) {
+        result = await this.runExtractionInline(task);
       } else {
         result = await this.runInference(task);
       }
@@ -787,6 +793,7 @@ class TaskManager {
         export_audio_clips: config.export_audio_clips || false,
         clip_duration: config.clip_duration || 5.0,
         extraction_mode: config.extraction_mode || 'binary',
+        separate_files_per_class: config.separate_files_per_class !== false,
         job_folder: jobFolder,
         config_output_path: configJsonPath,
         log_file_path: logFilePath
@@ -876,6 +883,74 @@ class TaskManager {
         }
       } else {
         throw new Error(startResult.error || 'Failed to start annotation task');
+      }
+    } catch (error) {
+      throw new Error(`Clip extraction task failed: ${error.message}`);
+    }
+  }
+
+  async runExtractionInline(task) {
+    const config = task.config;
+    const backendUrl = await getBackendUrl();
+    const processId = `extraction_inline_${task.id}_${Date.now()}`;
+    this.updateTask(task.id, { processId });
+
+    try {
+      this.updateTask(task.id, { progress: 'Preparing extraction configuration...' });
+
+      const jobFolderName = await this.generateUniqueJobFolderName(config.output_dir, task.name);
+      const jobFolder = config.output_dir ? `${config.output_dir}/${jobFolderName}` : '';
+      const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
+      const logFilePath = jobFolder ? `${jobFolder}/annotation_log.txt` : '';
+
+      const tempDir = await this.getTempDir();
+      const tempConfigPath = `${tempDir}/annotation_config_${processId}.json`;
+      const configData = {
+        predictions_folder: config.predictions_folder,
+        class_list: config.class_list || [],
+        stratification: config.stratification,
+        filtering: config.filtering,
+        extraction: config.extraction,
+        output_dir: config.output_dir,
+        export_audio_clips: config.export_audio_clips || false,
+        clip_duration: config.clip_duration || 5.0,
+        extraction_mode: config.extraction_mode || 'binary',
+        separate_files_per_class: config.separate_files_per_class !== false,
+        job_folder: jobFolder,
+        config_output_path: configJsonPath,
+        log_file_path: logFilePath
+      };
+
+      const saveResponse = await fetch(`${backendUrl}/config/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_data: configData, output_path: tempConfigPath })
+      });
+      const saveResult = await saveResponse.json();
+      if (saveResult.status !== 'success') {
+        throw new Error(`Failed to save configuration: ${saveResult.error}`);
+      }
+
+      this.updateTask(task.id, { progress: 'Running extraction...' });
+
+      const response = await fetch(`${backendUrl}/extraction/run-inline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_path: tempConfigPath })
+      });
+      const result = await response.json();
+
+      if (result.status === 'completed') {
+        return {
+          success: true,
+          annotation_files: result.extraction_files || [],
+          job_folder: configData.job_folder,
+          config_path: configData.config_output_path,
+          total_classes: configData.class_list.length,
+          message: 'Clip extraction completed successfully',
+        };
+      } else {
+        throw new Error(result.error || 'Inline extraction failed');
       }
     } catch (error) {
       throw new Error(`Clip extraction task failed: ${error.message}`);
@@ -1040,7 +1115,7 @@ class TaskManager {
         (config.class_list ? config.class_list.split(/[,\n]/).filter(c => c.trim()).length : 0);
       const classDescription = classCount > 0 ? `${classCount} classes` : 'no classes';
       return `Training ${modelName} - ${classDescription} - ${timestamp}`;
-    } else if (taskType === TASK_TYPE.EXTRACTION) {
+    } else if (taskType === TASK_TYPE.EXTRACTION || taskType === TASK_TYPE.EXTRACTION_INLINE) {
       // Generate annotation task name
       const classCount = Array.isArray(config.class_list) ? config.class_list.length : 0;
       const classDescription = classCount > 0 ? `${classCount} classes` : 'no classes';

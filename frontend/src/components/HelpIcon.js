@@ -71,7 +71,7 @@ const HELP_TOOLTIPS = {
   'training-testing-mode': 'Run a quick test pass on a small subset to verify setup.',
 
   // Extraction
-  'extraction-predictions-folder': 'Folder containing inference result CSVs to extract clips from.',
+  'extraction-predictions-folder': 'Folder containing inference result (files named "...predictions.csv" or "...sparse_preds.pkl") to extract clips from.',
   'extraction-methods': 'How clips are selected: top scores, random sample, threshold-based, etc.',
   'extraction-output': 'Directory where extracted annotation tasks will be saved.',
   'extraction-audio-export': 'Also copy the raw audio segments alongside the annotation task.',
