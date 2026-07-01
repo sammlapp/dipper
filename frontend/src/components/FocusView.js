@@ -25,6 +25,7 @@ function FocusView({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [audioUrl, setAudioUrl] = useState(null);
+  const [hoveredZone, setHoveredZone] = useState(null); // 'left' | 'right' | null
   const audioRef = useRef(null);
   const hasAutoPlayedRef = useRef(false);
   const spectrogramRef = useRef(null);
@@ -50,7 +51,7 @@ function FocusView({
   const extDuration = end_time > start_time ? end_time - start_time : 0;
   // Clip is visible only when its time range overlaps the current loaded window
   const clipVisibleInWindow = hasContext && clip_start_time < end_time && clip_end_time > start_time;
-  const highlightLeft  = clipVisibleInWindow && extDuration > 0 ? (clip_start_time - start_time) / extDuration : 0;
+  const highlightLeft = clipVisibleInWindow && extDuration > 0 ? (clip_start_time - start_time) / extDuration : 0;
   const highlightWidth = clipVisibleInWindow && extDuration > 0 ? (clip_end_time - clip_start_time) / extDuration : 1;
   // Offset into the loaded WAV where the annotation clip begins (for cursor positioning)
   const clipOffsetSeconds = hasContext ? clip_start_time - start_time : 0;
@@ -198,8 +199,12 @@ function FocusView({
     }
   }, []);
 
-  // Restart audio function — seeks to clip start within context window
+  // Restart: re-center page if paged away, then seek playhead to clip start
   const handleRestart = useCallback(() => {
+    if (onContextPage && viewOffset !== 0) {
+      onContextPage(null); // re-center; new audio will load and autoplay/position handled by load effect
+      return;
+    }
     if (audioRef.current) {
       audioRef.current.currentTime = clipOffsetSeconds;
       setCurrentTime(clipOffsetSeconds);
@@ -207,7 +212,7 @@ function FocusView({
         audioRef.current.play();
       }
     }
-  }, [isPlaying]);
+  }, [onContextPage, viewOffset, clipOffsetSeconds, isPlaying]);
 
   // Format time helper
   const formatTime = useCallback((seconds) => {
@@ -314,10 +319,10 @@ function FocusView({
 
   // Binary annotation options
   const binaryOptions = [
-    { value: 'yes', label: 'Yes', key: 'a', color: 'rgb(145, 180, 135)' },
-    { value: 'no', label: 'No', key: 's', color: 'rgb(207, 122, 107)' },
-    { value: 'uncertain', label: 'Uncertain', key: 'd', color: 'rgb(237, 223, 177)' },
-    { value: 'unlabeled', label: 'Unlabeled', key: 'f', color: 'rgb(223, 223, 223)' }
+    { value: 'yes', label: 'Yes', key: 'a', color: 'var(--yes)' },
+    { value: 'no', label: 'No', key: 's', color: 'var(--no)' },
+    { value: 'uncertain', label: 'Uncertain', key: 'd', color: 'var(--uncertain)' },
+    { value: 'unlabeled', label: 'Unlabeled', key: 'f', color: 'var(--unlabeled)' }
   ];
 
   // Multi-class annotation options
@@ -332,9 +337,9 @@ function FocusView({
 
   // Annotation status options for multi-class mode
   const annotationStatusOptions = [
-    { value: 'complete', label: 'Complete', symbol: 'check_circle', color: 'rgb(145, 180, 135)' },
-    { value: 'uncertain', label: 'Uncertain', symbol: 'help', color: 'rgb(237, 223, 177)' },
-    { value: 'unreviewed', label: 'Unreviewed', symbol: 'radio_button_unchecked', color: 'rgb(223, 223, 223)' }
+    { value: 'complete', label: 'Complete', symbol: 'check_circle', color: 'var(--complete)' },
+    { value: 'uncertain', label: 'Uncertain', symbol: 'help', color: 'var(--uncertain)' },
+    { value: 'unreviewed', label: 'Unreviewed', symbol: 'radio_button_unchecked', color: 'var(--unreviewed)' }
   ];
 
   // Multi-class annotation change handler
@@ -426,21 +431,55 @@ function FocusView({
     };
   }, [reviewMode, handleAnnotationChangeWithAdvance, onNavigate, togglePlayPause]);
 
-  // Single click — seek to clicked position within the loaded audio
+  const PAGE_ZONE_FRACTION = 0.10; // left/right 10% triggers paging
+
+  const getClickZone = useCallback((e) => {
+    if (!spectrogramRef.current) return 'seek';
+    const rect = spectrogramRef.current.getBoundingClientRect();
+    const fraction = (e.clientX - rect.left) / rect.width;
+    if (fraction < PAGE_ZONE_FRACTION) return 'left';
+    if (fraction > 1 - PAGE_ZONE_FRACTION) return 'right';
+    return 'seek';
+  }, []);
+
+  const handleSpectrogramMouseMove = useCallback((e) => {
+    if (!onContextPage) return;
+    setHoveredZone(getClickZone(e));
+  }, [getClickZone, onContextPage]);
+
+  const handleSpectrogramMouseLeave = useCallback(() => {
+    setHoveredZone(null);
+  }, []);
+
+  // Single click — page left/right in edge zones, seek in centre
   const handleSpectrogramClick = useCallback((e) => {
+    const zone = getClickZone(e);
+    if (zone === 'left' && onContextPage) {
+      onContextPage(-1);
+      return;
+    }
+    if (zone === 'right' && onContextPage) {
+      onContextPage(1);
+      return;
+    }
+    // Centre zone: seek
     if (!audioRef.current || !spectrogramRef.current) return;
     const rect = spectrogramRef.current.getBoundingClientRect();
     const fraction = (e.clientX - rect.left) / rect.width;
     const seekTime = fraction * (audioRef.current.duration || 0);
     audioRef.current.currentTime = seekTime;
     setCurrentTime(seekTime);
-  }, []);
+  }, [getClickZone, onContextPage]);
 
-  // Double click — toggle play/pause
+  // Double click — re-center on clip (recenter paging) or toggle play/pause if already centred
   const handleSpectrogramDoubleClick = useCallback((e) => {
     e.preventDefault();
-    togglePlayPause();
-  }, [togglePlayPause]);
+    if (onContextPage && viewOffset !== 0) {
+      onContextPage(null);
+    } else {
+      togglePlayPause();
+    }
+  }, [onContextPage, viewOffset, togglePlayPause]);
 
   const [contextMenu, setContextMenu] = useState(null);
   const handleSpectrogramContextMenu = useCallback((e) => {
@@ -451,373 +490,367 @@ function FocusView({
 
   return (
     <>
-    <div className="focus-view">
-      <div className="focus-view-inner">
-        {/* Hidden audio element */}
-        {audioUrl && (
-          <audio
-            ref={audioRef}
-            src={audioUrl}
-            onTimeUpdate={handleAudioTimeUpdate}
-            onLoadedMetadata={handleAudioLoadedMetadata}
-            onPlay={handleAudioPlay}
-            onPause={handleAudioPause}
-            onEnded={handleAudioEnded}
-            preload="metadata"
-          />
-        )}
+      <div className="focus-view">
+        <div className="focus-view-inner">
+          {/* Hidden audio element */}
+          {audioUrl && (
+            <audio
+              ref={audioRef}
+              src={audioUrl}
+              onTimeUpdate={handleAudioTimeUpdate}
+              onLoadedMetadata={handleAudioLoadedMetadata}
+              onPlay={handleAudioPlay}
+              onPause={handleAudioPause}
+              onEnded={handleAudioEnded}
+              preload="metadata"
+            />
+          )}
 
-        {/* Large spectrogram display */}
-        <div className={`focus-spectrogram-container ${settings?.focus_size ? `size-${settings.focus_size}` : 'size-medium'}`}>
-          <div className="focus-spectrogram-grid">
-            <div className="focus-axis-y-outside">
-              {spectrogram_base64 && freqTicks.map((tick, idx) => (
-                <div
-                  key={`freq-outside-${idx}`}
-                  className="focus-axis-outside-tick-wrap focus-axis-outside-tick-wrap-y"
-                  style={{ top: `${tick.pctFromTop}%` }}
-                >
-                  <div className="focus-axis-outside-label focus-axis-outside-label-y">{tick.label}</div>
-                  <div className="focus-axis-outside-tick focus-axis-outside-tick-y" />
-                </div>
-              ))}
-            </div>
-
-            <div
-              ref={spectrogramRef}
-              className="focus-spectrogram"
-              onClick={handleSpectrogramClick}
-              onDoubleClick={handleSpectrogramDoubleClick}
-              onContextMenu={handleSpectrogramContextMenu}
-              title={audioUrl ? 'Click to seek · Double-click to play/pause' : 'Audio not available'}
-              style={{ position: 'relative', cursor: audioUrl ? 'crosshair' : 'default' }}
-            >
-              {spectrogram_base64 ? (
-                <img
-                  src={`data:image/png;base64,${spectrogram_base64}`}
-                  alt="Spectrogram"
-                  className="focus-spectrogram-image"
-                />
-              ) : (
-                <div className="focus-spectrogram-placeholder">
-                  <img src="/icon.svg" alt="Loading" className="placeholder-icon app-icon" />
-                  <div className="placeholder-text">Loading spectrogram...</div>
-                </div>
-              )}
-
-              {/* Clip region highlight — only shown when the annotation clip is within the current view window */}
-              {clipVisibleInWindow && spectrogram_base64 && (
-                <div
-                  className="focus-clip-highlight"
-                  style={{
-                    left: `${highlightLeft * 100}%`,
-                    width: `${highlightWidth * 100}%`,
-                  }}
-                />
-              )}
-
-              {/* Bounding box overlay for drawing annotations */}
-              {onBoundingBoxChange && time_range && frequency_range && (
-                <BoundingBoxOverlay
-                  boundingBox={
-                    bbox_start_time != null && bbox_end_time != null &&
-                      bbox_low_freq != null && bbox_high_freq != null
-                      ? { start_time: bbox_start_time, end_time: bbox_end_time, low_freq: bbox_low_freq, high_freq: bbox_high_freq }
-                      : null
-                  }
-                  onBoundingBoxChange={onBoundingBoxChange}
-                  timeRange={time_range}
-                  frequencyRange={frequency_range}
-                />
-              )}
-
-              {/* Progress bar overlay */}
-              {duration > 0 && (
-                <div className="focus-progress-bar">
+          {/* Large spectrogram display */}
+          <div className={`focus-spectrogram-container ${settings?.focus_size ? `size-${settings.focus_size}` : 'size-medium'}`}>
+            <div className="focus-spectrogram-grid">
+              <div className="focus-axis-y-outside">
+                {spectrogram_base64 && freqTicks.map((tick, idx) => (
                   <div
-                    className="focus-progress-fill"
-                    style={{ width: `${(currentTime / duration) * 100}%` }}
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="focus-axis-x-outside">
-              {spectrogram_base64 && timeTicks.map((tick, idx) => (
-                <div
-                  key={`time-outside-${idx}`}
-                  className="focus-axis-outside-tick-wrap focus-axis-outside-tick-wrap-x"
-                  style={{ left: `${tick.pct}%` }}
-                >
-                  <div className="focus-axis-outside-tick focus-axis-outside-tick-x" />
-                  <div className="focus-axis-outside-label focus-axis-outside-label-x">{tick.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Compact controls beneath spectrogram */}
-        <div className="focus-controls-compact">
-
-          {/* Binary annotation controls with comments on the right */}
-          {reviewMode === 'binary' && (
-            <div className="focus-annotation-controls">
-              <div className="focus-binary-segmented-control">
-                {binaryOptions.map((option, index) => (
-                  <button
-                    key={option.value}
-                    className={`segmented-control-option ${(option.value === 'unlabeled' && annotationValue === null) ||
-                      (option.value !== 'unlabeled' && annotationValue === option.value) ? 'active' : ''
-                      } ${index === 0 ? 'first' : index === binaryOptions.length - 1 ? 'last' : 'middle'
-                      }`}
-                    style={{
-                      backgroundColor: ((option.value === 'unlabeled' && annotationValue === null) ||
-                        (option.value !== 'unlabeled' && annotationValue === option.value)) ? option.color : 'transparent',
-                      border: "none",
-                      fontSize: '1rem',
-                      color: ((option.value === 'unlabeled' && annotationValue === null) ||
-                        (option.value !== 'unlabeled' && annotationValue === option.value)) ? 'white' : option.color
-                    }}
-                    onClick={() => handleAnnotationChangeWithAdvance(option.value === 'unlabeled' ? '' : option.value)}
+                    key={`freq-outside-${idx}`}
+                    className="focus-axis-outside-tick-wrap focus-axis-outside-tick-wrap-y"
+                    style={{ top: `${tick.pctFromTop}%` }}
                   >
-                    <span className="segmented-key">({option.key})</span>
-                    {option.value === 'unlabeled' ? (
-                      <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>restart_alt</span>
-                    ) : (
-                      <span className="segmented-label">{option.label}</span>
-                    )}
-                  </button>
+                    <div className="focus-axis-outside-label focus-axis-outside-label-y">{tick.label}</div>
+                    <div className="focus-axis-outside-tick focus-axis-outside-tick-y" />
+                  </div>
                 ))}
               </div>
-              <div className="focus-comments-right">
-                <textarea
-                  placeholder="Comments..."
-                  value={localComment}
-                  onChange={handleCommentChange}
-                  className="focus-comment-textarea-right"
-                  rows={2}
-                />
-              </div>
-            </div>
-          )}
-          {/* Audio controls row */}
-          {audioUrl && (
-            <div className="focus-audio-row">
-              <div className="audio-controls-compact">
-                <button
-                  onClick={togglePlayPause}
-                  className="audio-btn"
-                  title={isPlaying ? 'Pause' : 'Play'}
-                >
-                  <span className="material-symbols-outlined">
-                    {isPlaying ? 'pause' : 'play_arrow'}
-                  </span>
-                </button>
-                <button
-                  onClick={handleRestart}
-                  className="audio-btn"
-                  title="Restart"
-                >
-                  <span className="material-symbols-outlined">restart_alt</span>
-                </button>
-                <button
-                  onClick={handleDownloadCurrentClip}
-                  className="audio-btn"
-                  title="Download current clip audio"
-                >
-                  <span className="material-symbols-outlined">download</span>
-                </button>
-              </div>
-              <div className="audio-timeline-compact">
-                <input
-                  type="range"
-                  min="0"
-                  max={duration || 0}
-                  value={currentTime}
-                  onChange={handleSeek}
-                  className="audio-scrubber-compact"
-                  step="0.1"
-                />
-              </div>
-              <div className="audio-time-compact">
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </div>
-              {onContextPage && (
-                <div className="focus-context-page-controls">
-                  <button
-                    className="audio-btn"
-                    onClick={() => onContextPage(-1)}
-                    title="Page backward in audio"
-                  >
-                    <span className="material-symbols-outlined">chevron_left</span>
-                  </button>
-                  <span className="focus-context-page-label">
-                    {viewOffset !== 0 ? `${viewOffset > 0 ? '+' : ''}${viewOffset.toFixed(1)}s` : 'clip'}
-                  </span>
-                  <button
-                    className="audio-btn"
-                    onClick={() => onContextPage(1)}
-                    title="Page forward in audio"
-                  >
-                    <span className="material-symbols-outlined">chevron_right</span>
-                  </button>
-                  {viewOffset !== 0 && (
-                    <button
-                      className="audio-btn"
-                      onClick={() => onContextPage(null)}
-                      title="Re-center on clip"
-                    >
-                      <span className="material-symbols-outlined">filter_center_focus</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* Multi-class annotation controls with comments on the right */}
-          {reviewMode === 'multiclass' && (
-            <div className="focus-annotation-controls">
-              <div className="focus-multiclass-controls">
-                <div className="focus-multiclass-select">
-                  <Select
-                    isMulti
-                    options={multiclassOptions}
-                    value={multiclassValue}
-                    onChange={handleMulticlassAnnotationChange}
-                    placeholder="Select classes..."
-                    styles={{
-                      control: (provided) => ({
-                        ...provided,
-                        minHeight: '44px',
-                        fontSize: '0.9rem',
-                        backgroundColor: 'var(--white)',
-                        borderColor: 'var(--border)',
-                        '&:hover': {
-                          borderColor: 'var(--dark-accent)'
-                        }
-                      }),
-                      multiValue: (provided) => ({
-                        ...provided,
-                        backgroundColor: 'var(--dark-accent)',
-                        borderRadius: '4px',
-                      }),
-                      multiValueLabel: (provided) => ({
-                        ...provided,
-                        color: 'white',
-                        fontSize: '0.85rem',
-                        fontWeight: '500'
-                      }),
-                      multiValueRemove: (provided) => ({
-                        ...provided,
-                        color: 'white',
-                        '&:hover': {
-                          backgroundColor: 'var(--dark)',
-                          color: 'white',
-                        }
-                      }),
-                      placeholder: (provided) => ({
-                        ...provided,
-                        color: 'var(--medium-gray)',
-                        fontSize: '0.9rem'
-                      })
+              <div
+                ref={spectrogramRef}
+                className="focus-spectrogram"
+                onClick={handleSpectrogramClick}
+                onDoubleClick={handleSpectrogramDoubleClick}
+                onMouseMove={handleSpectrogramMouseMove}
+                onMouseLeave={handleSpectrogramMouseLeave}
+                onContextMenu={handleSpectrogramContextMenu}
+                title={audioUrl ? 'Click edges to page · Click centre to seek · Double-click to play/pause' : 'Audio not available'}
+                style={{ position: 'relative', cursor: hoveredZone === 'left' || hoveredZone === 'right' ? 'pointer' : (audioUrl ? 'crosshair' : 'default') }}
+              >
+                {spectrogram_base64 ? (
+                  <img
+                    src={`data:image/png;base64,${spectrogram_base64}`}
+                    alt="Spectrogram"
+                    className="focus-spectrogram-image"
+                  />
+                ) : (
+                  <div className="focus-spectrogram-placeholder">
+                    <img src="/icon.svg" alt="Loading" className="placeholder-icon app-icon" />
+                    <div className="placeholder-text">Loading spectrogram...</div>
+                  </div>
+                )}
+
+                {/* Left/right page zones — hover reveals arrow overlay */}
+                {onContextPage && (
+                  <>
+                    <div className={`focus-page-zone focus-page-zone-left ${hoveredZone === 'left' ? 'hovered' : ''}`}>
+                      <span className="material-symbols-outlined focus-page-zone-arrow">chevron_left</span>
+                    </div>
+                    <div className={`focus-page-zone focus-page-zone-right ${hoveredZone === 'right' ? 'hovered' : ''}`}>
+                      <span className="material-symbols-outlined focus-page-zone-arrow">chevron_right</span>
+                    </div>
+                  </>
+                )}
+
+                {/* Clip region highlight — only shown when the annotation clip is within the current view window */}
+                {clipVisibleInWindow && spectrogram_base64 && (
+                  <div
+                    className="focus-clip-highlight"
+                    style={{
+                      left: `${highlightLeft * 100}%`,
+                      width: `${highlightWidth * 100}%`,
                     }}
-                    className="focus-multiclass-select"
-                    classNamePrefix="select"
-                    isClearable
-                    closeMenuOnSelect={false}
-                    hideSelectedOptions={false}
-                    blurInputOnSelect={false}
+                  />
+                )}
+
+                {/* Bounding box overlay for drawing annotations */}
+                {onBoundingBoxChange && time_range && frequency_range && (
+                  <BoundingBoxOverlay
+                    boundingBox={
+                      bbox_start_time != null && bbox_end_time != null &&
+                        bbox_low_freq != null && bbox_high_freq != null
+                        ? { start_time: bbox_start_time, end_time: bbox_end_time, low_freq: bbox_low_freq, high_freq: bbox_high_freq }
+                        : null
+                    }
+                    onBoundingBoxChange={onBoundingBoxChange}
+                    timeRange={time_range}
+                    frequencyRange={frequency_range}
+                  />
+                )}
+
+                {/* Progress bar overlay */}
+                {duration > 0 && (
+                  <div className="focus-progress-bar">
+                    <div
+                      className="focus-progress-fill"
+                      style={{ width: `${(currentTime / duration) * 100}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="focus-axis-x-outside">
+                {spectrogram_base64 && timeTicks.map((tick, idx) => (
+                  <div
+                    key={`time-outside-${idx}`}
+                    className="focus-axis-outside-tick-wrap focus-axis-outside-tick-wrap-x"
+                    style={{ left: `${tick.pct}%` }}
+                  >
+                    <div className="focus-axis-outside-tick focus-axis-outside-tick-x" />
+                    <div className="focus-axis-outside-label focus-axis-outside-label-x">{tick.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Compact controls beneath spectrogram */}
+          <div className="focus-controls-compact">
+
+            {/* Binary annotation controls with audio buttons on the left */}
+            {reviewMode === 'binary' && (
+              <div className="focus-annotation-controls">
+                {audioUrl && (
+                  <div className="audio-controls-compact">
+                    <button
+                      onClick={togglePlayPause}
+                      className="audio-btn"
+                      title={isPlaying ? 'Pause (space)' : 'Play (space)'}
+                    >
+                      <span className="material-symbols-outlined">
+                        {isPlaying ? 'pause' : 'play_arrow'}
+                      </span>
+                    </button>
+                    <button
+                      onClick={handleRestart}
+                      className="audio-btn"
+                      title={viewOffset !== 0 ? 'Re-center on clip' : 'Restart to clip start'}
+                    >
+                      <span className="material-symbols-outlined">restart_alt</span>
+                    </button>
+                    <button
+                      onClick={handleDownloadCurrentClip}
+                      className="audio-btn"
+                      title="Download current clip audio"
+                    >
+                      <span className="material-symbols-outlined">download</span>
+                    </button>
+                  </div>
+                )}
+                <div className="focus-binary-segmented-control">
+                  {binaryOptions.map((option, index) => (
+                    <button
+                      key={option.value}
+                      className={`segmented-control-option ${(option.value === 'unlabeled' && annotationValue === null) ||
+                        (option.value !== 'unlabeled' && annotationValue === option.value) ? 'active' : ''
+                        } ${index === 0 ? 'first' : index === binaryOptions.length - 1 ? 'last' : 'middle'
+                        }`}
+                      style={{
+                        backgroundColor: ((option.value === 'unlabeled' && annotationValue === null) ||
+                          (option.value !== 'unlabeled' && annotationValue === option.value)) ? option.color : 'transparent',
+                        border: "none",
+                        fontSize: '1rem',
+                        color: ((option.value === 'unlabeled' && annotationValue === null) ||
+                          (option.value !== 'unlabeled' && annotationValue === option.value)) ? 'white' : option.color
+                      }}
+                      onClick={() => handleAnnotationChangeWithAdvance(option.value === 'unlabeled' ? '' : option.value)}
+                    >
+                      <span className="segmented-key">({option.key})</span>
+                      {option.value === 'unlabeled' ? (
+                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>restart_alt</span>
+                      ) : (
+                        <span className="segmented-label">{option.label}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="focus-comments-right">
+                  <textarea
+                    placeholder="Comments..."
+                    value={localComment}
+                    onChange={handleCommentChange}
+                    className="focus-comment-textarea-right"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Multi-class annotation controls with audio buttons on the left */}
+            {reviewMode === 'multiclass' && (
+              <div className="focus-annotation-controls">
+                {audioUrl && (
+                  <div className="audio-controls-compact">
+                    <button
+                      onClick={togglePlayPause}
+                      className="audio-btn"
+                      title={isPlaying ? 'Pause (space)' : 'Play (space)'}
+                    >
+                      <span className="material-symbols-outlined">
+                        {isPlaying ? 'pause' : 'play_arrow'}
+                      </span>
+                    </button>
+                    <button
+                      onClick={handleRestart}
+                      className="audio-btn"
+                      title={viewOffset !== 0 ? 'Re-center on clip' : 'Restart to clip start'}
+                    >
+                      <span className="material-symbols-outlined">restart_alt</span>
+                    </button>
+                    <button
+                      onClick={handleDownloadCurrentClip}
+                      className="audio-btn"
+                      title="Download current clip audio"
+                    >
+                      <span className="material-symbols-outlined">download</span>
+                    </button>
+                  </div>
+                )}
+                <div className="focus-multiclass-controls">
+                  <div className="focus-multiclass-select">
+                    <Select
+                      isMulti
+                      options={multiclassOptions}
+                      value={multiclassValue}
+                      onChange={handleMulticlassAnnotationChange}
+                      placeholder="Select classes..."
+                      styles={{
+                        control: (provided) => ({
+                          ...provided,
+                          minHeight: '44px',
+                          fontSize: '0.9rem',
+                          backgroundColor: 'var(--white)',
+                          borderColor: 'var(--border)',
+                          '&:hover': {
+                            borderColor: 'var(--dark-accent)'
+                          }
+                        }),
+                        multiValue: (provided) => ({
+                          ...provided,
+                          backgroundColor: 'var(--dark-accent)',
+                          borderRadius: '4px',
+                        }),
+                        multiValueLabel: (provided) => ({
+                          ...provided,
+                          color: 'white',
+                          fontSize: '0.85rem',
+                          fontWeight: '500'
+                        }),
+                        multiValueRemove: (provided) => ({
+                          ...provided,
+                          color: 'white',
+                          '&:hover': {
+                            backgroundColor: 'var(--dark)',
+                            color: 'white',
+                          }
+                        }),
+                        placeholder: (provided) => ({
+                          ...provided,
+                          color: 'var(--medium-gray)',
+                          fontSize: '0.9rem'
+                        })
+                      }}
+                      className="focus-multiclass-select"
+                      classNamePrefix="select"
+                      isClearable
+                      closeMenuOnSelect={false}
+                      hideSelectedOptions={false}
+                      blurInputOnSelect={false}
+                    />
+                  </div>
+
+                  {/* Annotation status control */}
+                  <div className="focus-annotation-status-control">
+                    <label className="focus-status-label">Review Status:</label>
+                    <div className="focus-status-buttons">
+                      {annotationStatusOptions.map(option => (
+                        <button
+                          key={option.value}
+                          className={`focus-status-button ${annotation_status === option.value ? 'active' : ''}`}
+                          style={{
+                            backgroundColor: annotation_status === option.value ? option.color : 'transparent',
+                            borderColor: option.color,
+                            color: annotation_status === option.value ? 'white' : option.color
+                          }}
+                          onClick={() => handleAnnotationStatusChange(option.value)}
+                          title={option.label}
+                        >
+                          <span className="material-symbols-outlined">{option.symbol}</span>
+                          <span className="status-label">{option.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="focus-navigation-compact">
+                  <button
+                    className="nav-btn"
+                    onClick={() => onNavigate('previous')}
+                    title="Previous clip (j)"
+                  >
+                    <span className="material-symbols-outlined">skip_previous</span>j
+                  </button>
+                  <button
+                    className="nav-btn"
+                    onClick={() => onNavigate('next')}
+                    title="Next clip (k)"
+                  >
+                    k<span className="material-symbols-outlined">skip_next</span>
+                  </button>
+                </div>
+                <div className="focus-comments-right">
+                  <textarea
+                    placeholder="Comments..."
+                    value={localComment}
+                    onChange={handleCommentChange}
+                    className="focus-comment-textarea-right"
+                    rows={2}
                   />
                 </div>
 
-                {/* Annotation status control */}
-                <div className="focus-annotation-status-control">
-                  <label className="focus-status-label">Review Status:</label>
-                  <div className="focus-status-buttons">
-                    {annotationStatusOptions.map(option => (
-                      <button
-                        key={option.value}
-                        className={`focus-status-button ${annotation_status === option.value ? 'active' : ''}`}
-                        style={{
-                          backgroundColor: annotation_status === option.value ? option.color : 'transparent',
-                          borderColor: option.color,
-                          color: annotation_status === option.value ? 'white' : option.color
-                        }}
-                        onClick={() => handleAnnotationStatusChange(option.value)}
-                        title={option.label}
-                      >
-                        <span className="material-symbols-outlined">{option.symbol}</span>
-                        <span className="status-label">{option.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="focus-navigation-compact">
-                <button
-                  className="nav-btn"
-                  onClick={() => onNavigate('previous')}
-                  title="Previous clip (j)"
-                >
-                  <span className="material-symbols-outlined">skip_previous</span>j
-                </button>
-                <button
-                  className="nav-btn"
-                  onClick={() => onNavigate('next')}
-                  title="Next clip (k)"
-                >
-                  k<span className="material-symbols-outlined">skip_next</span>
-                </button>
-              </div>
-              <div className="focus-comments-right">
-                <textarea
-                  placeholder="Comments..."
-                  value={localComment}
-                  onChange={handleCommentChange}
-                  className="focus-comment-textarea-right"
-                  rows={2}
-                />
               </div>
 
-            </div>
-
-          )}
+            )}
 
 
 
-          {/* File info row — always shows original annotation clip times */}
-          <div className="focus-info-row">
-            <div className="focus-file-name">{file ? basename(file) : 'Unknown file'}</div>
-            <div className="focus-time-info">
-              {(hasContext ? clip_start_time : start_time) !== undefined && (
-                <span>{(hasContext ? clip_start_time : start_time).toFixed(1)}s</span>
-              )}
-              {(hasContext ? clip_end_time : end_time) && (hasContext ? clip_end_time !== clip_start_time : end_time !== start_time) && (
-                <span> - {(hasContext ? clip_end_time : end_time).toFixed(1)}s</span>
-              )}
+            {/* File info row — always shows original annotation clip times */}
+            <div className="focus-info-row">
+              <div className="focus-file-name">{file ? basename(file) : 'Unknown file'}</div>
+              <div className="focus-time-info">
+                {(hasContext ? clip_start_time : start_time) !== undefined && (
+                  <span>{(hasContext ? clip_start_time : start_time).toFixed(1)}s</span>
+                )}
+                {(hasContext ? clip_end_time : end_time) && (hasContext ? clip_end_time !== clip_start_time : end_time !== start_time) && (
+                  <span> - {(hasContext ? clip_end_time : end_time).toFixed(1)}s</span>
+                )}
+              </div>
             </div>
           </div>
+
+
         </div>
-
-
       </div>
-    </div>
 
-    {contextMenu && (
-      <SpectrogramContextMenu
-        x={contextMenu.x}
-        y={contextMenu.y}
-        onClose={() => setContextMenu(null)}
-        filePath={file}
-        audioRootPath={audioRootPath}
-        audioBase64={audio_base64}
-        spectrogramBase64={spectrogram_base64}
-        clipLabel={`${file ? file.replace(/.*[\\/]/, '').replace(/\.[^.]+$/, '') : 'clip'}_${start_time}-${end_time}`}
-        isDesktop={isDesktop}
-      />
-    )}
+      {contextMenu && (
+        <SpectrogramContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          filePath={file}
+          audioRootPath={audioRootPath}
+          audioBase64={audio_base64}
+          spectrogramBase64={spectrogram_base64}
+          clipLabel={`${file ? file.replace(/.*[\\/]/, '').replace(/\.[^.]+$/, '') : 'clip'}_${start_time}-${end_time}`}
+          isDesktop={isDesktop}
+        />
+      )}
     </>
   );
 }

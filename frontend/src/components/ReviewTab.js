@@ -858,7 +858,15 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     setSettings(prev => ({ ...prev, spectrogram_colormap: targetColormap }));
 
     // Trigger spectrogram reload
-    setCurrentDataVersion(v => v + 1);
+    if (isFocusMode) {
+      const currentClip = annotationData[focusClipIndex];
+      if (currentClip) {
+        setFocusClipData(null);
+        loadFocusClipSpectrogram(currentClip, focusViewOffset);
+      }
+    } else {
+      setCurrentDataVersion(v => v + 1);
+    }
   }, [darkMode]);
 
   // Load spectrograms when page/bin changes, new data loaded, settings change, filtering changes, or mode changes
@@ -2493,9 +2501,12 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     setLoadedPageData([]);
   }, [settings.focus_size]);
 
+  const focusFetchIdRef = useRef(0); // incremented each call; used to discard stale responses
+
   // Function to load spectrogram for a specific clip in focus mode
   // viewOffsetSeconds: additional time shift applied on top of the default context window (for paging)
   const loadFocusClipSpectrogram = useCallback(async (clip, viewOffsetSeconds = 0) => {
+    const fetchId = ++focusFetchIdRef.current;
     try {
       const currentRootAudioPath = rootAudioPath || '';
       let fullFilePath = clip.file;
@@ -2556,7 +2567,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
 
       const loadedClip = await httpLoader.loadClipsBatch([clipToLoad], visualizationSettings);
 
-      if (loadedClip && loadedClip.length > 0) {
+      if (loadedClip && loadedClip.length > 0 && fetchId === focusFetchIdRef.current) {
         const newData = {
           ...loadedClip[0],
           clip_start_time: clipStartTime,
@@ -3107,7 +3118,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
             <>
               <ReviewSettings
                 onSettingsChange={handleSettingsChange}
-                onReRenderSpectrograms={loadCurrentPageSpectrograms}
+                onReRenderSpectrograms={() => {
+                  if (isFocusMode) {
+                    const currentClip = annotationData[focusClipIndex];
+                    if (currentClip) {
+                      setFocusClipData(null);
+                      loadFocusClipSpectrogram(currentClip, focusViewOffset);
+                    }
+                  } else {
+                    loadCurrentPageSpectrograms();
+                  }
+                }}
                 onClearCache={httpLoader.clearCache}
                 currentSettings={settings}
                 onSaveConfig={saveConfigToFile}

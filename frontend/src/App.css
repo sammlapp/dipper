@@ -3528,6 +3528,43 @@ body.dark-mode .react-select__placeholder {
   transition: width 0.1s ease;
 }
 
+.focus-page-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.focus-page-zone-left {
+  left: 0;
+}
+
+.focus-page-zone-right {
+  right: 0;
+}
+
+.focus-page-zone.hovered {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.focus-page-zone-arrow {
+  font-size: 2rem;
+  color: rgba(255, 255, 255, 0);
+  transition: color 0.15s ease;
+  pointer-events: none;
+}
+
+.focus-page-zone.hovered .focus-page-zone-arrow {
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .focus-clip-highlight {
   position: absolute;
   top: 0;
@@ -3986,6 +4023,7 @@ body.dark-mode .react-select__placeholder {
 
 .audio-controls-compact {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
 }
 
@@ -4000,8 +4038,8 @@ body.dark-mode .react-select__placeholder {
   color: var(--dark-accent);
   cursor: pointer;
   transition: all 0.2s ease;
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
 }
 
 .audio-btn:hover {
@@ -6558,7 +6596,7 @@ body.dark-mode ::-webkit-scrollbar-thumb:hover {
   max-height: 90vh;
   background: var(--panel-bg);
   border-radius: 10px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -6731,7 +6769,7 @@ body.dark-mode ::-webkit-scrollbar-thumb:hover {
   position: absolute;
   top: 5px;
   right: 6px;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0, 0, 0, 0.45);
   border-radius: 50%;
   width: 26px;
   height: 26px;
@@ -6750,7 +6788,7 @@ body.dark-mode ::-webkit-scrollbar-thumb:hover {
 
 .xc-play-icon.playing {
   opacity: 1;
-  background: rgba(60,120,255,0.7);
+  background: rgba(60, 120, 255, 0.7);
 }
 
 .xc-clip-meta {
@@ -6846,7 +6884,9 @@ body.dark-mode ::-webkit-scrollbar-thumb:hover {
 }
 
 @keyframes xc-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .xc-spin {
