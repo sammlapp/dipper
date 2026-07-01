@@ -36,6 +36,16 @@ from scripts import scan_folder
 from scripts import load_scores
 from scripts import clip_extraction
 
+import birdnames  # for taxonomy and naming conversions
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent / ".env")
+
+# XC recommends using an app-specific API key
+# we could allow user to specify their own eventually if we get rate limited
+XC_API_KEY = os.environ.get("XC_DIPPER_API_KEY", "")  # API key for xeno canto
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,6 +64,14 @@ PYTORCH_ENV_ASSET = {
     "Windows": {"source": "github", "name": "dipper_ml_env-windows-x64.tar.gz"},
     "Linux": {"source": "hf", "name": "dipper_ml_env-linux-x64.tar.gz"},
 }
+
+common_to_sci = birdnames.Converter(
+    from_type="common_name",
+    to_type="scientific_name",
+    soft_matching=True,
+    fuzzy_matching=True,
+)
+# common_to_sci.convert('Kirtlands warbler')
 
 
 def is_process_alive(pid):
@@ -1478,6 +1496,174 @@ class DipperServer:
         self.app.router.add_post(
             "/songspace/dataset-samples", self.songspace_dataset_samples
         )
+
+        self.app.router.add_get("/xeno-canto/search", self.xeno_canto_search)
+        self.app.router.add_get("/xeno-canto/clip", self.xeno_canto_clip)
+
+    async def xeno_canto_search(self, request):
+        """Proxy Xeno-Canto API v3 search."""
+        import aiohttp as aiohttp_client
+
+        params = request.query
+        genus = params.get("genus", "").strip()
+        species = params.get("species", "").strip()
+        english_name = params.get("en", "").strip()
+        rec_type = params.get("type", "").strip()
+        quality = params.get("quality", "").strip()
+        page = params.get("page", "1")
+        per_page = params.get("per_page", "100")
+
+        # Build v3 query using search tags
+        query_parts = []
+        if english_name:
+            # try converting bird name to scientific with fuzzy matching
+            try:
+                gen, sp = common_to_sci.convert(english_name).split(" ")
+                query_parts.append(f"gen:{gen}")
+                query_parts.append(f"sp:{sp}")
+            except:  # not found / might be non bird species, pass en name to xc query
+                query_parts.append(f'en:"={english_name}"')
+        else:
+            if genus:
+                query_parts.append(f"gen:{genus}")
+            if species:
+                query_parts.append(f"sp:{species}")
+        if rec_type:
+            # Multi-word types need quoting
+            if " " in rec_type:
+                query_parts.append(f'type:"{rec_type}"')
+            else:
+                query_parts.append(f"type:{rec_type}")
+        if quality:
+            # Frontend sends either a single grade ("A"), a ">X" threshold (">B"),
+            # or nothing. Emit as a single q: tag, quoting if it contains operators.
+            q = quality.strip()
+            if q.startswith(">"):
+                query_parts.append(f'q:"{q}"')
+            elif q:
+                query_parts.append(f"q:{q}")
+
+        if not query_parts:
+            return web.json_response({"error": "No query specified"}, status=400)
+
+        xc_query = " ".join(query_parts)
+        logger.info(f"XC query: {xc_query!r}")
+        url = "https://xeno-canto.org/api/3/recordings"
+        try:
+            async with aiohttp_client.ClientSession() as session:
+                async with session.get(
+                    url,
+                    params={
+                        "query": xc_query,
+                        "key": XC_API_KEY,
+                        "page": page,
+                        "per_page": per_page,
+                    },
+                    timeout=aiohttp_client.ClientTimeout(total=15),
+                ) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        return web.json_response(
+                            {
+                                "error": f"XC API returned {resp.status}",
+                                "detail": body[:300],
+                            },
+                            status=502,
+                        )
+                    data = await resp.json(content_type=None)
+                    return web.json_response(data)
+        except Exception as e:
+            logger.error(f"XC search error: {e}")
+            return web.json_response({"error": str(e)}, status=502)
+
+    async def xeno_canto_clip(self, request):
+        """Fetch a XC recording URL, trim to first 6 s, return spectrogram+audio base64."""
+        import aiohttp as aiohttp_client
+
+        params = request.query
+        audio_url = params.get("url", "")
+        if not audio_url:
+            return web.json_response({"error": "url parameter required"}, status=400)
+
+        settings = {
+            "spec_window_size": int(params.get("spec_window_size", 512)),
+            "spectrogram_colormap": params.get("spectrogram_colormap", "greys_r"),
+            "dB_range": json.loads(params.get("dB_range", "[-80, -20]")),
+            "use_bandpass": params.get("use_bandpass", "false").lower() == "true",
+            "bandpass_range": json.loads(params.get("bandpass_range", "[500, 8000]")),
+            "resize_images": params.get("resize_images", "true").lower() == "true",
+            "image_width": int(params.get("image_width", 224)),
+            "image_height": int(params.get("image_height", 224)),
+            "normalize_audio": params.get("normalize_audio", "true").lower() == "true",
+        }
+
+        try:
+            async with aiohttp_client.ClientSession() as session:
+                async with session.get(
+                    audio_url,
+                    headers={"User-Agent": f"Dipper/{XC_API_KEY}"},
+                    timeout=aiohttp_client.ClientTimeout(total=30),
+                ) as resp:
+                    if resp.status != 200:
+                        return web.json_response(
+                            {"error": f"Failed to fetch audio: {resp.status}"},
+                            status=502,
+                        )
+                    audio_bytes = await resp.read()
+
+            # Determine format from content-type or URL
+            is_mp3 = "mp3" in audio_url.lower()
+            raw_suffix = ".mp3" if is_mp3 else ".ogg"
+            with tempfile.NamedTemporaryFile(suffix=raw_suffix, delete=False) as tmp:
+                tmp.write(audio_bytes)
+                raw_path = tmp.name
+
+            wav_path = None
+            try:
+                if raw_suffix != ".wav":
+                    # Convert to WAV via ffmpeg so soundfile can read it
+                    wav_path = raw_path + ".wav"
+                    proc = subprocess.run(
+                        [
+                            "ffmpeg",
+                            "-y",
+                            "-i",
+                            raw_path,
+                            "-ar",
+                            "22050",
+                            "-ac",
+                            "1",
+                            wav_path,
+                        ],
+                        capture_output=True,
+                        timeout=30,
+                    )
+                    if proc.returncode != 0:
+                        raise RuntimeError(
+                            f"ffmpeg conversion failed: {proc.stderr.decode()[:200]}"
+                        )
+                    process_path = wav_path
+                else:
+                    process_path = raw_path
+
+                clip_data = {
+                    "file_path": process_path,
+                    "start_time": 0,
+                    "end_time": 6.0,
+                }
+                result = process_single_clip(clip_data, settings)
+            finally:
+                for p in [raw_path, wav_path]:
+                    if p:
+                        try:
+                            os.unlink(p)
+                        except Exception:
+                            pass
+
+            return web.json_response(result)
+        except Exception as e:
+            logger.error(f"XC clip error: {e}")
+            return web.json_response({"error": str(e)}, status=500)
 
     async def root_handler(self, request):
         """Root endpoint to handle HEAD requests from wait-on"""

@@ -6,6 +6,7 @@ import { Drawer, IconButton, Modal, Box, Typography, FormControl, Select, MenuIt
 import { Close as CloseIcon } from '@mui/icons-material';
 import AnnotationCard from './AnnotationCard';
 import ReviewSettings from './ReviewSettings';
+import XenoCantoPanel from './XenoCantoPanel';
 import FocusView from './FocusView';
 import HelpIcon from './HelpIcon';
 import ClassifierGuidedPanel from './ClassifierGuidedPanel';
@@ -318,6 +319,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
   const [lastRenderedFocusClipIndex, setLastRenderedFocusClipIndex] = useState(0); // Track which focus clip we last rendered
   const [isPageTransitioning, setIsPageTransitioning] = useState(false);
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
+  const [isXCPanelOpen, setIsXCPanelOpen] = useState(false);
   const [rootAudioPath, setRootAudioPath] = useState('');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [focusClipIndex, setFocusClipIndex] = useState(0);
@@ -3738,6 +3740,12 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
         </div>
       </Drawer>
 
+      {/* Xeno-Canto Reference Panel */}
+      <XenoCantoPanel
+        open={isXCPanelOpen}
+        onClose={() => setIsXCPanelOpen(false)}
+      />
+
       {/* Main Content Area - Full Window */}
       <div className="review-main-content">
         {/* Compact Top Toolbar */}
@@ -4038,6 +4046,15 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
               <span className="material-symbols-outlined">
                 {darkMode ? 'light_mode' : 'dark_mode'}
               </span>
+            </button>
+
+            {/* Xeno-Canto Reference Button */}
+            <button
+              onClick={() => setIsXCPanelOpen(true)}
+              className="toolbar-btn"
+              title="Xeno-Canto Reference"
+            >
+              <img src="/assets/xc_logo.svg" alt="XC" style={{ width: 18, height: 18, borderRadius: 3 }} />
             </button>
 
             {/* Settings Button */}

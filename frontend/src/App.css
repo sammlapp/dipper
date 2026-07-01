@@ -6522,3 +6522,309 @@ body.dark-mode ::-webkit-scrollbar-thumb {
 body.dark-mode ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
+
+/* ── Xeno-Canto Panel ─────────────────────────────────────── */
+.xc-panel-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(900px, 95vw);
+  max-height: 90vh;
+  background: var(--panel-bg);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: var(--app-font);
+  color: var(--text-primary);
+}
+
+.xc-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.xc-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.xc-panel-controls {
+  padding: 10px 16px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.xc-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.xc-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.xc-input {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 0.84rem;
+  font-family: var(--app-font);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  width: 120px;
+}
+
+.xc-input:disabled {
+  opacity: 0.4;
+}
+
+.xc-input-wide {
+  width: 180px;
+}
+
+.xc-or {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.xc-filter-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.xc-quality-toggles {
+  display: flex;
+  gap: 3px;
+}
+
+.xc-quality-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.xc-quality-btn.active {
+  background: var(--toolbar-btn-active-bg);
+  color: var(--text-primary);
+  border-color: var(--accent, #5287f0);
+}
+
+.xc-search-btn {
+  margin-left: 6px;
+  gap: 4px;
+}
+
+.xc-results-header {
+  padding: 5px 16px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.xc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 220px;
+  gap: 10px;
+  padding: 10px 16px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.xc-clip-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--bg-surface);
+  height: 100%;
+}
+
+.xc-clip-spectrogram {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--panel-bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.xc-clip-spectrogram img.annotation-spectrogram {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+}
+
+.xc-clip-loading,
+.xc-clip-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 8px;
+  text-align: center;
+}
+
+.xc-play-icon {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  background: rgba(0,0,0,0.45);
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  pointer-events: none;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.xc-clip-spectrogram:hover .xc-play-icon {
+  opacity: 1;
+}
+
+.xc-play-icon.playing {
+  opacity: 1;
+  background: rgba(60,120,255,0.7);
+}
+
+.xc-clip-meta {
+  padding: 6px 8px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.xc-clip-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.xc-clip-en {
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.xc-clip-details {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.xc-tag {
+  font-size: 0.7rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--toolbar-btn-active-bg);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.xc-quality {
+  font-weight: 700;
+}
+
+.xc-clip-loc {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.xc-link {
+  font-size: 0.7rem;
+  color: var(--accent, #5287f0);
+  text-decoration: none;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.xc-link:hover {
+  text-decoration: underline;
+}
+
+.xc-error {
+  color: var(--no, #d9534f);
+  font-size: 0.82rem;
+  padding: 6px 16px;
+}
+
+.xc-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 32px 0;
+  font-size: 0.9rem;
+}
+
+.xc-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.xc-page-info {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+@keyframes xc-spin {
+  to { transform: rotate(360deg); }
+}
+
+.xc-spin {
+  display: inline-block;
+  animation: xc-spin 0.8s linear infinite;
+}
