@@ -21,6 +21,10 @@ Task queue tab: after restarting a task, current task duration is correct in the
 # Incomplete items / TODO /feature request
 test download and use of ML env from HF/GitHub release 
 
+allow 'file' for stratification
+allow 'week' for stratification
+allow csv metadata: categories based on mapping of file or folder name to any column value
+
 Switch annotation saving format to always "long" - no multi-class rows, just one row per annotation (like a database entry in HopLite) indexed by F,S,E,class
 - dropdown/type to select for current class (eg species) viewed
 - display annotations of other classes on the same clip as bubble

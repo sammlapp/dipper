@@ -1048,8 +1048,8 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
               </div>
             )}
 
-            {/* Species filter panel — shown for bmz and local_file */}
-            {(config.model_source === 'bmz' || config.model_source === 'local_file') && (
+            {/* Species filter panel — shown for bmz only */}
+            {config.model_source === 'bmz' && (
               <div className="form-group full-width">
                 <label>
                   <Checkbox

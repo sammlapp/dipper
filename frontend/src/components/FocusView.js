@@ -380,6 +380,9 @@ function FocusView({
         return;
       }
 
+      // Don't intercept single-key shortcuts when a modifier is held (e.g. Ctrl+S = save)
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+
       // Prevent default behavior for our shortcuts
       if (['a', 's', 'd', 'f', 'j', 'k', ' '].includes(event.key.toLowerCase())) {
         event.preventDefault();
@@ -431,45 +434,15 @@ function FocusView({
     };
   }, [reviewMode, handleAnnotationChangeWithAdvance, onNavigate, togglePlayPause]);
 
-  const PAGE_ZONE_FRACTION = 0.10; // left/right 10% triggers paging
-
-  const getClickZone = useCallback((e) => {
-    if (!spectrogramRef.current) return 'seek';
-    const rect = spectrogramRef.current.getBoundingClientRect();
-    const fraction = (e.clientX - rect.left) / rect.width;
-    if (fraction < PAGE_ZONE_FRACTION) return 'left';
-    if (fraction > 1 - PAGE_ZONE_FRACTION) return 'right';
-    return 'seek';
-  }, []);
-
-  const handleSpectrogramMouseMove = useCallback((e) => {
-    if (!onContextPage) return;
-    setHoveredZone(getClickZone(e));
-  }, [getClickZone, onContextPage]);
-
-  const handleSpectrogramMouseLeave = useCallback(() => {
-    setHoveredZone(null);
-  }, []);
-
-  // Single click — page left/right in edge zones, seek in centre
+  // Single click on spectrogram — always seek
   const handleSpectrogramClick = useCallback((e) => {
-    const zone = getClickZone(e);
-    if (zone === 'left' && onContextPage) {
-      onContextPage(-1);
-      return;
-    }
-    if (zone === 'right' && onContextPage) {
-      onContextPage(1);
-      return;
-    }
-    // Centre zone: seek
     if (!audioRef.current || !spectrogramRef.current) return;
     const rect = spectrogramRef.current.getBoundingClientRect();
     const fraction = (e.clientX - rect.left) / rect.width;
     const seekTime = fraction * (audioRef.current.duration || 0);
     audioRef.current.currentTime = seekTime;
     setCurrentTime(seekTime);
-  }, [getClickZone, onContextPage]);
+  }, []);
 
   // Double click — re-center on clip (recenter paging) or toggle play/pause if already centred
   const handleSpectrogramDoubleClick = useCallback((e) => {
@@ -509,6 +482,29 @@ function FocusView({
           {/* Large spectrogram display */}
           <div className={`focus-spectrogram-container ${settings?.focus_size ? `size-${settings.focus_size}` : 'size-medium'}`}>
             <div className="focus-spectrogram-grid">
+              {/* External paging strips — outside the spectrogram so clicks don't block cursor seek */}
+              {onContextPage && (
+                <>
+                  <div
+                    className={`focus-page-strip focus-page-strip-left ${hoveredZone === 'left' ? 'hovered' : ''}`}
+                    onClick={() => onContextPage(-1)}
+                    onMouseEnter={() => setHoveredZone('left')}
+                    onMouseLeave={() => setHoveredZone(null)}
+                    title="Page backward"
+                  >
+                    <span className="material-symbols-outlined focus-page-strip-arrow">chevron_left</span>
+                  </div>
+                  <div
+                    className={`focus-page-strip focus-page-strip-right ${hoveredZone === 'right' ? 'hovered' : ''}`}
+                    onClick={() => onContextPage(1)}
+                    onMouseEnter={() => setHoveredZone('right')}
+                    onMouseLeave={() => setHoveredZone(null)}
+                    title="Page forward"
+                  >
+                    <span className="material-symbols-outlined focus-page-strip-arrow">chevron_right</span>
+                  </div>
+                </>
+              )}
               <div className="focus-axis-y-outside">
                 {spectrogram_base64 && freqTicks.map((tick, idx) => (
                   <div
@@ -527,11 +523,9 @@ function FocusView({
                 className="focus-spectrogram"
                 onClick={handleSpectrogramClick}
                 onDoubleClick={handleSpectrogramDoubleClick}
-                onMouseMove={handleSpectrogramMouseMove}
-                onMouseLeave={handleSpectrogramMouseLeave}
                 onContextMenu={handleSpectrogramContextMenu}
-                title={audioUrl ? 'Click edges to page · Click centre to seek · Double-click to play/pause' : 'Audio not available'}
-                style={{ position: 'relative', cursor: hoveredZone === 'left' || hoveredZone === 'right' ? 'pointer' : (audioUrl ? 'crosshair' : 'default') }}
+                title={audioUrl ? 'Click to seek · Double-click to play/pause' : 'Audio not available'}
+                style={{ position: 'relative', cursor: audioUrl ? 'crosshair' : 'default' }}
               >
                 {spectrogram_base64 ? (
                   <img
@@ -544,18 +538,6 @@ function FocusView({
                     <img src="/icon.svg" alt="Loading" className="placeholder-icon app-icon" />
                     <div className="placeholder-text">Loading spectrogram...</div>
                   </div>
-                )}
-
-                {/* Left/right page zones — hover reveals arrow overlay */}
-                {onContextPage && (
-                  <>
-                    <div className={`focus-page-zone focus-page-zone-left ${hoveredZone === 'left' ? 'hovered' : ''}`}>
-                      <span className="material-symbols-outlined focus-page-zone-arrow">chevron_left</span>
-                    </div>
-                    <div className={`focus-page-zone focus-page-zone-right ${hoveredZone === 'right' ? 'hovered' : ''}`}>
-                      <span className="material-symbols-outlined focus-page-zone-arrow">chevron_right</span>
-                    </div>
-                  </>
                 )}
 
                 {/* Clip region highlight — only shown when the annotation clip is within the current view window */}

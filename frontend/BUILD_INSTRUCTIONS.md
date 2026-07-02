@@ -160,6 +160,7 @@ sudo apt-get install build-essential libarchive-tools
 The Python backend is bundled using PyInstaller. To rebuild:
 ```bash
 cd backend
+python build_secrets.py
 python build_pyinstaller.py
 ```
 

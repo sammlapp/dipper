@@ -74,6 +74,9 @@ frontend/models--DBD*
 .env
 .env.local
 
+# Generated secrets file (built from .env at build time, never commit)
+backend/_secrets.py
+
 # Build outputs
 build/
 dist/

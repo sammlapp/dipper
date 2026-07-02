@@ -5,6 +5,7 @@
 
 import os
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_data_files
 
 # Get the directory containing this spec file
 spec_root = os.path.abspath(SPECPATH)
@@ -22,11 +23,19 @@ if os.path.exists(scripts_dir):
                 # Add as (source, destination_folder)
                 script_datas.append((src_path, rel_dir))
 
+birdnames_datas = collect_data_files('birdnames')
+
+# Include _secrets.py if present (generated from .env at build time, never committed)
+secrets_datas = []
+secrets_path = os.path.join(spec_root, '_secrets.py')
+if os.path.exists(secrets_path):
+    secrets_datas = [(secrets_path, '.')]
+
 a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=script_datas,  # Include all Python scripts
+    datas=script_datas + birdnames_datas + secrets_datas,  # Include all Python scripts
     hiddenimports=[
         'aiohttp',
         'aiohttp_cors',

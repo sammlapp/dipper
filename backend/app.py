@@ -44,7 +44,10 @@ load_dotenv(Path(__file__).parent / ".env")
 
 # XC recommends using an app-specific API key
 # we could allow user to specify their own eventually if we get rate limited
-XC_API_KEY = os.environ.get("XC_DIPPER_API_KEY", "")  # API key for xeno canto
+try:
+    from _secrets import XC_API_KEY
+except ImportError:
+    XC_API_KEY = os.environ.get("XC_DIPPER_API_KEY", "")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -375,9 +378,19 @@ def download_environment():
     return {"status": "success", "archive_path": archive_path}
 
 
+EXTRACTION_SENTINEL = ".dipper_extraction_complete"
+
+
 def check_environment(env_path):
     """Check if conda-pack environment exists and is valid"""
     try:
+        # Sentinel file is written only after full extraction + conda-unpack complete.
+        # A partial extraction will have a working python binary but a broken stdlib,
+        # so we require the sentinel rather than relying on `python --version`.
+        sentinel = os.path.join(env_path, EXTRACTION_SENTINEL)
+        if not os.path.exists(sentinel):
+            return {"status": "missing", "python_path": None}
+
         python_path = os.path.join(env_path, "bin", "python")
         if os.name == "nt":  # Windows
             python_path = os.path.join(env_path, "python.exe")
@@ -427,9 +440,9 @@ def extract_environment(archive_path, extract_dir):
             logger.info("Running conda-unpack to fix library paths...")
             result = subprocess.run([conda_unpack], capture_output=True, text=True)
             if result.returncode != 0:
-                logger.warning(
-                    f"conda-unpack exited with code {result.returncode}: {result.stderr}"
-                )
+                error_msg = f"conda-unpack exited with code {result.returncode}: {result.stderr}"
+                logger.error(error_msg)
+                return {"status": "error", "error": error_msg}
             else:
                 logger.info("conda-unpack complete")
         else:
@@ -437,7 +450,14 @@ def extract_environment(archive_path, extract_dir):
                 f"conda-unpack not found at {conda_unpack} — skipping prefix rewrite"
             )
 
-        # Check if extraction was successful
+        # Write sentinel only after tar extraction and conda-unpack both succeed.
+        # check_environment requires this file so a partial extraction is never
+        # mistaken for a ready environment.
+        sentinel = os.path.join(extract_dir, EXTRACTION_SENTINEL)
+        with open(sentinel, "w") as f:
+            f.write("ok")
+
+        # Verify python binary is usable
         env_check = check_environment(extract_dir)
         if env_check["status"] == "ready":
             return {"status": "success", "env_path": extract_dir}
@@ -2058,15 +2078,20 @@ class DipperServer:
         """Purge completed/failed jobs from running_jobs to free memory."""
         try:
             before = len(self.running_jobs)
-            done_keys = [k for k, v in self.running_jobs.items()
-                         if v.get("status") in ("completed", "failed", "cancelled")]
+            done_keys = [
+                k
+                for k, v in self.running_jobs.items()
+                if v.get("status") in ("completed", "failed", "cancelled")
+            ]
             for k in done_keys:
                 del self.running_jobs[k]
             after = len(self.running_jobs)
-            return web.json_response({
-                "status": "success",
-                "message": f"Removed {before - after} completed jobs ({after} active remaining)"
-            })
+            return web.json_response(
+                {
+                    "status": "success",
+                    "message": f"Removed {before - after} completed jobs ({after} active remaining)",
+                }
+            )
         except Exception as e:
             logger.error(f"Error clearing cache: {e}")
             return web.json_response({"error": str(e)}, status=500)
@@ -2075,20 +2100,25 @@ class DipperServer:
         """Return process memory usage and running_jobs breakdown."""
         try:
             import psutil, os
+
             proc = psutil.Process(os.getpid())
             mem = proc.memory_info()
             job_counts = {}
             for v in self.running_jobs.values():
                 s = v.get("status", "unknown")
                 job_counts[s] = job_counts.get(s, 0) + 1
-            return web.json_response({
-                "rss_mb": round(mem.rss / 1024 / 1024, 1),
-                "vms_mb": round(mem.vms / 1024 / 1024, 1),
-                "running_jobs_total": len(self.running_jobs),
-                "running_jobs_by_status": job_counts,
-            })
+            return web.json_response(
+                {
+                    "rss_mb": round(mem.rss / 1024 / 1024, 1),
+                    "vms_mb": round(mem.vms / 1024 / 1024, 1),
+                    "running_jobs_total": len(self.running_jobs),
+                    "running_jobs_by_status": job_counts,
+                }
+            )
         except ImportError:
-            return web.json_response({"error": "psutil not installed; run: pip install psutil"}, status=501)
+            return web.json_response(
+                {"error": "psutil not installed; run: pip install psutil"}, status=501
+            )
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
 
@@ -3821,7 +3851,8 @@ def main():
                 await asyncio.sleep(300)
                 cutoff = asyncio.get_event_loop().time() - 300
                 stale = [
-                    k for k, v in server.running_jobs.items()
+                    k
+                    for k, v in server.running_jobs.items()
                     if v.get("status") in ("completed", "failed", "cancelled")
                     and v.get("last_checked", 0) < cutoff
                 ]

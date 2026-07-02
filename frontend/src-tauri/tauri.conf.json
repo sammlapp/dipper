@@ -27,12 +27,7 @@
       "exceptionDomain": "",
       "frameworks": [],
       "providerShortName": null,
-      "signingIdentity": "$APPLE_SIGNING_IDENTITY",
-      "notarizationCredentials": {
-        "appleId": "$APPLE_ID",
-        "appleIdPassword": "$APPLE_PASSWORD",
-        "teamId": "$APPLE_TEAM_ID"
-      }
+      "signingIdentity": "$APPLE_SIGNING_IDENTITY"
     },
     "linux": {
       "appimage": {

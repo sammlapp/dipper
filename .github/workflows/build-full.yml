@@ -36,6 +36,7 @@ jobs:
       - name: Build PyInstaller executable
         run: |
           cd backend
+          python build_secrets.py
           python build_pyinstaller.py
         env:
           PYTHONIOENCODING: utf-8
