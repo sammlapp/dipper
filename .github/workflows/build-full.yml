@@ -34,12 +34,14 @@ jobs:
           python-version: '3.11'
 
       - name: Build PyInstaller executable
+        shell: bash
         run: |
           cd backend
-          python build_secrets.py
+          printf 'XC_API_KEY = "%s"\n' "$XC_DIPPER_API_KEY" > _secrets.py
           python build_pyinstaller.py
         env:
           PYTHONIOENCODING: utf-8
+          XC_DIPPER_API_KEY: ${{ secrets.XC_DIPPER_API_KEY }}
 
       - name: Verify executable exists
         shell: bash
