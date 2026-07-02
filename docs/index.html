@@ -5,6 +5,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dipper</title>
+  <link rel="icon" type="image/svg+xml" href="img/icon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="img/icon_32x32.png" />
+  <link rel="apple-touch-icon" sizes="32x32" href="img/icon_32x32@2x.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -463,7 +466,7 @@
     <img class="header-icon" src="img/icon.svg" alt="Dipper icon" />
 
     <div class="logo">Dipper</div>
-    <p class="tagline">Bioacoustics ML training, inference, and annotation — cross-platform desktop app</p>
+    <p class="tagline">Bioacoustics ML inference and annotation — cross-platform desktop app</p>
     <div class="badge-row">
       <span class="badge blue">macOS · Windows · Linux</span>
       <span class="badge green">Open Source · MIT</span>
@@ -503,7 +506,7 @@
             <li>Spectrogram + audio playback</li>
             <li>Bounding box annotation</li>
             <li>CGL classifier-guided listening</li>
-            <li class="no">ML training / inference</li>
+            <li class="no">ML inference</li>
           </ul>
           <div class="dl-grid" id="review-downloads">
             <a class="dl-btn" id="review-macos" href="https://github.com/sammlapp/dipper/releases/latest"
@@ -531,18 +534,18 @@
         <div class="edition-card featured">
           <div class="edition-label green">Dipper Full</div>
           <div class="edition-title">Full ML Toolkit</div>
-          <div class="edition-desc">Complete application with annotation, training, inference, and extraction. Requires
+          <div class="edition-desc">Complete application with annotation, inference, and extraction. Requires
             ~700 MB ML environment (downloaded on first use).</div>
           <ul class="feature-list">
             <li>Everything in Dipper Review</li>
-            <li>Model training</li>
-            <li>Batch inference</li>
-            <li>Clip extraction</li>
+            <li>Apply machine learning classifiers</li>
+            <li>Select clips for review</li>
+            <li class="no">Coming soon: Custom classifier training</li>
             <li>~700 MB ML environment</li>
           </ul>
-          <div class="edition-label green">Coming soon! <p>
-              (currently available in Server Mode)</div>
-          <!-- <div class="dl-grid" id="full-downloads">
+          <!-- <div class="edition-label green">Coming soon! <p>
+              (currently available in Server Mode)</div> -->
+          <div class="dl-grid" id="full-downloads">
             <a class="dl-btn" id="full-macos" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
               <span class="platform-icon"></span>
               <span class="platform-name">macOS</span>
@@ -559,7 +562,7 @@
               <span class="platform-name">Linux</span>
               <span class="platform-detail">x64 · AppImage</span>
             </a>
-          </div> -->
+          </div>
         </div>
       </div>
 

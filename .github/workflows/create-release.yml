@@ -42,6 +42,7 @@ jobs:
           path: artifacts/
           allow_forks: false
           skip_unpack: false
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List downloaded files
         run: |
