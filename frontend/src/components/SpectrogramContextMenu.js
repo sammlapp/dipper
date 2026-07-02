@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { getBackendUrl } from '../utils/backendConfig';
 
 /**
  * Right-click context menu for spectrogram / audio widgets.
@@ -102,6 +103,21 @@ function SpectrogramContextMenu({ x, y, onClose, filePath, audioRootPath, audioB
     onClose();
   };
 
+  const handleDownloadFullFile = async () => {
+    if (!absolutePath) return;
+    onClose();
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const filename = absolutePath.split('/').pop().split('\\').pop();
+      const destPath = await invoke('save_file_any', { defaultName: filename });
+      await invoke('copy_file', { src: absolutePath, dest: destPath });
+    } catch (err) {
+      if (!String(err).includes('cancelled')) {
+        console.error('Failed to download full file:', err);
+      }
+    }
+  };
+
   const handleOpenFile = async () => {
     if (!absolutePath) return;
     try {
@@ -131,6 +147,12 @@ function SpectrogramContextMenu({ x, y, onClose, filePath, audioRootPath, audioB
       label: 'Download spectrogram',
       disabled: !spectrogramBase64,
       onClick: handleDownloadSpectrogram,
+    },
+    {
+      icon: '💾',
+      label: 'Download full audio file',
+      disabled: !absolutePath,
+      onClick: handleDownloadFullFile,
     },
     ...(isDesktop ? [{
       icon: '📂',

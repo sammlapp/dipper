@@ -378,41 +378,66 @@ def download_environment():
     return {"status": "success", "archive_path": archive_path}
 
 
-EXTRACTION_SENTINEL = ".dipper_extraction_complete"
+EXTRACTION_STATUS_FILE = ".dipper_extraction_status"
+
+
+def _read_extraction_status(env_path):
+    """Read the extraction status file. Returns 'complete', 'in_progress', or None."""
+    status_file = os.path.join(env_path, EXTRACTION_STATUS_FILE)
+    try:
+        with open(status_file, "r") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return None
+
+
+def _write_extraction_status(env_path, status):
+    """Write extraction status: 'in_progress' or 'complete'."""
+    os.makedirs(env_path, exist_ok=True)
+    status_file = os.path.join(env_path, EXTRACTION_STATUS_FILE)
+    with open(status_file, "w") as f:
+        f.write(status)
 
 
 def check_environment(env_path):
-    """Check if conda-pack environment exists and is valid"""
+    """Check if conda-pack environment exists and is fully extracted."""
     try:
-        # Sentinel file is written only after full extraction + conda-unpack complete.
-        # A partial extraction will have a working python binary but a broken stdlib,
-        # so we require the sentinel rather than relying on `python --version`.
-        sentinel = os.path.join(env_path, EXTRACTION_SENTINEL)
-        if not os.path.exists(sentinel):
+        extraction_status = _read_extraction_status(env_path)
+
+        if extraction_status == "in_progress":
+            return {"status": "extracting", "python_path": None}
+
+        if extraction_status != "complete":
+            # No status file at all — either never extracted, or an old env
+            # that predates status tracking. Check if python works as migration path.
+            python_path = os.path.join(env_path, "bin", "python")
+            if os.name == "nt":
+                python_path = os.path.join(env_path, "python.exe")
+            if not os.path.exists(python_path):
+                return {"status": "missing", "python_path": None}
+            result = subprocess.run(
+                [python_path, "--version"], capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                # Old valid env — write status file so future checks are fast
+                _write_extraction_status(env_path, "complete")
+                return {"status": "ready", "python_path": python_path, "version": result.stdout.strip()}
             return {"status": "missing", "python_path": None}
 
+        # Status is 'complete' — verify python binary is usable
         python_path = os.path.join(env_path, "bin", "python")
-        if os.name == "nt":  # Windows
+        if os.name == "nt":
             python_path = os.path.join(env_path, "python.exe")
 
         if not os.path.exists(python_path):
-            return {"status": "missing", "python_path": python_path}
+            return {"status": "broken", "error": "Python binary missing after extraction"}
 
-        # Try to run a simple Python command
         result = subprocess.run(
             [python_path, "--version"], capture_output=True, text=True
         )
         if result.returncode == 0:
-            return {
-                "status": "ready",
-                "python_path": python_path,
-                "version": result.stdout.strip(),
-            }
-        else:
-            return {
-                "status": "broken",
-                "error": f"Python check failed: {result.stderr}",
-            }
+            return {"status": "ready", "python_path": python_path, "version": result.stdout.strip()}
+        return {"status": "broken", "error": f"Python check failed: {result.stderr}"}
 
     except Exception as e:
         return {"status": "error", "error": str(e)}
@@ -423,8 +448,11 @@ def extract_environment(archive_path, extract_dir):
     try:
         logger.info(f"Extracting environment from {archive_path} to {extract_dir}")
 
-        # Create extraction directory
+        # Create extraction directory and mark extraction as in-progress immediately.
+        # If the process is interrupted mid-extraction, check_environment will see
+        # "in_progress" and refuse to use the partial env.
         os.makedirs(extract_dir, exist_ok=True)
+        _write_extraction_status(extract_dir, "in_progress")
 
         # Extract the tar.gz file
         with tarfile.open(archive_path, "r:gz") as tar:
@@ -450,12 +478,8 @@ def extract_environment(archive_path, extract_dir):
                 f"conda-unpack not found at {conda_unpack} — skipping prefix rewrite"
             )
 
-        # Write sentinel only after tar extraction and conda-unpack both succeed.
-        # check_environment requires this file so a partial extraction is never
-        # mistaken for a ready environment.
-        sentinel = os.path.join(extract_dir, EXTRACTION_SENTINEL)
-        with open(sentinel, "w") as f:
-            f.write("ok")
+        # Mark extraction complete only after tar + conda-unpack both succeed.
+        _write_extraction_status(extract_dir, "complete")
 
         # Verify python binary is usable
         env_check = check_environment(extract_dir)
@@ -1500,6 +1524,7 @@ class DipperServer:
         self.app.router.add_post("/files/save", self.save_file_server)
         self.app.router.add_post("/files/read", self.read_file_server)
         self.app.router.add_post("/files/unique-name", self.generate_unique_name)
+        self.app.router.add_get("/files/download", self.download_file)
 
         # SongSpace routes
         self.app.router.add_post("/songspace/open", self.songspace_open)
@@ -3363,6 +3388,26 @@ class DipperServer:
         except Exception as e:
             logger.error(f"Error reading file: {e}")
             return web.json_response({"error": str(e)}, status=500)
+
+    async def download_file(self, request):
+        """Stream a raw file to the browser as a download (GET /files/download?path=...)"""
+        try:
+            file_path = request.rel_url.query.get("path", "")
+            if not file_path:
+                return web.Response(text="Missing path", status=400)
+
+            normalized_path = os.path.normpath(os.path.abspath(file_path))
+            if not os.path.exists(normalized_path) or not os.path.isfile(normalized_path):
+                return web.Response(text="File not found", status=404)
+
+            filename = os.path.basename(normalized_path)
+            return web.FileResponse(
+                normalized_path,
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        except Exception as e:
+            logger.error(f"Error downloading file: {e}")
+            return web.Response(text=str(e), status=500)
 
     async def generate_unique_name(self, request):
         """Generate unique folder/file name (server mode only)"""

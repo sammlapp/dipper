@@ -183,6 +183,32 @@ async fn open_file(app: tauri::AppHandle, file_path: String) -> Result<(), Strin
         .map_err(|e| format!("Failed to open file: {}", e))
 }
 
+/// Save dialog with no forced file type filter — for audio and other non-CSV/JSON files
+#[tauri::command]
+async fn save_file_any(app: tauri::AppHandle, default_name: String) -> Result<String, String> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.dialog()
+        .file()
+        .set_file_name(&default_name)
+        .add_filter("All Files", &["*"])
+        .save_file(move |path| {
+            tx.send(path).ok();
+        });
+    match rx.recv() {
+        Ok(Some(p)) => Ok(p.to_string()),
+        Ok(None) => Err("Save cancelled".to_string()),
+        Err(_) => Err("Failed to receive selection".to_string()),
+    }
+}
+
+/// Copy a file to a user-chosen destination (for "Download full audio file")
+#[tauri::command]
+async fn copy_file(src: String, dest: String) -> Result<(), String> {
+    fs::copy(&src, &dest)
+        .map(|_| ())
+        .map_err(|e| format!("Failed to copy file: {}", e))
+}
+
 /// Read text content from a file
 #[tauri::command]
 async fn read_text_file(file_path: String) -> Result<String, String> {
@@ -558,7 +584,9 @@ fn main() {
             select_json_files,
             select_model_files,
             save_file,
+            save_file_any,
             write_file,
+            copy_file,
             open_file,
             read_text_file,
             generate_unique_folder_name,
