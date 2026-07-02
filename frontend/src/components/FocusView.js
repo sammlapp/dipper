@@ -26,6 +26,9 @@ function FocusView({
   const [duration, setDuration] = useState(0);
   const [audioUrl, setAudioUrl] = useState(null);
   const [hoveredZone, setHoveredZone] = useState(null); // 'left' | 'right' | null
+  const [slideClass, setSlideClass] = useState('');
+  const prevSpecRef = useRef(null);
+  const prevViewOffsetRef = useRef(viewOffset);
   const audioRef = useRef(null);
   const hasAutoPlayedRef = useRef(false);
   const spectrogramRef = useRef(null);
@@ -55,6 +58,18 @@ function FocusView({
   const highlightWidth = clipVisibleInWindow && extDuration > 0 ? (clip_end_time - clip_start_time) / extDuration : 1;
   // Offset into the loaded WAV where the annotation clip begins (for cursor positioning)
   const clipOffsetSeconds = hasContext ? clip_start_time - start_time : 0;
+
+  // Slide transition: when a new spectrogram arrives, animate in from the direction of travel
+  useEffect(() => {
+    if (spectrogram_base64 && spectrogram_base64 !== prevSpecRef.current) {
+      const delta = viewOffset - prevViewOffsetRef.current;
+      if (delta > 0) setSlideClass('focus-spec-slide-from-right');
+      else if (delta < 0) setSlideClass('focus-spec-slide-from-left');
+      else setSlideClass('focus-spec-slide-fade');
+      prevSpecRef.current = spectrogram_base64;
+      prevViewOffsetRef.current = viewOffset;
+    }
+  }, [spectrogram_base64, viewOffset]);
 
   // Read annotation and bbox from dynamic column keys based on annotationColumn prop
   const annotation = (clipData && clipData[annotationColumn]) ?? '';
@@ -529,9 +544,10 @@ function FocusView({
               >
                 {spectrogram_base64 ? (
                   <img
+                    key={spectrogram_base64.slice(-32)}
                     src={`data:image/png;base64,${spectrogram_base64}`}
                     alt="Spectrogram"
-                    className="focus-spectrogram-image"
+                    className={`focus-spectrogram-image ${slideClass}`}
                   />
                 ) : (
                   <div className="focus-spectrogram-placeholder">

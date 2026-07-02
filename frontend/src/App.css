@@ -3527,6 +3527,52 @@ body.dark-mode .react-select__placeholder {
   object-fit: fill;
 }
 
+@keyframes focusSlideFromRight {
+  from {
+    transform: translateX(48px);
+    opacity: 0.3;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes focusSlideFromLeft {
+  from {
+    transform: translateX(-48px);
+    opacity: 0.3;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes focusFadeIn {
+  from {
+    opacity: 0.2;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.focus-spec-slide-from-right {
+  animation: focusSlideFromRight 0.38s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.focus-spec-slide-from-left {
+  animation: focusSlideFromLeft 0.38s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.focus-spec-slide-fade {
+  animation: focusFadeIn 0.3s ease-out;
+}
+
 .focus-spectrogram-placeholder {
   display: flex;
   flex-direction: column;
