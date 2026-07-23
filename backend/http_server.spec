@@ -24,6 +24,7 @@ if os.path.exists(scripts_dir):
                 script_datas.append((src_path, rel_dir))
 
 birdnames_datas = collect_data_files('birdnames')
+certifi_datas = collect_data_files('certifi')
 
 # Include _secrets.py if present (generated from .env at build time, never committed)
 secrets_datas = []
@@ -35,7 +36,7 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=script_datas + birdnames_datas + secrets_datas,  # Include all Python scripts
+    datas=script_datas + birdnames_datas + certifi_datas + secrets_datas,
     hiddenimports=[
         'aiohttp',
         'aiohttp_cors',

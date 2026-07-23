@@ -21,6 +21,8 @@ import threading
 import tarfile
 import glob
 import platform
+import ssl
+import certifi
 import yaml
 from pathlib import Path
 from aiohttp import web, web_request
@@ -83,6 +85,10 @@ GITHUB_REPO = "sammlapp/dipper"
 HF_REPO = "sammlapp/dipper-envs"
 
 # Per-platform download config — all platforms hosted on Hugging Face
+# SSL context using certifi's CA bundle — required in PyInstaller builds where
+# the system cert store is not accessible from the bundled Python runtime.
+SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+
 PYTORCH_ENV_ASSET = {
     "Darwin": {"source": "hf", "name": "dipper_ml_env-macos-arm64.tar.gz"},
     "Windows": {"source": "hf", "name": "dipper_ml_env-windows-x64.tar.gz"},
@@ -307,7 +313,20 @@ def _download_url_to_file(url, archive_path):
 
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Dipper-App"})
-        urllib.request.urlretrieve(req.full_url, tmp_path, reporthook=_report)
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPSHandler(context=SSL_CONTEXT)
+        )
+        with opener.open(req) as response, open(tmp_path, "wb") as out:
+            block_size = 8192
+            total_size = int(response.headers.get("Content-Length", 0))
+            block_count = 0
+            while True:
+                chunk = response.read(block_size)
+                if not chunk:
+                    break
+                out.write(chunk)
+                block_count += 1
+                _report(block_count, block_size, total_size)
         os.replace(tmp_path, archive_path)
     except Exception as e:
         if os.path.exists(tmp_path):
@@ -1612,6 +1631,7 @@ class DipperServer:
                         "per_page": per_page,
                     },
                     timeout=aiohttp_client.ClientTimeout(total=15),
+                    ssl=SSL_CONTEXT,
                 ) as resp:
                     if resp.status != 200:
                         body = await resp.text()
@@ -1655,6 +1675,7 @@ class DipperServer:
                     audio_url,
                     headers={"User-Agent": f"Dipper/{XC_API_KEY}"},
                     timeout=aiohttp_client.ClientTimeout(total=30),
+                    ssl=SSL_CONTEXT,
                 ) as resp:
                     if resp.status != 200:
                         return web.json_response(

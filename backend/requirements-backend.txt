@@ -43,6 +43,7 @@ python-dotenv>=1.0.0
 # HTTP server
 aiohttp>=3.8.0
 aiohttp-cors>=0.7.0
+certifi>=2024.0.0
 
 # Configuration and validation
 pydantic>=1.8.0
