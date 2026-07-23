@@ -20,14 +20,17 @@ jobs:
             os: macos-latest
             artifact_name: conda-env-macos-arm64
             asset_name: dipper_ml_env-macos-arm64.tar.gz
+            hf_path: dipper_ml_env-macos-arm64.tar.gz
           - platform: windows-x64
             os: windows-latest
             artifact_name: conda-env-windows-x64
             asset_name: dipper_ml_env-windows-x64.tar.gz
+            hf_path: dipper_ml_env-windows-x64.tar.gz
           - platform: linux-x64
             os: ubuntu-latest
             artifact_name: conda-env-linux-x64
             asset_name: dipper_ml_env-linux-x64.tar.gz
+            hf_path: dipper_ml_env-linux-x64.tar.gz
 
     steps:
       - name: Checkout code
@@ -72,94 +75,28 @@ jobs:
           path: environments/${{ matrix.asset_name }}
           retention-days: 90
 
-      - name: Upload Linux env to Hugging Face
-        if: matrix.platform == 'linux-x64'
+      - name: Upload env to Hugging Face
         shell: bash -el {0}
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           pip install huggingface_hub
           python - <<'EOF'
-          import os
+          import os, sys
           from huggingface_hub import HfApi
+
+          src = "environments/${{ matrix.asset_name }}"
+          if not os.path.exists(src):
+              print(f"[ERROR] Artifact not found at {src}")
+              sys.exit(1)
+
           api = HfApi()
           api.upload_file(
-              path_or_fileobj="environments/dipper_ml_env-linux-x64.tar.gz",
-              path_in_repo="dipper_ml_env-linux-x64.tar.gz",
+              path_or_fileobj=src,
+              path_in_repo="${{ matrix.hf_path }}",
               repo_id="sammlapp/dipper-envs",
               repo_type="dataset",
               token=os.environ["HF_TOKEN"],
           )
-          print("Upload to Hugging Face complete")
+          print("Upload to Hugging Face complete: ${{ matrix.hf_path }}")
           EOF
-
-  create-release:
-    name: Create Conda Environment Release
-    needs: build-conda-pack
-    runs-on: ubuntu-latest
-    # Only run if at least one build succeeded
-    if: always() && contains(needs.build-conda-pack.result, 'success')
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-
-      - name: Display artifact structure
-        run: |
-          echo "Downloaded artifacts:"
-          find artifacts/ -type f
-
-      - name: Create release tag
-        id: tag
-        run: |
-          if [ -n "${{ github.event.inputs.tag_suffix }}" ]; then
-            TAG="conda-env-$(date +'%Y%m%d')-${{ github.event.inputs.tag_suffix }}"
-          else
-            TAG="conda-env-$(date +'%Y%m%d-%H%M%S')"
-          fi
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "Release tag: ${TAG}"
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: "ML Environment - ${{ steps.tag.outputs.tag }}"
-          # Linux is hosted on Hugging Face (>2GB), only include macOS + Windows here
-          files: |
-            artifacts/conda-env-macos-arm64/*.tar.gz
-            artifacts/conda-env-windows-x64/*.tar.gz
-          draft: false
-          prerelease: false
-          make_latest: false
-          body: |
-            ## Dipper ML Environment (conda-pack)
-
-            Pre-built conda-pack environments for running ML tasks in Dipper.
-            The app downloads the appropriate file automatically on first use.
-
-            ### Downloads
-            | Platform | Location |
-            |----------|----------|
-            | macOS Apple Silicon | GitHub release asset below |
-            | Windows x64 | GitHub release asset below |
-            | Linux x64 | [Hugging Face](https://huggingface.co/datasets/sammlapp/dipper-envs) (CUDA-enabled, ~5GB) |
-
-            ### Manual installation
-            Download the archive for your platform and place it at:
-            - **macOS:** `~/Library/Caches/Dipper/archives/dipper_ml_env.tar.gz`
-            - **Windows:** `%LOCALAPPDATA%\BioacousticsApp\Dipper\Cache\archives\dipper_ml_env.tar.gz`
-            - **Linux:** `~/.cache/Dipper/archives/dipper_ml_env.tar.gz`
-
-            Then launch Dipper and run any ML task — it will extract automatically.
-
-            ### Contents
-            - Python 3.11, PyTorch (CUDA on Linux), OpenSoundscape, Bioacoustics Model Zoo
-
-            Built: ${{ steps.tag.outputs.tag }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

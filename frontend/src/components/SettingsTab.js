@@ -17,20 +17,74 @@ import SaveIcon from '@mui/icons-material/Save';
 import RestoreIcon from '@mui/icons-material/Restore';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
+import DownloadIcon from '@mui/icons-material/Download';
 import { useDarkMode } from '../hooks/useDarkMode';
+import { useBackendUrl } from '../hooks/useBackendUrl';
 
-/**
- * Settings Tab - Global application configuration
- *
- * Currently supports:
- * - Max concurrent background tasks
- * - Extraction task exemption from concurrency limit
- */
-function SettingsTab() {
+function SettingsTab({ onEnvReady }) {
   const [maxConcurrentTasks, setMaxConcurrentTasks] = useState(1);
   const [exemptExtractionTasks, setExemptExtractionTasks] = useState(false);
   const [saveMessage, setSaveMessage] = useState(null);
   const { darkMode, set: setDarkMode } = useDarkMode();
+  const backendUrl = useBackendUrl();
+
+  // ML environment state
+  // envStatus: 'unknown' | 'ready' | 'missing' | 'broken' | 'extracting' | 'downloading' | 'error'
+  const [envStatus, setEnvStatus] = useState('unknown');
+  const [envMessage, setEnvMessage] = useState('');
+  const envPollRef = React.useRef(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const checkEnv = () => {
+    if (!backendUrl) return;
+    fetch(`${backendUrl}/env/check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ env_path: null }) })
+      .then(r => r.json())
+      .then(result => {
+        setEnvStatus(result.status);
+        setEnvMessage(result.version ? `Python ${result.version}` : result.error || '');
+        if (onEnvReady) onEnvReady(result.status === 'ready');
+      })
+      .catch(() => setEnvStatus('unknown'));
+  };
+
+  useEffect(() => {
+    checkEnv();
+  }, [backendUrl]); // eslint-disable-line
+
+  const startEnvInstall = () => {
+    if (!backendUrl) return;
+    setEnvStatus('downloading');
+    setEnvMessage('Starting download...');
+    fetch(`${backendUrl}/env/install`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .catch(() => { });
+    envPollRef.current = setInterval(() => {
+      fetch(`${backendUrl}/env/install/status`)
+        .then(r => r.json())
+        .then(state => {
+          setEnvStatus(state.stage);
+          setEnvMessage(state.message || '');
+          if (state.stage === 'ready' || state.stage === 'error') {
+            clearInterval(envPollRef.current);
+            checkEnv();
+          }
+        })
+        .catch(() => { });
+    }, 2000);
+  };
+
+  const removeEnv = () => {
+    if (!backendUrl) return;
+    fetch(`${backendUrl}/env/remove`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then(r => r.json())
+      .then(() => { setEnvStatus('missing'); setEnvMessage(''); setConfirmRemove(false); if (onEnvReady) onEnvReady(false); })
+      .catch(() => { });
+  };
+
+  const envStatusColor = { ready: 'success', missing: 'warning', broken: 'error', error: 'error', unknown: 'info' }[envStatus] || 'info';
+  const envStatusLabel = {
+    ready: 'Installed', missing: 'Not installed', broken: 'Broken',
+    downloading: 'Downloading...', extracting: 'Installing...', error: 'Error', unknown: 'Checking...',
+  }[envStatus] || envStatus;
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -191,6 +245,82 @@ function SettingsTab() {
               }
             />
           </FormGroup>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            ML Environment
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            The conda-pack ML environment is required for inference, training, and extraction tasks (~700 MB on macOS/Windows, ~5 GB on Linux with CUDA).
+          </Typography>
+          <Divider sx={{ my: 2 }} />
+
+          <Alert severity={envStatusColor} sx={{ mb: 2 }}>
+            <strong>Status: {envStatusLabel}</strong>
+            {envMessage ? ` — ${envMessage}` : ''}
+          </Alert>
+
+          {(envStatus === 'downloading' || envStatus === 'extracting') && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {envStatus === 'downloading' ? 'Downloading ML environment. This may take several minutes...' : 'Extracting environment. This may take a few minutes...'}
+            </Alert>
+          )}
+
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Button variant="outlined" onClick={checkEnv} disabled={envStatus === 'downloading' || envStatus === 'extracting'}>
+              Check
+            </Button>
+            <Button
+              variant="contained"
+              onClick={startEnvInstall}
+              disabled={envStatus === 'ready' || envStatus === 'downloading' || envStatus === 'extracting'}
+            >
+              {envStatus === 'missing' || envStatus === 'unknown' ? 'Download and Install' : 'Re-install'}
+            </Button>
+            {confirmRemove ? (
+              <>
+                <Button variant="contained" color="error" onClick={removeEnv}>
+                  Confirm Remove
+                </Button>
+                <Button variant="outlined" onClick={() => setConfirmRemove(false)}>
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => setConfirmRemove(true)}
+                disabled={envStatus !== 'ready' && envStatus !== 'broken'}
+              >
+                Remove
+              </Button>
+            )}
+          </Box>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Debugging
+          </Typography>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Download the backend server log to share with developers when reporting issues.
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            component="a"
+            href="http://localhost:8000/debug/log"
+            download="dipper-backend.log"
+          >
+            Download Debug Log
+          </Button>
         </CardContent>
       </Card>
 

@@ -111,7 +111,7 @@ const RUGR_CWT_DEFAULTS = {
   points_range: [9, 100],
 };
 
-function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
+function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady }) {
   const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
   const [settingsTab, setSettingsTab] = useState(0);
   const [fileSelectionMode, setFileSelectionMode] = useState(DEFAULT_VALUES.fileSelectionMode);
@@ -1797,7 +1797,8 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun }) {
           <button
             className="button-primary"
             onClick={() => handleSubmit(true)}
-            disabled={(fileCount === 0) || !config.output_dir}
+            disabled={(fileCount === 0) || !config.output_dir || !mlEnvReady}
+            title={!mlEnvReady ? 'ML environment not installed — install from Settings tab' : undefined}
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
           >
             Create and Run Task
@@ -1916,7 +1917,7 @@ function ResumeInferenceTask({ onResumeTask }) {
 }
 
 // Wrapper component with tabs for creating or resuming inference tasks
-function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
+function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady }) {
   const [tabValue, setTabValue] = useState(0);
 
   const handleTabChange = (_event, newValue) => {
@@ -1938,6 +1939,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           <CreateInferenceTaskForm
             onTaskCreate={onTaskCreate}
             onTaskCreateAndRun={onTaskCreateAndRun}
+            mlEnvReady={mlEnvReady}
           />
         )}
       </div>

@@ -290,27 +290,6 @@ class TaskManager {
     }
   }
 
-  // Polls /env/install/status and updates task progress while env is being set up.
-  // Returns a stop function. Call stop() once the run endpoint has responded.
-  startEnvProgressPolling(taskId, backendUrl) {
-    let active = true;
-    const poll = async () => {
-      while (active) {
-        try {
-          const r = await fetch(`${backendUrl}/env/install/status`);
-          const state = await r.json();
-          if (active && state && state.stage && state.stage !== 'idle' && state.stage !== 'ready') {
-            this.updateTask(taskId, { progress: state.message || 'Setting up ML environment...' });
-          }
-        } catch (_) { /* ignore */ }
-        if (!active) break;
-        await new Promise(res => setTimeout(res, 1500));
-      }
-    };
-    poll();
-    return () => { active = false; };
-  }
-
   async runInference(task) {
     const config = task.config;
     const backendUrl = await getBackendUrl();
@@ -336,6 +315,7 @@ class TaskManager {
         // Normal mode: create new unique job folder
         const jobFolderName = await this.generateUniqueJobFolderName(config.output_dir, task.name);
         jobFolder = config.output_dir ? `${config.output_dir}/${jobFolderName}` : '';
+        this.updateTask(task.id, { progress: 'Creating new job folder at ' + jobFolder });
       }
 
       const configJsonPath = jobFolder ? `${jobFolder}/${task.name}_${task.id}.json` : '';
@@ -398,30 +378,19 @@ class TaskManager {
         throw new Error(`Failed to save configuration: ${saveResult.error}`);
       }
 
-      // Update progress
-      this.updateTask(task.id, { progress: 'Setting up ML environment...' });
-
       // Get environment path - use custom environment if specified, otherwise null for default
       let envPath = null;
       if (config.use_custom_python_env && config.custom_python_env_path) {
         envPath = config.custom_python_env_path;
       }
-      // If envPath is null, backend will use default cache directory and auto-download if needed
 
-      // Poll env install status while waiting for the run endpoint (env setup can take minutes)
-      const stopEnvPoll = this.startEnvProgressPolling(task.id, backendUrl);
-
-      // Start inference via HTTP API (now returns immediately with job ID)
-      let inferenceResponse;
-      try {
-        inferenceResponse = await fetch(`${backendUrl}/inference/run`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ config_path: tempConfigPath, env_path: envPath, job_id: processId })
-        });
-      } finally {
-        stopEnvPoll();
-      }
+      // Start inference via HTTP API (returns immediately with job ID)
+      this.updateTask(task.id, { progress: 'Starting inference...' });
+      const inferenceResponse = await fetch(`${backendUrl}/inference/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_path: tempConfigPath, env_path: envPath, job_id: processId })
+      });
 
       const startResult = await inferenceResponse.json();
 
@@ -568,8 +537,8 @@ class TaskManager {
       // Construct full hoplite_db_path for new databases
       const fullHopliteDbPath = config.mode === 'train_on_embeddings' && config.hoplite_db_path
         ? (config.use_existing_hoplite_db
-            ? config.hoplite_db_path
-            : `${config.hoplite_db_path}/${config.hoplite_db_name || 'hoplite_embeddings'}`)
+          ? config.hoplite_db_path
+          : `${config.hoplite_db_path}/${config.hoplite_db_name || 'hoplite_embeddings'}`)
         : '';
 
       const configData = {
@@ -620,30 +589,19 @@ class TaskManager {
         throw new Error(`Failed to save configuration: ${saveResult.error}`);
       }
 
-      // Update progress
-      this.updateTask(task.id, { progress: 'Setting up ML environment...' });
-
       // Get environment path - use custom environment if specified, otherwise null for default
       let envPath = null;
       if (config.use_custom_python_env && config.custom_python_env_path) {
         envPath = config.custom_python_env_path;
       }
-      // If envPath is null, backend will use default cache directory and auto-download if needed
-
-      // Poll env install status while waiting for the run endpoint (env setup can take minutes)
-      const stopEnvPoll = this.startEnvProgressPolling(task.id, backendUrl);
 
       // Start training via HTTP API (returns immediately with job ID)
-      let trainingResponse;
-      try {
-        trainingResponse = await fetch(`${backendUrl}/training/run`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ config_path: tempConfigPath, env_path: envPath, job_id: processId })
-        });
-      } finally {
-        stopEnvPoll();
-      }
+      this.updateTask(task.id, { progress: 'Starting training...' });
+      const trainingResponse = await fetch(`${backendUrl}/training/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_path: tempConfigPath, env_path: envPath, job_id: processId })
+      });
 
       const startResult = await trainingResponse.json();
 
@@ -816,30 +774,19 @@ class TaskManager {
         throw new Error(`Failed to save configuration: ${saveResult.error}`);
       }
 
-      // Update progress
-      this.updateTask(task.id, { progress: 'Setting up ML environment...' });
-
       // Get environment path - use custom environment if specified, otherwise null for default
       let envPath = null;
       if (config.use_custom_python_env && config.custom_python_env_path) {
         envPath = config.custom_python_env_path;
       }
-      // If envPath is null, backend will use default cache directory and auto-download if needed
 
-      // Poll env install status while waiting for the run endpoint (env setup can take minutes)
-      const stopEnvPoll = this.startEnvProgressPolling(task.id, backendUrl);
-
-      // Start annotation via HTTP API (returns immediately with job ID)
-      let extractionResponse;
-      try {
-        extractionResponse = await fetch(`${backendUrl}/extraction/run`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ config_path: tempConfigPath, env_path: envPath, job_id: processId })
-        });
-      } finally {
-        stopEnvPoll();
-      }
+      // Start extraction via HTTP API (returns immediately with job ID)
+      this.updateTask(task.id, { progress: 'Starting extraction...' });
+      const extractionResponse = await fetch(`${backendUrl}/extraction/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_path: tempConfigPath, env_path: envPath, job_id: processId })
+      });
 
       const startResult = await extractionResponse.json();
 

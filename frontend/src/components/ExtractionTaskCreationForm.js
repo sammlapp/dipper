@@ -40,7 +40,7 @@ const DEFAULT_VALUES = {
   }
 };
 
-function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, onTaskCreateAndRunInline, initialPredictionsFolder }) {
+function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, onTaskCreateAndRunInline, initialPredictionsFolder, mlEnvReady }) {
   const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
   const [settingsTab, setSettingsTab] = useState(0);
   const [config, setConfig] = useState(DEFAULT_VALUES.config);
@@ -854,18 +854,18 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, onTaskCr
           <button
             className="button-primary"
             onClick={() => handleSubmit('inline')}
-            disabled={!config.predictions_folder || config.class_list.length === 0 || !config.output_dir || config.export_audio_clips}
+            disabled={!config.predictions_folder || config.class_list.length === 0 || !config.output_dir || config.export_audio_clips || !mlEnvReady}
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-            title={config.export_audio_clips ? "Run is unavailable when Export Audio Clips is enabled — use Run in background task instead" : "Run extraction directly in the backend process (faster startup)"}
+            title={!mlEnvReady ? 'ML environment not installed — install from Settings tab' : config.export_audio_clips ? "Run is unavailable when Export Audio Clips is enabled — use Run in background task instead" : "Run extraction directly in the backend process (faster startup)"}
           >
             Run
           </button>
           <button
             className="button-secondary"
             onClick={() => handleSubmit(true)}
-            disabled={!config.predictions_folder || config.class_list.length === 0 || !config.output_dir}
+            disabled={!config.predictions_folder || config.class_list.length === 0 || !config.output_dir || !mlEnvReady}
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-            title="Run extraction as a background subprocess task"
+            title={!mlEnvReady ? 'ML environment not installed — install from Settings tab' : "Run extraction as a background subprocess task"}
           >
             Run in background task
           </button>

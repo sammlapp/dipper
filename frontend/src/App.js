@@ -112,12 +112,7 @@ function App() {
   const [extractionPredictionsFolder, setExtractionPredictionsFolder] = useState(null); // {folder, ts}
   const backendUrl = useBackendUrl();
 
-  // ML environment state
-  // envStatus: 'unknown' | 'ready' | 'missing' | 'installing'
-  const [envStatus, setEnvStatus] = useState('unknown');
-  const [envInstallState, setEnvInstallState] = useState(null); // {stage, message, error}
-  const [showEnvDialog, setShowEnvDialog] = useState(false);
-  const envPollRef = React.useRef(null);
+  const [envReady, setEnvReady] = useState(false);
 
   const tabs = [
     { id: 'inference',  name: 'Inference',   icon: <PlayArrowIcon /> },
@@ -180,58 +175,14 @@ function App() {
     };
   }, []);
 
-  // ML environment: check on launch, then show dialog if missing
+  // ML environment: check on launch so task forms know whether env is ready
   useEffect(() => {
     if (isReviewOnly || !backendUrl) return;
     fetch(`${backendUrl}/env/check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ env_path: null }) })
       .then(r => r.json())
-      .then(result => {
-        if (result.status === 'ready') {
-          setEnvStatus('ready');
-        } else {
-          setEnvStatus('missing');
-          setShowEnvDialog(true);
-        }
-      })
-      .catch(() => { }); // backend not yet up — silently ignore
-  }, [backendUrl, isReviewOnly]);
-
-  const startEnvInstall = () => {
-    setShowEnvDialog(false);
-    setEnvStatus('installing');
-    setEnvInstallState({ stage: 'downloading', message: 'Starting download...', error: null });
-    fetch(`${backendUrl}/env/install`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then(result => setEnvReady(result.status === 'ready'))
       .catch(() => { });
-    // Poll for status
-    envPollRef.current = setInterval(() => {
-      fetch(`${backendUrl}/env/install/status`)
-        .then(r => r.json())
-        .then(state => {
-          setEnvInstallState(state);
-          if (state.stage === 'ready') {
-            setEnvStatus('ready');
-            clearInterval(envPollRef.current);
-          } else if (state.stage === 'error') {
-            setEnvStatus('missing');
-            clearInterval(envPollRef.current);
-          } else if (state.stage === 'extracting' || state.stage === 'downloading') {
-            // Fallback: also directly check if the env is actually ready already,
-            // in case the background thread updated the env but the state update was missed.
-            fetch(`${backendUrl}/env/check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ env_path: null }) })
-              .then(r => r.json())
-              .then(result => {
-                if (result.status === 'ready') {
-                  setEnvInstallState({ stage: 'ready', message: 'ML environment ready', error: null });
-                  setEnvStatus('ready');
-                  clearInterval(envPollRef.current);
-                }
-              })
-              .catch(() => { });
-          }
-        })
-        .catch(() => { });
-    }, 2000);
-  };
+  }, [backendUrl, isReviewOnly]);
 
   // Task handlers
   const handleTaskCreate = (taskConfig, taskName) => {
@@ -366,35 +317,12 @@ function App() {
         flexDirection: 'column',
         minHeight: '100vh'
       }}>
-        {/* ML environment install dialog */}
-        {showEnvDialog && (
-          <div className="env-dialog-overlay">
-            <div className="env-dialog">
-              <h3>ML Environment Not Installed</h3>
-              <p>
-                The ML backend (conda-pack environment) is required for inference, training, and extraction.
-                It will be downloaded and installed automatically (~700 MB on macOS/Windows, ~5 GB on Linux).
-              </p>
-              <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>
-                You can also install it later by running any ML task, or skip and use the Review / Explore tabs now.
-              </p>
-              <div className="env-dialog-actions">
-                <button className="env-dialog-btn primary" onClick={startEnvInstall}>
-                  Download &amp; Install Now
-                </button>
-                <button className="env-dialog-btn secondary" onClick={() => setShowEnvDialog(false)}>
-                  Skip for Now
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Keep all tabs mounted to preserve state - only hide/show with CSS */}
         <div className="tab-content" style={{ display: activeTab === 'inference' ? 'block' : 'none' }}>
           <TaskCreationForm
             onTaskCreate={handleTaskCreate}
             onTaskCreateAndRun={handleTaskCreateAndRun}
+            mlEnvReady={envReady}
           />
         </div>
 
@@ -403,6 +331,7 @@ function App() {
             <TrainingTaskCreationForm
               onTaskCreate={handleTaskCreate}
               onTaskCreateAndRun={handleTaskCreateAndRun}
+              mlEnvReady={envReady}
             />
           </div>
         )}
@@ -413,6 +342,7 @@ function App() {
             onTaskCreateAndRun={handleTaskCreateAndRun}
             onTaskCreateAndRunInline={handleTaskCreateAndRun}
             initialPredictionsFolder={extractionPredictionsFolder}
+            mlEnvReady={envReady}
           />
         </div>
 
@@ -431,7 +361,7 @@ function App() {
         )}
 
         <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }}>
-          <SettingsTab />
+          <SettingsTab onEnvReady={setEnvReady} />
         </div>
 
         <div style={{ display: activeTab === 'help' ? 'block' : 'none' }}>
@@ -450,15 +380,7 @@ function App() {
             duration: theme.transitions.duration.leavingScreen,
           })
         }}>
-          {envStatus === 'installing' ? (
-            <div className="status-running status-env-install">
-              <span className="status-icon">{envInstallState?.stage === 'extracting' ? '📦' : '⬇️'}</span>
-              <span>{envInstallState?.message || 'Installing ML environment...'}</span>
-              {envInstallState?.error && (
-                <span className="status-env-error"> — Error: {envInstallState.error}</span>
-              )}
-            </div>
-          ) : runningTasks.length > 0 ? (
+          {runningTasks.length > 0 ? (
             <div className="status-running" onClick={() => setActiveTab('tasks')} style={{ cursor: 'pointer' }}>
               <span className="status-icon">🔄</span>
               {runningTasks.length === 1 ? (
@@ -469,11 +391,6 @@ function App() {
               ) : (
                 <span>Running {runningTasks.length} tasks: {runningTasks.map(t => t.name).join(', ').substring(0, 80)}...</span>
               )}
-            </div>
-          ) : envStatus === 'missing' ? (
-            <div className="status-running" style={{ cursor: 'pointer' }} onClick={() => setShowEnvDialog(true)}>
-              <span className="status-icon">⚠️</span>
-              <span>ML environment not installed — click to install</span>
             </div>
           ) : (
             <div className="status-idle" onClick={() => setActiveTab('tasks')} style={{ cursor: 'pointer' }}>

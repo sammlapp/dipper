@@ -52,7 +52,7 @@ const DEFAULT_VALUES = {
   }
 };
 
-function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
+function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady }) {
   const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
   const [settingsTab, setSettingsTab] = useState(0);
   const [config, setConfig] = useState(DEFAULT_VALUES.config);
@@ -1038,7 +1038,8 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun }) {
           <button
             className="button-primary"
             onClick={() => handleSubmit(true)}
-            disabled={getClassListArray().length === 0 || !config.save_location}
+            disabled={getClassListArray().length === 0 || !config.save_location || !mlEnvReady}
+            title={!mlEnvReady ? 'ML environment not installed — install from Settings tab' : undefined}
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
           >
             Create and Run Task

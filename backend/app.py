@@ -49,9 +49,32 @@ try:
 except ImportError:
     XC_API_KEY = os.environ.get("XC_DIPPER_API_KEY", "")
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up logging — stderr for dev, plus a rotating file in the user cache dir
+import platformdirs as _platformdirs
+from logging.handlers import RotatingFileHandler as _RotatingFileHandler
+
+_log_dir = _platformdirs.user_log_dir("Dipper", "Dipper")
+os.makedirs(_log_dir, exist_ok=True)
+LOG_FILE_PATH = os.path.join(_log_dir, "dipper-backend.log")
+
+_file_handler = _RotatingFileHandler(
+    LOG_FILE_PATH, maxBytes=5 * 1024 * 1024, backupCount=2, encoding="utf-8"
+)
+_file_handler.setFormatter(
+    logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+)
+_stream_handler = logging.StreamHandler()
+_stream_handler.setFormatter(
+    logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+)
+# Configure root logger directly — basicConfig is a no-op if any library
+# has already added handlers, so we add ours explicitly.
+_root = logging.getLogger()
+_root.setLevel(logging.INFO)
+_root.addHandler(_file_handler)
+_root.addHandler(_stream_handler)
 logger = logging.getLogger(__name__)
+logger.info(f"Log file: {LOG_FILE_PATH}")
 
 # GitHub repository for ML environment releases (owner/repo)
 GITHUB_REPO = "sammlapp/dipper"
@@ -59,12 +82,10 @@ GITHUB_REPO = "sammlapp/dipper"
 # Hugging Face dataset repo for large environments that exceed GitHub's 2GB asset limit
 HF_REPO = "sammlapp/dipper-envs"
 
-# Per-platform download config.
-# source "github": fetched from the latest conda-env-* GitHub release asset
-# source "hf":     fetched directly from Hugging Face (no size limit)
+# Per-platform download config — all platforms hosted on Hugging Face
 PYTORCH_ENV_ASSET = {
-    "Darwin": {"source": "github", "name": "dipper_ml_env-macos-arm64.tar.gz"},
-    "Windows": {"source": "github", "name": "dipper_ml_env-windows-x64.tar.gz"},
+    "Darwin": {"source": "hf", "name": "dipper_ml_env-macos-arm64.tar.gz"},
+    "Windows": {"source": "hf", "name": "dipper_ml_env-windows-x64.tar.gz"},
     "Linux": {"source": "hf", "name": "dipper_ml_env-linux-x64.tar.gz"},
 }
 
@@ -267,9 +288,7 @@ def get_default_env_archive_path():
 
 def get_default_env_cache_dir():
     """Get the default environment caching folder in system-specific cache directory"""
-    import platformdirs
-
-    return platformdirs.user_cache_dir("Dipper", "BioacousticsApp")
+    return _platformdirs.user_cache_dir("Dipper", "Dipper")
 
 
 def _download_url_to_file(url, archive_path):
@@ -318,61 +337,13 @@ def download_environment():
     archive_path = get_default_env_archive_path()
     os.makedirs(os.path.dirname(archive_path), exist_ok=True)
 
-    if source == "hf":
-        # Direct download from Hugging Face — URL is stable and predictable
-        url = f"https://huggingface.co/datasets/{HF_REPO}/resolve/main/{asset_name}"
-        logger.info(f"Downloading {asset_name} from Hugging Face to {archive_path}...")
-        try:
-            _download_url_to_file(url, archive_path)
-        except Exception as e:
-            return {"status": "error", "error": f"Hugging Face download failed: {e}"}
-
-    elif source == "github":
-        # Discover the latest conda-env-* release via GitHub API
-        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
-        logger.info(f"Fetching releases list from {api_url}")
-        try:
-            req = urllib.request.Request(api_url, headers={"User-Agent": "Dipper-App"})
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                releases = _json.loads(resp.read().decode())
-        except Exception as e:
-            return {"status": "error", "error": f"Failed to fetch GitHub releases: {e}"}
-
-        env_releases = [
-            r for r in releases if r.get("tag_name", "").startswith("conda-env-")
-        ]
-        if not env_releases:
-            return {
-                "status": "error",
-                "error": "No conda-env releases found on GitHub.",
-            }
-        latest = env_releases[0]  # newest-first
-
-        asset_url = next(
-            (
-                a["browser_download_url"]
-                for a in latest.get("assets", [])
-                if a["name"] == asset_name
-            ),
-            None,
-        )
-        if asset_url is None:
-            available = [a["name"] for a in latest.get("assets", [])]
-            return {
-                "status": "error",
-                "error": f"Asset '{asset_name}' not found in release '{latest['tag_name']}'. Available: {available}",
-            }
-
-        logger.info(
-            f"Downloading {asset_name} from {latest['tag_name']} to {archive_path}..."
-        )
-        try:
-            _download_url_to_file(asset_url, archive_path)
-        except Exception as e:
-            return {"status": "error", "error": f"GitHub download failed: {e}"}
-
-    else:
-        return {"status": "error", "error": f"Unknown download source '{source}'"}
+    # Direct download from Hugging Face — URL is stable and predictable
+    url = f"https://huggingface.co/datasets/{HF_REPO}/resolve/main/{asset_name}"
+    logger.info(f"Downloading {asset_name} from Hugging Face to {archive_path}...")
+    try:
+        _download_url_to_file(url, archive_path)
+    except Exception as e:
+        return {"status": "error", "error": f"Hugging Face download failed: {e}"}
 
     logger.info(f"Download complete: {archive_path}")
     return {"status": "success", "archive_path": archive_path}
@@ -421,7 +392,11 @@ def check_environment(env_path):
             if result.returncode == 0:
                 # Old valid env — write status file so future checks are fast
                 _write_extraction_status(env_path, "complete")
-                return {"status": "ready", "python_path": python_path, "version": result.stdout.strip()}
+                return {
+                    "status": "ready",
+                    "python_path": python_path,
+                    "version": result.stdout.strip(),
+                }
             return {"status": "missing", "python_path": None}
 
         # Status is 'complete' — verify python binary is usable
@@ -430,13 +405,20 @@ def check_environment(env_path):
             python_path = os.path.join(env_path, "python.exe")
 
         if not os.path.exists(python_path):
-            return {"status": "broken", "error": "Python binary missing after extraction"}
+            return {
+                "status": "broken",
+                "error": "Python binary missing after extraction",
+            }
 
         result = subprocess.run(
             [python_path, "--version"], capture_output=True, text=True
         )
         if result.returncode == 0:
-            return {"status": "ready", "python_path": python_path, "version": result.stdout.strip()}
+            return {
+                "status": "ready",
+                "python_path": python_path,
+                "version": result.stdout.strip(),
+            }
         return {"status": "broken", "error": f"Python check failed: {result.stderr}"}
 
     except Exception as e:
@@ -473,16 +455,18 @@ def extract_environment(archive_path, extract_dir):
                 return {"status": "error", "error": error_msg}
             else:
                 logger.info("conda-unpack complete")
-        else:
-            logger.warning(
-                f"conda-unpack not found at {conda_unpack} — skipping prefix rewrite"
-            )
-
+        else: 
+            error_msg = f"conda-unpack not found at {conda_unpack}"
+            logger.error(error_msg)
+            return {"status": "error", "error": error_msg}
+        
         # Mark extraction complete only after tar + conda-unpack both succeed.
         _write_extraction_status(extract_dir, "complete")
 
         # Verify python binary is usable
+        logger.info("Verifying extracted Python binary...")
         env_check = check_environment(extract_dir)
+        logger.info(f"Environment check result: {env_check}")
         if env_check["status"] == "ready":
             return {"status": "success", "env_path": extract_dir}
         else:
@@ -547,7 +531,9 @@ def setup_environment(env_dir=None):
         logger.info(f"Using default environment path: {env_dir}")
 
         # check if environment already exists
+        logger.info(f"Checking if environment is ready...")
         env_check = check_environment(env_dir)
+        logger.info(f"Environment check result: {env_check}")
 
         if env_check["status"] == "ready":
             return {
@@ -560,14 +546,16 @@ def setup_environment(env_dir=None):
         # we may need to download it then extract it
         # or just extract it if we already have the archive file
         # in the expected location
+        logger.info("Environment is not ready, proceeding with setup...")
 
         # Check cache directory for archive
+        logger.info("Checking for cached environment archive...")
         archive_path = get_default_env_archive_path()
 
-        if os.path.exists(archive_path):
+        if os.path.exists(archive_path): #already downloaded
             logger.info(f"Using cached archive: {archive_path}")
         else:
-            # Download from GitHub releases or Hugging Face depending on platform
+            # Download from Hugging Face
             logger.info("Archive not found in cache, downloading...")
             download_result = download_environment()
 
@@ -587,8 +575,9 @@ def setup_environment(env_dir=None):
             }
 
         # Extract the environment from the cached archive file
-        logger.info(f"Extracting environment from {archive_path} to {env_dir}")
+        
         extract_result = extract_environment(archive_path, env_dir)
+        logger.info(f"Extraction result: {extract_result}")
 
         if extract_result["status"] == "success":
             # Check again after extraction
@@ -1486,6 +1475,7 @@ class DipperServer:
         self.app.router.add_post("/env/setup", self.setup_env)
         self.app.router.add_post("/env/install", self.install_env)
         self.app.router.add_get("/env/install/status", self.install_env_status)
+        self.app.router.add_post("/env/remove", self.remove_env)
         self.app.router.add_post("/inference/run", self.run_inference)
         self.app.router.add_get("/inference/status/{job_id}", self.get_inference_status)
         self.app.router.add_post("/inference/cancel/{job_id}", self.cancel_inference)
@@ -1545,6 +1535,7 @@ class DipperServer:
         self.app.router.add_get("/xeno-canto/search", self.xeno_canto_search)
         self.app.router.add_get("/xeno-canto/clip", self.xeno_canto_clip)
         self.app.router.add_get("/memory", self.memory_stats)
+        self.app.router.add_get("/debug/log", self.download_debug_log)
 
     async def xeno_canto_search(self, request):
         """Proxy Xeno-Canto API v3 search."""
@@ -2121,6 +2112,17 @@ class DipperServer:
             logger.error(f"Error clearing cache: {e}")
             return web.json_response({"error": str(e)}, status=500)
 
+    async def download_debug_log(self, request):
+        """Stream the backend log file as a download (GET /debug/log)."""
+        if not os.path.exists(LOG_FILE_PATH):
+            return web.Response(text="Log file not found", status=404)
+        return web.FileResponse(
+            LOG_FILE_PATH,
+            headers={
+                "Content-Disposition": 'attachment; filename="dipper-backend.log"'
+            },
+        )
+
     async def memory_stats(self, request):
         """Return process memory usage and running_jobs breakdown."""
         try:
@@ -2337,6 +2339,20 @@ class DipperServer:
         """Return current state of background env install."""
         return web.json_response(self._env_install_state)
 
+    async def remove_env(self, request):
+        """Delete the default ML environment directory (POST /env/remove)."""
+        import shutil
+        env_dir = get_default_env_path()
+        try:
+            if os.path.exists(env_dir):
+                shutil.rmtree(env_dir)
+                logger.info(f"Removed ML environment at {env_dir}")
+                return web.json_response({"status": "removed"})
+            return web.json_response({"status": "not_found"})
+        except Exception as e:
+            logger.error(f"Failed to remove ML environment: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
     # Process Management Routes
     async def run_inference(self, request):
         """Start inference process and return immediately with job ID"""
@@ -2356,13 +2372,19 @@ class DipperServer:
             if not config_path:
                 return web.json_response({"error": "config_path required"}, status=400)
 
-            # First check/setup environment (env_path can be None for default)
-            env_result = setup_environment(env_path)
+            # Check environment is ready — install via Settings if missing
+            resolved_env = env_path if env_path else get_default_env_path()
+            env_result = check_environment(resolved_env)
             if env_result["status"] != "ready":
-                logger.error(f"Environment setup failed: {env_result}")
-                return web.json_response(env_result, status=500)
+                logger.error(f"Environment not ready: {env_result}")
+                return web.json_response(
+                    {"status": "error", "error": "ML environment is not installed. Please install it from the Settings tab.", "env_status": env_result["status"]},
+                    status=503,
+                )
+            logger.info(f"Environment is ready: {env_result}")
 
             # Start inference process (non-blocking)
+            logger.info(f"Starting inference process for job {job_id}...")
             result = start_inference_process(
                 job_id, config_path, env_result["python_path"]
             )
@@ -2593,11 +2615,15 @@ class DipperServer:
             if not config_path:
                 return web.json_response({"error": "config_path required"}, status=400)
 
-            # First check/setup environment (env_path can be None for default)
-            env_result = setup_environment(env_path)
+            # Check environment is ready — install via Settings if missing
+            resolved_env = env_path if env_path else get_default_env_path()
+            env_result = check_environment(resolved_env)
             if env_result["status"] != "ready":
-                logger.error(f"Environment setup failed: {env_result}")
-                return web.json_response(env_result, status=500)
+                logger.error(f"Environment not ready: {env_result}")
+                return web.json_response(
+                    {"status": "error", "error": "ML environment is not installed. Please install it from the Settings tab.", "env_status": env_result["status"]},
+                    status=503,
+                )
 
             # Start training process (non-blocking)
             result = start_training_process(
@@ -2789,11 +2815,15 @@ class DipperServer:
             if not config_path:
                 return web.json_response({"error": "config_path required"}, status=400)
 
-            # First check/setup environment (env_path can be None for default)
-            env_result = setup_environment(env_path)
+            # Check environment is ready — install via Settings if missing
+            resolved_env = env_path if env_path else get_default_env_path()
+            env_result = check_environment(resolved_env)
             if env_result["status"] != "ready":
-                logger.error(f"Environment setup failed: {env_result}")
-                return web.json_response(env_result, status=500)
+                logger.error(f"Environment not ready: {env_result}")
+                return web.json_response(
+                    {"status": "error", "error": "ML environment is not installed. Please install it from the Settings tab.", "env_status": env_result["status"]},
+                    status=503,
+                )
 
             # Start extraction process (non-blocking)
             result = start_extraction_process(
@@ -3397,7 +3427,9 @@ class DipperServer:
                 return web.Response(text="Missing path", status=400)
 
             normalized_path = os.path.normpath(os.path.abspath(file_path))
-            if not os.path.exists(normalized_path) or not os.path.isfile(normalized_path):
+            if not os.path.exists(normalized_path) or not os.path.isfile(
+                normalized_path
+            ):
                 return web.Response(text="File not found", status=404)
 
             filename = os.path.basename(normalized_path)
