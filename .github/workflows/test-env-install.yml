@@ -2,8 +2,6 @@ name: Test ML Environment Install
 
 on:
   workflow_dispatch:
-  # Run after a new conda env is published to HuggingFace
-  # or manually to verify a fix like the conda-unpack long-path issue
 
 jobs:
   test-env-install:
@@ -24,21 +22,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      # Python is needed only for downloading and extracting the archive.
+      # It must NOT be available when conda-unpack runs — that's the true
+      # use case (PyInstaller app has no system Python in PATH).
+      - name: Setup Python (download/extract only)
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install backend dependencies
-        run: |
-          pip install platformdirs huggingface_hub
+      - name: Install download dependencies
+        run: pip install platformdirs huggingface_hub
 
       - name: Download and extract ML environment
         shell: python
         env:
           HF_REPO: sammlapp/dipper-envs
         run: |
-          import sys, os, platform, subprocess, tarfile, re, tempfile
+          import os, platform, tarfile
           from pathlib import Path
           import platformdirs
           from huggingface_hub import hf_hub_download
@@ -53,6 +53,9 @@ jobs:
           extract_dir = Path(platformdirs.user_cache_dir("Dipper", "BioacousticsApp")) / "envs" / "dipper_ml_env"
           extract_dir.mkdir(parents=True, exist_ok=True)
 
+          # Write path to a file so later shell steps can read it without Python
+          Path("extract_dir.txt").write_text(str(extract_dir))
+
           print(f"Downloading {asset} from HuggingFace...")
           archive = hf_hub_download(
               repo_id=os.environ["HF_REPO"],
@@ -64,48 +67,94 @@ jobs:
           print(f"Extracting to {extract_dir}...")
           with tarfile.open(archive, "r:gz") as tar:
               tar.extractall(path=extract_dir)
-          print("Extraction complete")
+          print(f"Extraction complete: {extract_dir}")
 
-          # Run conda-unpack
-          conda_unpack = extract_dir / ("Scripts/conda-unpack.exe" if os.name == "nt" else "bin/conda-unpack")
-          if not conda_unpack.exists():
-              print(f"ERROR: conda-unpack not found at {conda_unpack}", file=sys.stderr)
-              sys.exit(1)
+      # Simulate the PyInstaller environment: remove all Python interpreters from
+      # PATH so that conda-unpack cannot rely on a system Python via its shebang.
+      # This is the true use case — the distributed app has no Python in PATH.
+      - name: Run conda-unpack WITHOUT system Python in PATH (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          EXTRACT_DIR=$(cat extract_dir.txt)
+          echo "Extract dir: $EXTRACT_DIR"
 
-          print("Running conda-unpack...")
-          result = subprocess.run([str(conda_unpack)], capture_output=True, text=True)
-          if result.returncode != 0:
-              print(f"ERROR: conda-unpack failed (exit {result.returncode}):\n{result.stderr}", file=sys.stderr)
-              sys.exit(1)
-          print("conda-unpack complete")
+          # Strip all Python-related directories from PATH
+          CLEAN_PATH=$(echo "$PATH" | tr ':' '\n' \
+            | grep -v -i python \
+            | grep -v -i conda \
+            | grep -v -i miniforge \
+            | grep -v -i miniconda \
+            | grep -v -i hostedtoolcache \
+            | tr '\n' ':' | sed 's/:$//')
+          echo "Cleaned PATH: $CLEAN_PATH"
 
-          # Verify Python binary works
-          python = extract_dir / ("python.exe" if os.name == "nt" else "bin/python")
-          if not python.exists():
-              print(f"ERROR: Python binary not found at {python}", file=sys.stderr)
-              sys.exit(1)
-          ver = subprocess.run([str(python), "--version"], capture_output=True, text=True)
-          if ver.returncode != 0:
-              print(f"ERROR: Python binary failed: {ver.stderr}", file=sys.stderr)
-              sys.exit(1)
-          print(f"Python OK: {ver.stdout.strip()}")
+          # Confirm python is gone
+          if PATH="$CLEAN_PATH" which python 2>/dev/null; then
+            echo "WARNING: python still found at $(PATH="$CLEAN_PATH" which python) — tightening PATH filter"
+          else
+            echo "Confirmed: no python in PATH"
+          fi
 
-          # Verify key ML imports work
-          imports = ["opensoundscape", "torch", "pandas", "numpy"]
-          failed = []
-          for pkg in imports:
-              r = subprocess.run(
-                  [str(python), "-c", f"import {pkg}; print('{pkg}', getattr({pkg}, '__version__', 'ok'))"],
-                  capture_output=True, text=True
-              )
-              if r.returncode == 0:
-                  print(f"  {r.stdout.strip()}")
-              else:
-                  print(f"  FAIL: {pkg} — {r.stderr.strip()}")
-                  failed.append(pkg)
+          # This is the exact invocation used by app.py
+          PATH="$CLEAN_PATH" /bin/sh -c ". \"$EXTRACT_DIR/bin/activate\" && conda-unpack"
+          echo "conda-unpack exit code: $?"
 
-          if failed:
-              print(f"ERROR: Failed imports: {failed}", file=sys.stderr)
-              sys.exit(1)
+      - name: Run conda-unpack WITHOUT system Python in PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          set /p EXTRACT_DIR=<extract_dir.txt
+          echo Extract dir: %EXTRACT_DIR%
 
-          print("\nAll checks passed!")
+          :: Build a PATH with no Python — keep only system32 and similar essentials
+          set CLEAN_PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0
+
+          echo Running conda-unpack with clean PATH...
+          set PATH=%CLEAN_PATH%
+          call "%EXTRACT_DIR%\Scripts\activate.bat" && conda-unpack
+          if errorlevel 1 (
+            echo ERROR: conda-unpack failed
+            exit /b 1
+          )
+          echo conda-unpack complete
+
+      - name: Verify ML environment works (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          EXTRACT_DIR=$(cat extract_dir.txt)
+          PYTHON="$EXTRACT_DIR/bin/python"
+
+          echo "Python version:"
+          "$PYTHON" --version
+
+          echo "Testing imports..."
+          for pkg in torch opensoundscape pandas numpy; do
+            if "$PYTHON" -c "import $pkg; print('OK: $pkg', getattr($pkg, '__version__', ''))"; then
+              :
+            else
+              echo "FAIL: $pkg"
+              exit 1
+            fi
+          done
+          echo "All imports OK"
+
+      - name: Verify ML environment works (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          set /p EXTRACT_DIR=<extract_dir.txt
+          set PYTHON=%EXTRACT_DIR%\python.exe
+
+          echo Python version:
+          "%PYTHON%" --version
+
+          for %%p in (torch opensoundscape pandas numpy) do (
+            "%PYTHON%" -c "import %%p; print('OK: %%p')"
+            if errorlevel 1 (
+              echo FAIL: %%p
+              exit /b 1
+            )
+          )
+          echo All imports OK
