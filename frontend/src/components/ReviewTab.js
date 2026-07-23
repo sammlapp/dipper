@@ -596,6 +596,10 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
 
   const totalPages = Math.ceil(paginationSource.length / itemsPerPage);
 
+  // focusClipIndex is an index into paginationSource (sorted order).
+  // Always derive the current clip from here so focus mode follows sort order.
+  const focusClip = paginationSource[focusClipIndex] ?? null;
+
   const getCurrentPageData = useCallback(() => {
     // Stratification mode: use bin data, resolved to live clip objects
     if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
@@ -859,10 +863,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
 
     // Trigger spectrogram reload
     if (isFocusMode) {
-      const currentClip = annotationData[focusClipIndex];
-      if (currentClip) {
+      if (focusClip) {
         setFocusClipData(null);
-        loadFocusClipSpectrogram(currentClip, focusViewOffset);
+        loadFocusClipSpectrogram(focusClip, focusViewOffset);
       }
     } else {
       setCurrentDataVersion(v => v + 1);
@@ -884,26 +887,21 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     }
   }, [currentPage, currentBinIndex]);
 
-  // Sync focus clip index with active clip when entering focus mode
+  // Sync focus clip index with active clip when entering focus mode.
+  // focusClipIndex is an index into paginationSource (sorted order).
   useEffect(() => {
     if (isFocusMode) {
       if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
-        // In CGL mode, get the active clip from the current bin
+        // CGL mode: active clip comes from the current bin
         const currentBin = stratifiedBins[currentBinIndex];
         if (currentBin && currentBin.clips[activeClipIndexOnPage]) {
           const activeClip = currentBin.clips[activeClipIndexOnPage];
-          const absoluteIndex = filteredAnnotationData.findIndex(clip => clip.id === activeClip.id);
-          if (absoluteIndex !== -1) {
-            setFocusClipIndex(absoluteIndex);
-          }
+          const idx = paginationSource.findIndex(clip => clip.id === activeClip.id);
+          if (idx !== -1) setFocusClipIndex(idx);
         }
       } else {
-        // Normal mode: Calculate absolute index from page and active clip index
-        const absoluteIndex = currentPage * itemsPerPage + activeClipIndexOnPage;
-        // Make sure it's within bounds of filtered data
-        if (absoluteIndex < filteredAnnotationData.length) {
-          setFocusClipIndex(absoluteIndex);
-        }
+        // Normal mode: active clip position in paginationSource is page * size + slot
+        setFocusClipIndex(currentPage * itemsPerPage + activeClipIndexOnPage);
       }
     }
   }, [isFocusMode]); // Only run when entering/exiting focus mode
@@ -911,7 +909,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
   // Sync currentBinIndex when navigating in focus mode (CGL only)
   useEffect(() => {
     if (isFocusMode && classifierGuidedMode.enabled && stratifiedBins.length > 0) {
-      const currentClip = filteredAnnotationData[focusClipIndex];
+      const currentClip = focusClip;
       if (currentClip) {
         // Find which bin contains the current focus clip
         const binIdx = stratifiedBins.findIndex(bin =>
@@ -929,7 +927,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     if (!isFocusMode && focusClipIndex >= 0) {
       if (classifierGuidedMode.enabled && stratifiedBins.length > 0) {
         // In CGL mode, find which bin and position the focus clip is at
-        const currentClip = filteredAnnotationData[focusClipIndex];
+        const currentClip = focusClip;
         if (currentClip) {
           const binIdx = stratifiedBins.findIndex(bin =>
             bin.clips.some(clip => clip.id === currentClip.id)
@@ -945,12 +943,10 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
           }
         }
       } else {
-        // Normal mode: Calculate page and active clip index from absolute focus index
+        // focusClipIndex is directly an index into paginationSource
         const newPage = Math.floor(focusClipIndex / itemsPerPage);
         const newActiveClipIndex = focusClipIndex % itemsPerPage;
-        if (newPage !== currentPage) {
-          setCurrentPage(newPage);
-        }
+        if (newPage !== currentPage) setCurrentPage(newPage);
         setActiveClipIndexOnPage(newActiveClipIndex);
         setSelectedClipIndices(new Set([newActiveClipIndex]));
       }
@@ -1709,37 +1705,35 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     setHasUnsavedChanges(true);
   }, [settings.annotation_column]);
 
-  // Focus mode navigation
+  // Focus mode navigation — steps through paginationSource order (respects sorting)
   const handleFocusNavigation = useCallback((direction) => {
     if (direction === 'next') {
-      setFocusClipIndex(prev => Math.min(annotationData.length - 1, prev + 1));
+      setFocusClipIndex(prev => Math.min(paginationSource.length - 1, prev + 1));
     } else if (direction === 'previous') {
       setFocusClipIndex(prev => Math.max(0, prev - 1));
     }
-  }, [annotationData.length]);
+  }, [paginationSource.length]);
 
   // Focus mode annotation change
   const handleFocusAnnotationChange = useCallback((newAnnotation, newAnnotationStatus) => {
-    const currentClip = filteredAnnotationData[focusClipIndex];
-    if (currentClip) {
-      handleAnnotationChange(currentClip.id, newAnnotation, newAnnotationStatus);
+    if (focusClip) {
+      handleAnnotationChange(focusClip.id, newAnnotation, newAnnotationStatus);
     }
-  }, [focusClipIndex, filteredAnnotationData, handleAnnotationChange]);
+  }, [focusClip, handleAnnotationChange]);
 
   // Focus mode comment change
   const handleFocusCommentChange = useCallback((newComment) => {
-    const currentClip = filteredAnnotationData[focusClipIndex];
-    if (currentClip) {
-      handleCommentChange(currentClip.id, newComment);
+    if (focusClip) {
+      handleCommentChange(focusClip.id, newComment);
     }
-  }, [focusClipIndex, filteredAnnotationData, handleCommentChange]);
+  }, [focusClip, handleCommentChange]);
 
   // Reset focus index when data changes
   useEffect(() => {
-    if (filteredAnnotationData.length > 0 && focusClipIndex >= filteredAnnotationData.length) {
+    if (paginationSource.length > 0 && focusClipIndex >= paginationSource.length) {
       setFocusClipIndex(0);
     }
-  }, [filteredAnnotationData.length, focusClipIndex]);
+  }, [paginationSource.length, focusClipIndex]);
 
   // Get available filter options
   const getFilterOptions = useMemo(() => {
@@ -2466,14 +2460,13 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
   // Load current focus clip spectrogram when in focus mode.
   // Uses focusClipData (separate from grid's loadedPageData) to avoid any cross-contamination.
   useEffect(() => {
-    if (isFocusMode && annotationData.length > 0) {
-      const currentClip = annotationData[focusClipIndex];
-      const alreadyLoaded = focusClipData?.clip_id === currentClip?.id && focusClipData?.clip_start_time != null;
-      if (currentClip && !alreadyLoaded) {
-        loadFocusClipSpectrogram(currentClip);
+    if (isFocusMode && focusClip) {
+      const alreadyLoaded = focusClipData?.clip_id === focusClip.id && focusClipData?.clip_start_time != null;
+      if (!alreadyLoaded) {
+        loadFocusClipSpectrogram(focusClip);
       }
     }
-  }, [isFocusMode, focusClipIndex, annotationData]);
+  }, [isFocusMode, focusClipIndex, paginationSource]);
 
   // Reset view offset when navigating to a different clip
   useEffect(() => {
@@ -2587,18 +2580,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
 
   // Page the context view forward or backward along the audio file
   const handleContextPage = useCallback((direction) => {
-    const currentClip = annotationData[focusClipIndex];
-    if (!currentClip) return;
+    if (!focusClip) return;
     // direction === null means recenter on the clip
     const newOffset = direction === null ? 0 : (() => {
       const contextSeconds = settings.focus_context_seconds ?? 4;
-      const clipDuration = (currentClip.end_time || currentClip.start_time + 3) - currentClip.start_time;
+      const clipDuration = (focusClip.end_time || focusClip.start_time + 3) - focusClip.start_time;
       const windowSize = clipDuration + 2 * contextSeconds;
       return focusViewOffset + direction * windowSize;
     })();
     setFocusViewOffset(newOffset);
-    loadFocusClipSpectrogram(currentClip, newOffset);
-  }, [annotationData, focusClipIndex, focusViewOffset, settings.focus_context_seconds, loadFocusClipSpectrogram]);
+    loadFocusClipSpectrogram(focusClip, newOffset);
+  }, [focusClip, focusViewOffset, settings.focus_context_seconds, loadFocusClipSpectrogram]);
 
   const handleSelectRootAudioPath = async () => {
     try {
@@ -3120,10 +3112,9 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                 onSettingsChange={handleSettingsChange}
                 onReRenderSpectrograms={() => {
                   if (isFocusMode) {
-                    const currentClip = annotationData[focusClipIndex];
-                    if (currentClip) {
+                    if (focusClip) {
                       setFocusClipData(null);
-                      loadFocusClipSpectrogram(currentClip, focusViewOffset);
+                      loadFocusClipSpectrogram(focusClip, focusViewOffset);
                     }
                   } else {
                     loadCurrentPageSpectrograms();
@@ -4178,12 +4169,12 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                 (() => {
                   // Determine which clip to show - use same logic as grid mode
                   const isOnNewClip = focusClipIndex !== lastRenderedFocusClipIndex;
-                  const currentClip = filteredAnnotationData[focusClipIndex];
+                  const currentClip = focusClip;
                   const hasLoadedNewClip = focusClipData?.clip_id === currentClip?.id && focusClipData?.clip_start_time != null;
 
                   // Show old clip if we've navigated but new clip hasn't loaded yet
                   const clipIndexToShow = (isOnNewClip && !hasLoadedNewClip) ? lastRenderedFocusClipIndex : focusClipIndex;
-                  const clipToShow = filteredAnnotationData[clipIndexToShow];
+                  const clipToShow = paginationSource[clipIndexToShow];
 
                   // Calculate which bin the current focus clip belongs to (for CGL mode)
                   let focusBinIndex = currentBinIndex;
