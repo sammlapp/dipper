@@ -444,6 +444,7 @@ def check_environment(env_path):
         return {"status": "error", "error": str(e)}
 
 
+
 def extract_environment(archive_path, extract_dir):
     """Extract conda-pack environment from tar.gz archive"""
     try:
@@ -459,40 +460,37 @@ def extract_environment(archive_path, extract_dir):
         with tarfile.open(archive_path, "r:gz") as tar:
             tar.extractall(path=extract_dir)
 
-        # Run conda-unpack to rewrite hardcoded build-prefix paths in binaries/libraries.
-        # conda-pack bakes the builder's prefix into RPATHs; conda-unpack fixes them to
-        # the actual extraction path so shared libraries resolve correctly.
-        conda_unpack = os.path.join(extract_dir, "bin", "conda-unpack")
+        # Run conda-unpack via the canonical invocation from the conda-pack docs:
+        # source bin/activate && conda-unpack
+        # bin/activate is a plain shell script that sets PATH to point at this env's
+        # bin/, so conda-unpack finds the env's own Python without needing any
+        # pre-installed Python on the user's machine.
+        logger.info("Running conda-unpack to fix library paths...")
         if os.name == "nt":
-            conda_unpack = os.path.join(extract_dir, "Scripts", "conda-unpack.exe")
-        if os.path.exists(conda_unpack):
-            # tensorflow/include ships C++ development headers that are listed in
-            # conda-pack's file manifest but don't exist in the installed package.
-            # conda-unpack trips over them with FileNotFoundError. Remove the directory
-            # before unpacking — it contains only headers, not runtime code.
-            import shutil as _shutil
-            for _tf_include in [
-                os.path.join(extract_dir, "Lib", "site-packages", "tensorflow", "include"),
-                os.path.join(extract_dir, "lib", "python3.12", "site-packages", "tensorflow", "include"),
-                os.path.join(extract_dir, "lib", "python3.11", "site-packages", "tensorflow", "include"),
-            ]:
-                if os.path.isdir(_tf_include):
-                    logger.info(f"Removing tensorflow/include (headers not needed at runtime): {_tf_include}")
-                    _shutil.rmtree(_tf_include, ignore_errors=True)
-
-            logger.info("Running conda-unpack to fix library paths...")
+            # Windows: python.exe is a native executable with no RPATH dependencies,
+            # so it runs correctly before conda-unpack has fixed the env's paths.
+            # Run conda_unpack as a module directly — no shebang, no PATH tricks.
+            python_exe = os.path.join(extract_dir, "python.exe")
             result = subprocess.run(
-                [conda_unpack], capture_output=True, text=True
+                [python_exe, "-m", "conda_unpack"],
+                capture_output=True, text=True,
             )
-            if result.returncode != 0:
-                error_msg = f"conda-unpack exited with code {result.returncode}: {result.stderr}"
-                logger.error(error_msg)
-                return {"status": "error", "error": error_msg}
-            logger.info("conda-unpack complete")
         else:
-            error_msg = f"conda-unpack not found at {conda_unpack}"
+            # macOS/Linux: bin/python is a Mach-O/ELF binary whose shared library
+            # RPATHs still point to the build machine prefix before unpack — it won't
+            # load. Use /bin/sh (always present) to source bin/activate, which prepends
+            # the env's bin/ to PATH so `conda-unpack` resolves to bin/conda-unpack
+            # and `#!/usr/bin/env python` finds the env's own python.
+            activate = os.path.join(extract_dir, "bin", "activate")
+            result = subprocess.run(
+                ["/bin/sh", "-c", f'. "{activate}" && conda-unpack'],
+                capture_output=True, text=True,
+            )
+        if result.returncode != 0:
+            error_msg = f"conda-unpack exited with code {result.returncode}: {result.stderr}"
             logger.error(error_msg)
             return {"status": "error", "error": error_msg}
+        logger.info("conda-unpack complete")
         
         # Mark extraction complete only after tar + conda-unpack both succeed.
         _write_extraction_status(extract_dir, "complete")

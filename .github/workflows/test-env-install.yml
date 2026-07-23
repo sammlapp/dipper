@@ -69,36 +69,17 @@ jobs:
               tar.extractall(path=extract_dir)
           print(f"Extraction complete: {extract_dir}")
 
-      # Simulate the PyInstaller environment: remove all Python interpreters from
-      # PATH so that conda-unpack cannot rely on a system Python via its shebang.
-      # This is the true use case — the distributed app has no Python in PATH.
-      - name: Run conda-unpack WITHOUT system Python in PATH (Unix)
+      # Run the exact same command as app.py uses.
+      # bin/activate prepends the env's bin/ to PATH first, so conda-unpack's
+      # shebang (#!/usr/bin/env python) resolves to the env's own python —
+      # not whatever system python may be present.
+      - name: Run conda-unpack (Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           EXTRACT_DIR=$(cat extract_dir.txt)
           echo "Extract dir: $EXTRACT_DIR"
-
-          # Strip all Python-related directories from PATH
-          CLEAN_PATH=$(echo "$PATH" | tr ':' '\n' \
-            | grep -v -i python \
-            | grep -v -i conda \
-            | grep -v -i miniforge \
-            | grep -v -i miniconda \
-            | grep -v -i hostedtoolcache \
-            | tr '\n' ':' | sed 's/:$//')
-          echo "Cleaned PATH: $CLEAN_PATH"
-
-          # Confirm python is gone
-          if PATH="$CLEAN_PATH" which python 2>/dev/null; then
-            echo "WARNING: python still found at $(PATH="$CLEAN_PATH" which python) — tightening PATH filter"
-          else
-            echo "Confirmed: no python in PATH"
-          fi
-
-          # This is the exact invocation used by app.py
-          PATH="$CLEAN_PATH" /bin/sh -c ". \"$EXTRACT_DIR/bin/activate\" && conda-unpack"
-          echo "conda-unpack exit code: $?"
+          /bin/sh -c ". \"$EXTRACT_DIR/bin/activate\" && conda-unpack"
 
       - name: Run conda-unpack WITHOUT system Python in PATH (Windows)
         if: runner.os == 'Windows'
@@ -107,12 +88,13 @@ jobs:
           set /p EXTRACT_DIR=<extract_dir.txt
           echo Extract dir: %EXTRACT_DIR%
 
-          :: Build a PATH with no Python — keep only system32 and similar essentials
-          set CLEAN_PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0
+          :: Strip Python from PATH to simulate PyInstaller environment
+          set PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0
+          where python >nul 2>&1 && (echo WARNING: python still in PATH) || echo Confirmed: no python in PATH
 
-          echo Running conda-unpack with clean PATH...
-          set PATH=%CLEAN_PATH%
-          call "%EXTRACT_DIR%\Scripts\activate.bat" && conda-unpack
+          :: Use env's python.exe directly — it's a native exe with no RPATH deps,
+          :: runs correctly before conda-unpack has fixed the env's paths.
+          "%EXTRACT_DIR%\python.exe" -m conda_unpack
           if errorlevel 1 (
             echo ERROR: conda-unpack failed
             exit /b 1

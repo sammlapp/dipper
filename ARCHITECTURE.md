@@ -213,11 +213,11 @@ The `/clip` endpoint supports arbitrary `start_time`/`end_time` ranges. Focus mo
 
 **Purpose:** ML model training and inference (PyTorch, OpenSoundscape)
 **Build:** conda-pack creates portable conda environment
-**Download:** Auto-downloaded from Google Drive on first use
+**Download/Install:** Via Settings panel, downloads .tar.gz from HF, runs conda-unpack to set up
 **Location:** System cache directory via `appdirs.user_cache_dir("Dipper")`
 - macOS: `~/Library/Caches/Dipper/envs/dipper_ml_env`
 - Linux: `~/.cache/Dipper/envs/dipper_ml_env`
-- Windows: `C:\Users\<user>\AppData\Local\BioacousticsApp\Dipper\Cache\envs\dipper_ml_env`
+- Windows: `C:\Users\<user>\AppData\Local\Dipper\Dipper\Cache\envs\dipper_ml_env`
 
 **Size:** ~700MB compressed, ~2GB extracted
 
