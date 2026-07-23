@@ -447,15 +447,30 @@ def extract_environment(archive_path, extract_dir):
         if os.name == "nt":
             conda_unpack = os.path.join(extract_dir, "Scripts", "conda-unpack.exe")
         if os.path.exists(conda_unpack):
+            # tensorflow/include ships C++ development headers that are listed in
+            # conda-pack's file manifest but don't exist in the installed package.
+            # conda-unpack trips over them with FileNotFoundError. Remove the directory
+            # before unpacking — it contains only headers, not runtime code.
+            import shutil as _shutil
+            for _tf_include in [
+                os.path.join(extract_dir, "Lib", "site-packages", "tensorflow", "include"),
+                os.path.join(extract_dir, "lib", "python3.12", "site-packages", "tensorflow", "include"),
+                os.path.join(extract_dir, "lib", "python3.11", "site-packages", "tensorflow", "include"),
+            ]:
+                if os.path.isdir(_tf_include):
+                    logger.info(f"Removing tensorflow/include (headers not needed at runtime): {_tf_include}")
+                    _shutil.rmtree(_tf_include, ignore_errors=True)
+
             logger.info("Running conda-unpack to fix library paths...")
-            result = subprocess.run([conda_unpack], capture_output=True, text=True)
+            result = subprocess.run(
+                [conda_unpack], capture_output=True, text=True
+            )
             if result.returncode != 0:
                 error_msg = f"conda-unpack exited with code {result.returncode}: {result.stderr}"
                 logger.error(error_msg)
                 return {"status": "error", "error": error_msg}
-            else:
-                logger.info("conda-unpack complete")
-        else: 
+            logger.info("conda-unpack complete")
+        else:
             error_msg = f"conda-unpack not found at {conda_unpack}"
             logger.error(error_msg)
             return {"status": "error", "error": error_msg}
@@ -3475,7 +3490,23 @@ class DipperServer:
 
     async def start_server(self):
         """Start the HTTP server"""
-        runner = web.AppRunner(self.app)
+        # Suppress access log noise from high-frequency polling endpoints
+        _SILENT_PATHS = {"/env/install/status", "/memory", "/health"}
+
+        class _QuietAccessLogger(logging.Logger):
+            def info(self, msg, *args, **kwargs):
+                # aiohttp formats the access log line as the message string
+                line = msg % args if args else str(msg)
+                if any(p in line for p in _SILENT_PATHS):
+                    return
+                super().info(msg, *args, **kwargs)
+
+        access_logger = _QuietAccessLogger("aiohttp.access")
+        access_logger.setLevel(logging.INFO)
+        for h in logging.getLogger().handlers:
+            access_logger.addHandler(h)
+
+        runner = web.AppRunner(self.app, access_log=access_logger)
         await runner.setup()
 
         site = web.TCPSite(runner, self.host, self.port)

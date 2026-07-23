@@ -1,0 +1,111 @@
+name: Test ML Environment Install
+
+on:
+  workflow_dispatch:
+  # Run after a new conda env is published to HuggingFace
+  # or manually to verify a fix like the conda-unpack long-path issue
+
+jobs:
+  test-env-install:
+    name: Test env install - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macos-arm64
+          - os: windows-latest
+            platform: windows-x64
+          - os: ubuntu-latest
+            platform: linux-x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          pip install platformdirs huggingface_hub
+
+      - name: Download and extract ML environment
+        shell: python
+        env:
+          HF_REPO: sammlapp/dipper-envs
+        run: |
+          import sys, os, platform, subprocess, tarfile, re, tempfile
+          from pathlib import Path
+          import platformdirs
+          from huggingface_hub import hf_hub_download
+
+          system = platform.system()
+          asset = {
+              "Darwin":  "dipper_ml_env-macos-arm64.tar.gz",
+              "Windows": "dipper_ml_env-windows-x64.tar.gz",
+              "Linux":   "dipper_ml_env-linux-x64.tar.gz",
+          }[system]
+
+          extract_dir = Path(platformdirs.user_cache_dir("Dipper", "BioacousticsApp")) / "envs" / "dipper_ml_env"
+          extract_dir.mkdir(parents=True, exist_ok=True)
+
+          print(f"Downloading {asset} from HuggingFace...")
+          archive = hf_hub_download(
+              repo_id=os.environ["HF_REPO"],
+              filename=asset,
+              repo_type="dataset",
+          )
+          print(f"Downloaded to {archive}")
+
+          print(f"Extracting to {extract_dir}...")
+          with tarfile.open(archive, "r:gz") as tar:
+              tar.extractall(path=extract_dir)
+          print("Extraction complete")
+
+          # Run conda-unpack
+          conda_unpack = extract_dir / ("Scripts/conda-unpack.exe" if os.name == "nt" else "bin/conda-unpack")
+          if not conda_unpack.exists():
+              print(f"ERROR: conda-unpack not found at {conda_unpack}", file=sys.stderr)
+              sys.exit(1)
+
+          print("Running conda-unpack...")
+          result = subprocess.run([str(conda_unpack)], capture_output=True, text=True)
+          if result.returncode != 0:
+              print(f"ERROR: conda-unpack failed (exit {result.returncode}):\n{result.stderr}", file=sys.stderr)
+              sys.exit(1)
+          print("conda-unpack complete")
+
+          # Verify Python binary works
+          python = extract_dir / ("python.exe" if os.name == "nt" else "bin/python")
+          if not python.exists():
+              print(f"ERROR: Python binary not found at {python}", file=sys.stderr)
+              sys.exit(1)
+          ver = subprocess.run([str(python), "--version"], capture_output=True, text=True)
+          if ver.returncode != 0:
+              print(f"ERROR: Python binary failed: {ver.stderr}", file=sys.stderr)
+              sys.exit(1)
+          print(f"Python OK: {ver.stdout.strip()}")
+
+          # Verify key ML imports work
+          imports = ["opensoundscape", "torch", "pandas", "numpy"]
+          failed = []
+          for pkg in imports:
+              r = subprocess.run(
+                  [str(python), "-c", f"import {pkg}; print('{pkg}', getattr({pkg}, '__version__', 'ok'))"],
+                  capture_output=True, text=True
+              )
+              if r.returncode == 0:
+                  print(f"  {r.stdout.strip()}")
+              else:
+                  print(f"  FAIL: {pkg} — {r.stderr.strip()}")
+                  failed.append(pkg)
+
+          if failed:
+              print(f"ERROR: Failed imports: {failed}", file=sys.stderr)
+              sys.exit(1)
+
+          print("\nAll checks passed!")

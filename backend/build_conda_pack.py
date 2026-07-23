@@ -102,6 +102,31 @@ def install_conda_pack():
             sys.exit(1)
 
 
+def prune_environment():
+    """Remove files that cause conda-unpack to fail but aren't needed at runtime."""
+    import glob
+
+    # tensorflow/include ships C++ development headers. They're listed in conda-pack's
+    # file manifest but don't exist in the installed package, so conda-unpack trips over
+    # them with FileNotFoundError. Remove before packing so they're never in the archive.
+    result = subprocess.run(
+        f"conda run -n {ENV_NAME} python -c \"import site; print(site.getsitepackages()[0])\"",
+        shell=True, capture_output=True, text=True
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        print("[WARNING] Could not determine site-packages path, skipping prune")
+        return
+
+    site_packages = Path(result.stdout.strip())
+    tf_include = site_packages / "tensorflow" / "include"
+    if tf_include.is_dir():
+        n = sum(1 for _ in tf_include.rglob('*'))
+        shutil.rmtree(tf_include)
+        print(f"[OK] Removed {tf_include} ({n} files pruned)")
+    else:
+        print("[INFO] tensorflow/include not found, nothing to prune")
+
+
 def pack_environment():
     """Pack the conda environment"""
     print("[INFO] Packing environment with conda-pack...")
@@ -294,6 +319,9 @@ def main():
 
         # Create conda environment
         create_conda_environment()
+
+        # Remove files that break conda-unpack on end-user machines
+        prune_environment()
 
         # Pack environment
         output_file = pack_environment()
