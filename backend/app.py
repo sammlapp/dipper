@@ -467,23 +467,24 @@ def extract_environment(archive_path, extract_dir):
         # pre-installed Python on the user's machine.
         logger.info("Running conda-unpack to fix library paths...")
         if os.name == "nt":
-            # Windows: python.exe is a native executable with no RPATH dependencies,
-            # so it runs correctly before conda-unpack has fixed the env's paths.
-            # Run conda_unpack as a module directly — no shebang, no PATH tricks.
-            python_exe = os.path.join(extract_dir, "python.exe")
+            # Windows: Scripts\conda-unpack.exe is a native executable with no RPATH
+            # dependencies, so it runs correctly before conda-unpack has fixed the
+            # env's paths. No Python or PATH tricks needed.
+            conda_unpack_exe = os.path.join(extract_dir, "Scripts", "conda-unpack.exe")
             result = subprocess.run(
-                [python_exe, "-m", "conda_unpack"],
+                [conda_unpack_exe],
                 capture_output=True, text=True,
             )
         else:
             # macOS/Linux: bin/python is a Mach-O/ELF binary whose shared library
             # RPATHs still point to the build machine prefix before unpack — it won't
-            # load. Use /bin/sh (always present) to source bin/activate, which prepends
-            # the env's bin/ to PATH so `conda-unpack` resolves to bin/conda-unpack
-            # and `#!/usr/bin/env python` finds the env's own python.
+            # load. Source bin/activate under bash (bin/activate detects the shell via
+            # $BASH_VERSION; /bin/sh won't work). bin/activate prepends the env's bin/
+            # to PATH so `conda-unpack` resolves to bin/conda-unpack and
+            # `#!/usr/bin/env python` finds the env's own python.
             activate = os.path.join(extract_dir, "bin", "activate")
             result = subprocess.run(
-                ["/bin/sh", "-c", f'. "{activate}" && conda-unpack'],
+                ["bash", "-c", f'. "{activate}" && conda-unpack'],
                 capture_output=True, text=True,
             )
         if result.returncode != 0:

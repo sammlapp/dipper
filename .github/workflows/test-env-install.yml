@@ -69,17 +69,17 @@ jobs:
               tar.extractall(path=extract_dir)
           print(f"Extraction complete: {extract_dir}")
 
-      # Run the exact same command as app.py uses.
-      # bin/activate prepends the env's bin/ to PATH first, so conda-unpack's
-      # shebang (#!/usr/bin/env python) resolves to the env's own python —
-      # not whatever system python may be present.
+      # bin/activate detects the shell via $BASH_VERSION/$ZSH_VERSION etc.
+      # Must source it under bash (not /bin/sh) so the variable is set.
+      # bin/activate then prepends the env's bin/ to PATH, so conda-unpack's
+      # shebang (#!/usr/bin/env python) resolves to the env's own python.
       - name: Run conda-unpack (Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           EXTRACT_DIR=$(cat extract_dir.txt)
           echo "Extract dir: $EXTRACT_DIR"
-          /bin/sh -c ". \"$EXTRACT_DIR/bin/activate\" && conda-unpack"
+          bash -c ". \"$EXTRACT_DIR/bin/activate\" && conda-unpack"
 
       - name: Run conda-unpack WITHOUT system Python in PATH (Windows)
         if: runner.os == 'Windows'
@@ -92,9 +92,9 @@ jobs:
           set PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0
           where python >nul 2>&1 && (echo WARNING: python still in PATH) || echo Confirmed: no python in PATH
 
-          :: Use env's python.exe directly — it's a native exe with no RPATH deps,
+          :: Use env's conda-unpack.exe directly — it's a native exe with no RPATH deps,
           :: runs correctly before conda-unpack has fixed the env's paths.
-          "%EXTRACT_DIR%\python.exe" -m conda_unpack
+          "%EXTRACT_DIR%\Scripts\conda-unpack.exe"
           if errorlevel 1 (
             echo ERROR: conda-unpack failed
             exit /b 1
