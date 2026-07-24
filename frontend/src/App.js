@@ -12,6 +12,7 @@ import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
+import Badge from '@mui/material/Badge';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SchoolIcon from '@mui/icons-material/School';
 import RuleIcon from '@mui/icons-material/Rule';
@@ -109,6 +110,15 @@ function App() {
   const [currentTask, setCurrentTask] = useState(null);
   const [runningTasks, setRunningTasks] = useState([]);
   const [taskHistory, setTaskHistory] = useState([]);
+
+  const taskQueueDotColor = (() => {
+    if (runningTasks.length > 0) return '#2196f3';
+    const latest = taskHistory[taskHistory.length - 1];
+    if (!latest) return null;
+    if (latest.status === 'failed') return '#f44336';
+    if (latest.status === 'completed') return '#4caf50';
+    return null;
+  })();
   const [extractionPredictionsFolder, setExtractionPredictionsFolder] = useState(null); // {folder, ts}
   const backendUrl = useBackendUrl();
 
@@ -289,7 +299,11 @@ function App() {
                       },
                   ]}
                 >
-                  {tab.icon}
+                  {tab.id === 'tasks' && taskQueueDotColor ? (
+                    <Badge variant="dot" sx={{ '& .MuiBadge-dot': { backgroundColor: taskQueueDotColor, width: 8, height: 8, borderRadius: '50%' } }}>
+                      {tab.icon}
+                    </Badge>
+                  ) : tab.icon}
                 </ListItemIcon>
                 <ListItemText
                   primary={tab.name}
