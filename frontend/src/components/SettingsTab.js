@@ -29,8 +29,8 @@ function SettingsTab({ onEnvReady }) {
   const backendUrl = useBackendUrl();
 
   // ML environment state
-  // envStatus: 'unknown' | 'ready' | 'missing' | 'broken' | 'extracting' | 'downloading' | 'error'
-  const [envStatus, setEnvStatus] = useState('unknown');
+  // envStatus: 'checking' | 'ready' | 'missing' | 'broken' | 'extracting' | 'downloading' | 'error'
+  const [envStatus, setEnvStatus] = useState('checking');
   const [envMessage, setEnvMessage] = useState('');
   const envPollRef = React.useRef(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -44,7 +44,7 @@ function SettingsTab({ onEnvReady }) {
         setEnvMessage(result.version ? `Python ${result.version}` : result.error || '');
         if (onEnvReady) onEnvReady(result.status === 'ready');
       })
-      .catch(() => setEnvStatus('unknown'));
+      .catch(() => setEnvStatus('missing'));
   };
 
   useEffect(() => {
@@ -80,10 +80,10 @@ function SettingsTab({ onEnvReady }) {
       .catch(() => { });
   };
 
-  const envStatusColor = { ready: 'success', missing: 'warning', broken: 'error', error: 'error', unknown: 'info' }[envStatus] || 'info';
+  const envStatusColor = { ready: 'success', missing: 'warning', broken: 'error', error: 'error', checking: 'info' }[envStatus] || 'info';
   const envStatusLabel = {
     ready: 'Installed', missing: 'Not installed', broken: 'Broken',
-    downloading: 'Downloading...', extracting: 'Installing...', error: 'Error', unknown: 'Checking...',
+    downloading: 'Downloading...', extracting: 'Installing...', error: 'Error', checking: 'Checking...',
   }[envStatus] || envStatus;
 
   // Load settings from localStorage on mount
