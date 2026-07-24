@@ -691,7 +691,7 @@ const AnnotationCard = memo(function AnnotationCard({
         audioRootPath={audioRootPath}
         audioBase64={audio_base64}
         spectrogramBase64={spectrogram_base64}
-        clipLabel={`${file ? file.replace(/.*[\\/]/, '').replace(/\.[^.]+$/, '') : 'clip'}_${start_time}-${end_time}`}
+        clipLabel={`${file ? basename(file).replace(/\.[^.]+$/, '') : 'clip'}_${start_time}-${end_time}`}
         isDesktop={isDesktop}
       />
     )}

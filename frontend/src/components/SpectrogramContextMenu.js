@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { getBackendUrl } from '../utils/backendConfig';
+import { isAbsolute, join, basename } from 'pathe';
 
 /**
  * Right-click context menu for spectrogram / audio widgets.
@@ -19,9 +20,8 @@ function SpectrogramContextMenu({ x, y, onClose, filePath, audioRootPath, audioB
   // Resolve absolute path: prepend root only if path is relative
   const absolutePath = (() => {
     if (!filePath) return '';
-    const isAbsolute = filePath.startsWith('/') || /^[A-Za-z]:[/\\]/.test(filePath);
-    if (!isAbsolute && audioRootPath) {
-      return `${audioRootPath}/${filePath}`;
+    if (!isAbsolute(filePath) && audioRootPath) {
+      return join(audioRootPath, filePath);
     }
     return filePath;
   })();
@@ -108,7 +108,7 @@ function SpectrogramContextMenu({ x, y, onClose, filePath, audioRootPath, audioB
     onClose();
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const filename = absolutePath.split('/').pop().split('\\').pop();
+      const filename = basename(absolutePath);
       const destPath = await invoke('save_file_any', { defaultName: filename });
       await invoke('copy_file', { src: absolutePath, dest: destPath });
     } catch (err) {

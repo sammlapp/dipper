@@ -158,6 +158,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Set product name
+        working-directory: frontend
+        run: node ../scripts/set-product-name.js full
+
       - name: Build React app (full)
         working-directory: frontend
         run: npm run build
@@ -168,7 +172,9 @@ jobs:
 
       - name: Build Tauri app
         working-directory: frontend
-        run: npm run tauri:build:all -- --verbose
+        # Use tauri build directly (not tauri:build:all) — PyInstaller was already
+        # built in the build-pyinstaller job and placed in src-tauri/bin/.
+        run: npx tauri build --verbose
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}

@@ -23,7 +23,7 @@ import { selectCSVFiles, selectFolder, selectJSONFiles, saveFile, writeFile, rea
 import { isLocalMode } from '../utils/mode';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useBackendUrl } from '../hooks/useBackendUrl';
-import { dirname, basename } from 'pathe';
+import { dirname, basename, isAbsolute, join } from 'pathe';
 
 // Tauri throws string errors; Error objects have .message. Normalize to a readable string.
 function getErrorMessage(err) {
@@ -654,11 +654,10 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
         const currentRootAudioPath = rootAudioPath || '';
 
         const clipsToLoad = currentData.map(clip => {
-          // Construct full file path using root audio path if available
+          // Construct full file path using root audio path if the path is relative
           let fullFilePath = clip.file;
-          if (currentRootAudioPath && !clip.file.startsWith('/') && !clip.file.match(/^[A-Za-z]:\\\\/)) {
-            // File is relative, prepend root audio path
-            fullFilePath = `${currentRootAudioPath}/${clip.file}`;
+          if (currentRootAudioPath && !isAbsolute(clip.file)) {
+            fullFilePath = join(currentRootAudioPath, clip.file);
           }
 
           return {
@@ -2503,8 +2502,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     try {
       const currentRootAudioPath = rootAudioPath || '';
       let fullFilePath = clip.file;
-      if (currentRootAudioPath && !clip.file.startsWith('/') && !clip.file.match(/^[A-Za-z]:\\\\/)) {
-        fullFilePath = `${currentRootAudioPath}/${clip.file}`;
+      if (currentRootAudioPath && !isAbsolute(clip.file)) {
+        fullFilePath = join(currentRootAudioPath, clip.file);
       }
 
       const contextSeconds = settings.focus_context_seconds ?? 4;

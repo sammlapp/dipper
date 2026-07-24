@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { basename, join } from 'pathe';
 import {
   Box, Tabs, Tab, Chip, CircularProgress, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions, Button,
@@ -148,7 +149,7 @@ function SongSpaceTab() {
 
   const dbPath = mode === 'open'
     ? openPath.trim()
-    : (createParent.trim() && createName.trim() ? `${createParent.trim().replace(/\/$/, '')}/${createName.trim()}` : '');
+    : (createParent.trim() && createName.trim() ? join(createParent.trim(), createName.trim()) : '');
 
   const handleOpen = async () => {
     if (!dbPath) return;
@@ -611,7 +612,7 @@ function SimilaritySearchPanel({ info }) {
               {results.map((r, i) => (
                 <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
                   <td style={{ padding: '2px 10px', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <Tooltip title={r.file}><span>{r.file.split('/').pop()}</span></Tooltip>
+                    <Tooltip title={r.file}><span>{basename(r.file)}</span></Tooltip>
                   </td>
                   <td style={{ padding: '2px 10px' }}>{r.start_time?.toFixed(2)}</td>
                   <td style={{ padding: '2px 10px' }}>{r.end_time?.toFixed(2)}</td>
