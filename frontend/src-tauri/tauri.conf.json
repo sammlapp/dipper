@@ -51,7 +51,9 @@
       {
         "label": "main",
         "fullscreen": false,
-        "height": 900,
+        "maximized": true,
+        "minHeight": 600,
+        "minWidth": 900,
         "resizable": true,
         "title": "Dipper",
         "width": 1400,
