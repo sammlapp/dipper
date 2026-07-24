@@ -2151,10 +2151,12 @@ class DipperServer:
         """Stream the backend log file as a download (GET /debug/log)."""
         if not os.path.exists(LOG_FILE_PATH):
             return web.Response(text="Log file not found", status=404)
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return web.FileResponse(
             LOG_FILE_PATH,
             headers={
-                "Content-Disposition": 'attachment; filename="dipper-backend.log"'
+                "Content-Disposition": f'attachment; filename="dipper-backend_{timestamp}.log"'
             },
         )
 

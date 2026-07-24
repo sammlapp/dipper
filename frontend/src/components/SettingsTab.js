@@ -315,9 +315,11 @@ function SettingsTab({ onEnvReady }) {
           <Button
             variant="outlined"
             startIcon={<DownloadIcon />}
-            component="a"
-            href="http://localhost:8000/debug/log"
-            download="dipper-backend.log"
+            onClick={() => {
+              const a = document.createElement('a');
+              a.href = `${backendUrl}/debug/log`;
+              a.click();
+            }}
           >
             Download Debug Log
           </Button>
