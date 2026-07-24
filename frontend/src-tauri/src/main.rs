@@ -150,8 +150,11 @@ async fn save_file(app: tauri::AppHandle, default_name: String) -> Result<String
         .file()
         .set_file_name(&default_name);
 
+    let is_txt = default_name.to_lowercase().contains(".txt");
     if is_json {
         dialog = dialog.add_filter("JSON Files", &["json"]);
+    } else if is_txt {
+        dialog = dialog.add_filter("Text Files", &["txt"]);
     } else {
         dialog = dialog.add_filter("CSV Files", &["csv"]);
     }
