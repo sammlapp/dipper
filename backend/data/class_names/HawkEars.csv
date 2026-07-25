@@ -1,0 +1,354 @@
+common_name,scientific_name,ebird_code,alpha
+American Bullfrog,,,
+American Toad,,,
+Boreal Chorus Frog,,,
+Canine,,,
+Canadian Toad,,,
+Gray Treefrog,,,
+Great Plains Toad,,,
+Green Frog,,,
+Northern Leopard Frog,,,
+Mashup,,,
+Noise,,,
+Other,,,
+Pickerel Frog,,,
+Plains Spadefoot Toad,,,
+Rooster,,,
+Spring Peeper,,,
+Squirrel,,,
+Western Toad,,,
+Wood Frog,,,
+Acadian Flycatcher,Empidonax virescens,acafly,ACFL
+Alder Flycatcher,Empidonax alnorum,aldfly,ALFL
+American Avocet,Recurvirostra americana,ameavo,AMAV
+American Bittern,Botaurus lentiginosus,amebit,AMBI
+American Coot,Fulica americana,y00475,AMCO
+American Crow,Corvus brachyrhynchos,amecro,AMCR
+American Dipper,Cinclus mexicanus,amedip,AMDI
+American Golden-Plover,Pluvialis dominica,amgplo,AMGP
+American Goldfinch,Spinus tristis,amegfi,AGOL
+American Kestrel,Falco sparverius,amekes,AMKE
+American Pipit,Anthus rubescens,amepip,AMPI
+American Redstart,Setophaga ruticilla,amered,AMRE
+American Robin,Turdus migratorius,amerob,AMRO
+American Three-toed Woodpecker,Picoides dorsalis,attwoo1,ATTW
+American Tree Sparrow,Spizelloides arborea,amtspa,ATSP
+American Wigeon,Mareca americana,amewig,AMWI
+American Woodcock,Scolopax minor,amewoo,AMWO
+Anna's Hummingbird,Calypte anna,annhum,ANHU
+Arctic Tern,Sterna paradisaea,arcter,ARTE
+Baird's Sparrow,Centronyx bairdii,baispa,BAIS
+Baird's Sandpiper,Calidris bairdii,baisan,BASA
+Bald Eagle,Haliaeetus leucocephalus,baleag,BAEA
+Baltimore Oriole,Icterus galbula,balori,BAOR
+Band-tailed Pigeon,Patagioenas fasciata,batpig1,BTPI
+Bank Swallow,,,
+Barn Owl,,,
+Barn Swallow,Hirundo rustica,barswa,BARS
+Barred Owl,Strix varia,brdowl,BAOW
+Bay-breasted Warbler,Setophaga castanea,babwar,BBWA
+Bell's Vireo,Vireo bellii,belvir,BEVI
+Belted Kingfisher,Megaceryle alcyon,belkin1,BEKI
+Bewick's Wren,Thryomanes bewickii,bewwre,BEWR
+Black Oystercatcher,Haematopus bachmani,blkoys,BLOY
+Black Rail,Laterallus jamaicensis,blkrai,BLRA
+Black Tern,Chlidonias niger,blkter,BLTE
+Black Turnstone,Arenaria melanocephala,blktur,BLTU
+Black-and-white Warbler,Mniotilta varia,bawwar,BAWW
+Black-backed Woodpecker,Picoides arcticus,bkbwoo,BBWO
+Black-bellied Plover,,,
+Black-billed Cuckoo,Coccyzus erythropthalmus,bkbcuc,BBCU
+Black-billed Magpie,Pica hudsonia,bkbmag1,BBMA
+Black-capped Chickadee,Poecile atricapillus,bkcchi,BCCH
+Black-crowned Night Heron,Nycticorax nycticorax,bcnher,BCNH
+Black-headed Grosbeak,Pheucticus melanocephalus,bkhgro,BHGR
+Black-throated Blue Warbler,Setophaga caerulescens,btbwar,BTBW
+Black-throated Gray Warbler,,,
+Black-throated Green Warbler,Setophaga virens,btnwar,BTNW
+Blackburnian Warbler,Setophaga fusca,bkbwar,BLBW
+Blackpoll Warbler,Setophaga striata,bkpwar,BLPW
+Blue Jay,Cyanocitta cristata,blujay,BLJA
+Blue-gray Gnatcatcher,,,
+Blue-headed Vireo,Vireo solitarius,buhvir,BHVI
+Blue-winged Teal,Spatula discors,buwtea,BWTE
+Blue-winged Warbler,Vermivora cyanoptera,buwwar,BWWA
+Bobolink,Dolichonyx oryzivorus,boboli,BOBO
+Bohemian Waxwing,Bombycilla garrulus,bohwax,BOWA
+Bonaparte's Gull,Chroicocephalus philadelphia,bongul,BOGU
+Boreal Chickadee,Poecile hudsonicus,borchi2,BOCH
+Boreal Owl,Aegolius funereus,borowl,BOOW
+Brant,,,
+Brewer's Blackbird,Euphagus cyanocephalus,brebla,BRBL
+Brewer's Sparrow,Spizella breweri,brespa,BRSP
+Broad-winged Hawk,Buteo platypterus,brwhaw,BWHA
+Brown Creeper,Certhia americana,brncre,BRCR
+Brown Thrasher,Toxostoma rufum,brnthr,BRTH
+Brown-headed Cowbird,Molothrus ater,bnhcow,BHCO
+Bufflehead,Bucephala albeola,buffle,BUFF
+Bullock's Oriole,Icterus bullockiorum,,
+Bushtit,,,
+California Gull,Larus californicus,calgul,CAGU
+California Quail,Callipepla californica,calqua,CAQU
+Canada Goose,Branta canadensis,cangoo,CANG
+Canada Jay,Perisoreus canadensis,gryjay,CAJA
+Canada Warbler,Cardellina canadensis,canwar,CAWA
+Cape May Warbler,Setophaga tigrina,camwar,CMWA
+Carolina Wren,Thryothorus ludovicianus,carwre,CARW
+Caspian Tern,Hydroprogne caspia,caster1,CATE
+Cassin's Finch,Haemorhous cassinii,casfin,CAFI
+Cassin's Vireo,Vireo cassinii,casvir,CAVI
+Cedar Waxwing,Bombycilla cedrorum,cedwax,CEDW
+Cerulean Warbler,Setophaga cerulea,cerwar,CERW
+Chestnut-backed Chickadee,Poecile rufescens,chbchi,CBCH
+Chestnut-collared Longspur,Calcarius ornatus,chclon,CCLO
+Chestnut-sided Warbler,Setophaga pensylvanica,chswar,CSWA
+Chimney Swift,Chaetura pelagica,chiswi,CHSW
+Chipping Sparrow,Spizella passerina,chispa,CHSP
+Chuck-will's-widow,Antrostomus carolinensis,chwwid,CWWI
+Clapper Rail,Rallus crepitans,clarai11,CLRA
+Clark's Nutcracker,Nucifraga columbiana,clanut,CLNU
+Clay-colored Sparrow,Spizella pallida,clcspa,CCSP
+Cliff Swallow,,,
+Common Gallinule,Gallinula galeata,comgal1,COGA
+Common Goldeneye,Bucephala clangula,comgol,COGO
+Common Grackle,Quiscalus quiscula,comgra,COGR
+Common Loon,Gavia immer,comloo,COLO
+Common Merganser,Mergus merganser,commer,COME
+Common Murre,Uria aalge,commur,COMU
+Common Nighthawk,Chordeiles minor,comnig,CONI
+Common Poorwill,Phalaenoptilus nuttallii,compoo,COPO
+Common Raven,,,
+Common Tern,Sterna hirundo,comter,COTE
+Common Yellowthroat,Geothlypis trichas,comyel,COYE
+Connecticut Warbler,Oporornis agilis,conwar,CONW
+Cooper's Hawk,Astur cooperii,coohaw,
+Dark-eyed Junco,Junco hyemalis,daejun,DEJU
+Dickcissel,Spiza americana,dickci,DICK
+Double-crested Cormorant,Nannopterum auritum,doccor,DCCO
+Downy Woodpecker,Dryobates pubescens,dowwoo,DOWO
+Dunlin,Calidris alpina,dunlin,DUNL
+Dusky Flycatcher,,,
+Eared Grebe,,,
+Eastern Bluebird,Sialia sialis,easblu,EABL
+Eastern Kingbird,Tyrannus tyrannus,easkin,EAKI
+Eastern Meadowlark,Sturnella magna,easmea,EAME
+Eastern Phoebe,Sayornis phoebe,easpho,EAPH
+Eastern Screech-Owl,Megascops asio,easowl1,EASO
+Eastern Towhee,Pipilo erythrophthalmus,eastow,EATO
+Eastern Whip-poor-will,Antrostomus vociferus,easwpw1,EWPW
+Eastern Wood-Pewee,Contopus virens,eawpew,EAWP
+Eurasian Collared-Dove,Streptopelia decaocto,eucdov,EUCD
+European Starling,,,
+Evening Grosbeak,Hesperiphona vespertina,,
+Field Sparrow,Spizella pusilla,fiespa,FISP
+Fish Crow,Corvus ossifragus,fiscro,FICR
+Forster's Tern,Sterna forsteri,forter,FOTE
+Fox Sparrow,Passerella iliaca,foxspa,FOSP
+Franklin's Gull,Leucophaeus pipixcan,fragul,FRGU
+Gadwall,Mareca strepera,gadwal,GADW
+Glaucous-winged Gull,Larus glaucescens,glwgul,GWGU
+Golden Eagle,Aquila chrysaetos,goleag,GOEA
+Golden-crowned Kinglet,Regulus satrapa,gockin,GCKI
+Golden-crowned Sparrow,Zonotrichia atricapilla,gocspa,GCSP
+Golden-winged Warbler,Vermivora chrysoptera,gowwar,GWWA
+Grasshopper Sparrow,Ammodramus savannarum,graspa,GRSP
+Gray Catbird,,,
+Gray Flycatcher,,,
+Gray Partridge,,,
+Gray-cheeked Thrush,,,
+Great Black-backed Gull,Larus marinus,gbbgul,GBBG
+Great Blue Heron,Ardea herodias,grbher3,GBHE
+Great Crested Flycatcher,Myiarchus crinitus,grcfly,GCFL
+Great Egret,Ardea alba,greegr,GREG
+Great Gray Owl,,,
+Great Horned Owl,Bubo virginianus,grhowl,GHOW
+Greater White-fronted Goose,Anser albifrons,gwfgoo,GWFG
+Greater Yellowlegs,Tringa melanoleuca,greyel,GRYE
+Green Heron,Butorides virescens,grnher,GRHE
+Green-winged Teal,Anas crecca,gnwtea,GWTE
+Hairy Woodpecker,Leuconotopicus villosus,,
+Hammond's Flycatcher,Empidonax hammondii,hamfly,HAFL
+Harris's Sparrow,Zonotrichia querula,harspa,HASP
+Henslow's Sparrow,Centronyx henslowii,henspa,HESP
+Hermit Thrush,Catharus guttatus,herthr,HETH
+Herring Gull,,,
+Hooded Merganser,Lophodytes cucullatus,hoomer,HOME
+Hooded Warbler,Setophaga citrina,hoowar,HOWA
+Horned Grebe,Podiceps auritus,horgre,HOGR
+Horned Lark,Eremophila alpestris,horlar,HOLA
+House Finch,Haemorhous mexicanus,houfin,HOFI
+House Sparrow,Passer domesticus,houspa,HOSP
+House Wren,,,
+Indigo Bunting,Passerina cyanea,indbun,INBU
+Kentucky Warbler,Geothlypis formosa,kenwar,KEWA
+Killdeer,Charadrius vociferus,killde,KILL
+King Rail,Rallus elegans,kinrai4,KIRA
+Kirtland's Warbler,Setophaga kirtlandii,kirwar,KIWA
+Lapland Longspur,Calcarius lapponicus,laplon,LALO
+Lark Sparrow,Chondestes grammacus,larspa,LASP
+Lazuli Bunting,Passerina amoena,lazbun,LAZB
+Least Bittern,Botaurus exilis,leabit,LEBI
+Least Flycatcher,Empidonax minimus,leafly,LEFL
+Least Sandpiper,Calidris minutilla,leasan,LESA
+LeConte's Sparrow,Ammospiza leconteii,lecspa,LCSP
+Lesser Black-backed Gull,Larus fuscus,lbbgul,LBBG
+Lesser Yellowlegs,Tringa flavipes,lesyel,LEYE
+Lincoln's Sparrow,Melospiza lincolnii,linspa,LISP
+Loggerhead Shrike,Lanius ludovicianus,logshr,LOSH
+Long-billed Curlew,Numenius americanus,lobcur,LBCU
+Long-billed Dowitcher,Limnodromus scolopaceus,lobdow,LBDO
+Long-eared Owl,Asio otus,loeowl,LEOW
+Long-tailed Duck,Clangula hyemalis,lotduc,LTDU
+Louisiana Waterthrush,Parkesia motacilla,louwat,LOWA
+MacGillivray's Warbler,Geothlypis tolmiei,macwar,MGWA
+Magnolia Warbler,Setophaga magnolia,magwar,MAWA
+Mallard,Anas platyrhynchos,mallar3,MALL
+Marbled Godwit,Limosa fedoa,margod,MAGO
+Marbled Murrelet,Brachyramphus marmoratus,marmur,MAMU
+Marsh Wren,Cistothorus palustris,marwre,MAWR
+Merlin,Falco columbarius,merlin,MERL
+Mountain Bluebird,Sialia currucoides,moublu,MOBL
+Mountain Chickadee,Poecile gambeli,mouchi,MOCH
+Mourning Dove,Zenaida macroura,moudov,MODO
+Mourning Warbler,Geothlypis philadelphia,mouwar,MOWA
+Mute Swan,Cygnus olor,mutswa,MUSW
+Nashville Warbler,Leiothlypis ruficapilla,naswar,NAWA
+Nelson's Sparrow,Ammospiza nelsoni,nstspa,NESP
+Northern Cardinal,Cardinalis cardinalis,norcar,NOCA
+Northern Flicker,Colaptes auratus,norfli,NOFL
+American Goshawk,Astur atricapillus,norgos,
+Northern Harrier,Circus hudsonius,norhar2,NOHA
+Northern Hawk Owl,Surnia ulula,nohowl,NHOW
+Northern Parula,Setophaga americana,norpar,NOPA
+Northern Pintail,Anas acuta,norpin,NOPI
+Northern Pygmy-Owl,Glaucidium gnoma,nopowl,NOPO
+Northern Rough-winged Swallow,Stelgidopteryx serripennis,nrwswa,NRWS
+Northern Saw-whet Owl,Aegolius acadicus,nswowl,NSWO
+Northern Shoveler,Spatula clypeata,norsho,NSHO
+Northern Shrike,Lanius borealis,norshr4,NSHR
+Northern Waterthrush,Parkesia noveboracensis,norwat,NOWA
+Olive-sided Flycatcher,Contopus cooperi,olsfly,OSFL
+Orange-crowned Warbler,Leiothlypis celata,orcwar,OCWA
+Orchard Oriole,Icterus spurius,orcori,OROR
+Osprey,Pandion haliaetus,osprey,OSPR
+Ovenbird,Seiurus aurocapilla,ovenbi1,OVEN
+Pacific Wren,Troglodytes pacificus,pacwre1,PAWR
+Palm Warbler,Setophaga palmarum,palwar,PAWA
+Pectoral Sandpiper,Calidris melanotos,pecsan,PESA
+Peregrine Falcon,Falco peregrinus,perfal,PEFA
+Philadelphia Vireo,Vireo philadelphicus,phivir,PHVI
+Pied-billed Grebe,Podilymbus podiceps,pibgre,PBGR
+Pileated Woodpecker,Dryocopus pileatus,pilwoo,PIWO
+Pine Grosbeak,Pinicola enucleator,pingro,PIGR
+Pine Siskin,Spinus pinus,pinsis,PISI
+Pine Warbler,Setophaga pinus,pinwar,PIWA
+Prairie Warbler,Setophaga discolor,prawar,PRAW
+Prothonotary Warbler,Protonotaria citrea,prowar,PROW
+Purple Finch,Haemorhous purpureus,purfin,PUFI
+Purple Martin,Progne subis,purmar,PUMA
+Red Crossbill,Loxia curvirostra,redcro,RECR
+Redhead,Aythya americana,redhea,REDH
+Redpoll,Acanthis flammea,redpol1,REDP
+Red-bellied Woodpecker,Melanerpes carolinus,rebwoo,RBWO
+Red-breasted Nuthatch,Sitta canadensis,rebnut,RBNU
+Red-breasted Sapsucker,Sphyrapicus ruber,rebsap,RBSA
+Red-eyed Vireo,Vireo olivaceus,reevir1,REVI
+Red-headed Woodpecker,Melanerpes erythrocephalus,rehwoo,RHWO
+Red-naped Sapsucker,Sphyrapicus nuchalis,rensap,RNSA
+Red-necked Grebe,Podiceps grisegena,rengre,RNGR
+Red-necked Phalarope,Phalaropus lobatus,renpha,RNPH
+Red-shouldered Hawk,Buteo lineatus,reshaw,RSHA
+Red-tailed Hawk,Buteo jamaicensis,rethaw,RTHA
+Red-throated Loon,Gavia stellata,retloo,RTLO
+Red-winged Blackbird,Agelaius phoeniceus,rewbla,RWBL
+Ring-billed Gull,Larus delawarensis,ribgul,RBGU
+Ring-necked Duck,Aythya collaris,rinduc,RNDU
+Ring-necked Pheasant,,,
+Rock Pigeon,,,
+Rock Ptarmigan,Lagopus muta,rocpta1,ROPT
+Rock Wren,Salpinctes obsoletus,rocwre,ROWR
+Rose-breasted Grosbeak,Pheucticus ludovicianus,robgro,RBGR
+Rough-legged Hawk,,,
+Ruby-crowned Kinglet,Corthylio calendula,ruckin,RCKI
+Ruby-throated Hummingbird,Archilochus colubris,rthhum,RTHU
+Ruddy Duck,Oxyura jamaicensis,rudduc,RUDU
+Ruddy Turnstone,Arenaria interpres,rudtur,RUTU
+Ruffed Grouse,Bonasa umbellus,rufgro,RUGR
+Rufous Hummingbird,Selasphorus rufus,rufhum,RUHU
+Rusty Blackbird,Euphagus carolinus,rusbla,RUBL
+Sanderling,Calidris alba,sander,SAND
+Sandhill Crane,Antigone canadensis,sancra,SACR
+Savannah Sparrow,Passerculus sandwichensis,savspa,SAVS
+Say's Phoebe,Sayornis saya,saypho,SAPH
+Scarlet Tanager,Piranga olivacea,scatan,SCTA
+Sedge Wren,Cistothorus stellaris,sedwre1,SEWR
+Semipalmated Plover,Charadrius semipalmatus,semplo,SEPL
+Semipalmated Sandpiper,Calidris pusilla,semsan,SESA
+Sharp-shinned Hawk,Accipiter striatus,shshaw,SSHA
+Sharp-tailed Grouse,Tympanuchus phasianellus,shtgro,STGR
+Short-billed Dowitcher,Limnodromus griseus,shbdow,SBDO
+Short-billed Gull,Larus brachyrhynchus,mewgul2,SBIG
+Short-eared Owl,Asio flammeus,sheowl,SEOW
+Snow Bunting,Plectrophenax nivalis,snobun,SNBU
+Snow Goose,Anser caerulescens,snogoo,SNGO
+Solitary Sandpiper,Tringa solitaria,solsan,SOSA
+Song Sparrow,Melospiza melodia,sonspa,SOSP
+Sora,Porzana carolina,sora,SORA
+Spotted Sandpiper,Actitis macularius,sposan,SPSA
+Spotted Towhee,Pipilo maculatus,spotow,SPTO
+Sprague's Pipit,Anthus spragueii,sprpip,SPPI
+Spruce Grouse,Canachites canadensis,sprgro,SPGR
+Steller's Jay,Cyanocitta stelleri,stejay,STJA
+Summer Tanager,Piranga rubra,sumtan,SUTA
+Swainson's Hawk,Buteo swainsoni,swahaw,SWHA
+Swainson's Thrush,Catharus ustulatus,swathr,SWTH
+Swamp Sparrow,Melospiza georgiana,swaspa,SWSP
+Tennessee Warbler,Leiothlypis peregrina,tenwar,TEWA
+Thick-billed Longspur,Rhynchophanes mccownii,mcclon,TBLO
+Townsend's Solitaire,Myadestes townsendi,towsol,TOSO
+Townsend's Warbler,Setophaga townsendi,towwar,TOWA
+Tree Swallow,Tachycineta bicolor,treswa,TRES
+Trumpeter Swan,Cygnus buccinator,truswa,TRUS
+Tufted Titmouse,Baeolophus bicolor,tuftit,TUTI
+Tundra Swan,Cygnus columbianus,tunswa,TUSW
+Upland Sandpiper,Bartramia longicauda,uplsan,UPSA
+Varied Thrush,Ixoreus naevius,varthr,VATH
+Vaux's Swift,Chaetura vauxi,vauswi,VASW
+Veery,Catharus fuscescens,veery,VEER
+Vesper Sparrow,Pooecetes gramineus,vesspa,VESP
+Violet-green Swallow,Tachycineta thalassina,vigswa,VGSW
+Virginia Rail,Rallus limicola,virrai,VIRA
+Warbling Vireo,Vireo gilvus,warvir,WAVI
+Western Flycatcher,Empidonax difficilis,wesfly,WEFL
+Western Grebe,Aechmophorus occidentalis,wesgre,WEGR
+Western Kingbird,Tyrannus verticalis,weskin,WEKI
+Western Meadowlark,Sturnella neglecta,wesmea,WEME
+Western Tanager,Piranga ludoviciana,westan,WETA
+Western Wood-Pewee,Contopus sordidulus,wewpew,WEWP
+Whimbrel,,,
+White-breasted Nuthatch,Sitta carolinensis,whbnut,WBNU
+White-crowned Sparrow,Zonotrichia leucophrys,whcspa,WCSP
+White-eyed Vireo,Vireo griseus,whevir,WEVI
+White-rumped Sandpiper,Calidris fuscicollis,whrsan,WRSA
+White-throated Sparrow,Zonotrichia albicollis,whtspa,WTSP
+White-winged Crossbill,,,
+Wild Turkey,Meleagris gallopavo,wiltur,WITU
+Willet,Tringa semipalmata,willet1,WILL
+Willow Flycatcher,Empidonax traillii,wilfly,WIFL
+Willow Ptarmigan,Lagopus lagopus,wilpta,WIPT
+Wilson's Phalarope,Phalaropus tricolor,wilpha,WIPH
+Wilson's Snipe,Gallinago delicata,wilsni1,WISN
+Wilson's Warbler,Cardellina pusilla,wlswar,WIWA
+Winter Wren,Troglodytes hiemalis,winwre3,WIWR
+Wood Duck,Aix sponsa,wooduc,WODU
+Wood Thrush,Hylocichla mustelina,woothr,WOTH
+Yellow Rail,Coturnicops noveboracensis,yelrai,YERA
+Yellow Warbler,,,
+Yellow-bellied Flycatcher,Empidonax flaviventris,yebfly,YBFL
+Yellow-bellied Sapsucker,Sphyrapicus varius,yebsap,YBSA
+Yellow-billed Cuckoo,Coccyzus americanus,yebcuc,YBCU
+Yellow-breasted Chat,Icteria virens,yebcha,YBCH
+Yellow-headed Blackbird,Xanthocephalus xanthocephalus,yehbla,YHBL
+Yellow-rumped Warbler,Setophaga coronata,yerwar,YRWA
+Yellow-throated Vireo,Vireo flavifrons,yetvir,YTVI
+Yellow-throated Warbler,Setophaga dominica,yetwar,YTWA

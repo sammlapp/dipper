@@ -29,7 +29,7 @@ ENV/
 .ipynb_checkpoints/
 
 # Data files
-*.csv
+# *.csv
 *.h5
 *.hdf5
 *.pkl
