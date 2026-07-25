@@ -1,6 +1,7 @@
 # Lightweight requirements for PyInstaller backend
 # Excludes ML dependencies (PyTorch, OpenSoundscape, etc.)
 # Only includes essential libraries for data processing, audio handling, and basic utilities.
+python==3.12
 
 # Build tools
 pyinstaller>=6.14.2
