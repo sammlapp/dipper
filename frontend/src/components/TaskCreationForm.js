@@ -55,7 +55,7 @@ const DEFAULT_VALUES = {
     model_source: 'bmz',
     model: 'Perch2',
     overlap: 0.0,
-    batch_size: 1,
+    batch_size: null,
     worker_count: 1,
     output_dir: '',
     sparse_outputs_enabled: false,
@@ -661,7 +661,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
             output_dir: configData.output_dir || '',
             split_by_subfolder: configData.split_by_subfolder || false,
             overlap: configData.inference_settings?.clip_overlap || 0.0,
-            batch_size: configData.inference_settings?.batch_size || 1,
+            batch_size: configData.inference_settings?.batch_size ?? null,
             worker_count: configData.inference_settings?.num_workers || 1,
             sparse_outputs_enabled: configData.sparse_outputs?.enabled || false,
             sparse_save_threshold: configData.sparse_outputs?.threshold || -3.0,
@@ -1027,6 +1027,46 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
               </div>
             )}
 
+            {/* Clip Overlap / Batch Size / Workers — compact row */}
+            {(config.model_source === 'bmz' || config.model_source === 'local_file') && (
+              <div className="form-group full-width">
+                <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.8rem' }}>Clip Overlap (sec) <HelpIcon section="inference-overlap" /></label>
+                    <input className="compact-input" type="number" min="0" max="1" step="0.1"
+                      value={config.overlap}
+                      onChange={(e) => setConfig(prev => ({ ...prev, overlap: parseFloat(e.target.value) }))}
+                      style={{ width: 70 }}
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.8rem' }}>Batch Size <HelpIcon section="inference-batch-size" /></label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input type="checkbox"
+                        checked={config.batch_size === null}
+                        onChange={(e) => setConfig(prev => ({ ...prev, batch_size: e.target.checked ? null : 1 }))}
+                      />
+                      <span style={{ fontSize: '0.8rem' }}>Auto</span>
+                      <input className="compact-input" type="number" min="1" max="32"
+                        value={config.batch_size ?? ''}
+                        disabled={config.batch_size === null}
+                        onChange={(e) => setConfig(prev => ({ ...prev, batch_size: parseInt(e.target.value) || 1 }))}
+                        style={{ width: 60 }}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.8rem' }}>Workers <HelpIcon section="inference-workers" /></label>
+                    <input className="compact-input" type="number" min="1" max="8"
+                      value={config.worker_count}
+                      onChange={(e) => setConfig(prev => ({ ...prev, worker_count: parseInt(e.target.value) }))}
+                      style={{ width: 70 }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Species filter panel — shown for bmz only */}
             {config.model_source === 'bmz' && (
               <div className="form-group full-width">
@@ -1155,12 +1195,12 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
                       const availableFiltered = availablePool.filter(sp => {
                         if (selectedKeys.has(getSpeciesKey(sp))) return false;
                         if (!searchLower) return true;
-                        return ['ebird_code', 'scientific_name', 'common_name'].some(f => sp[f] && sp[f].toLowerCase().includes(searchLower));
+                        return ['ebird_code', 'scientific_name', 'common_name', 'alpha'].some(f => sp[f] && sp[f].toLowerCase().includes(searchLower));
                       });
                       const selSearchLower = selectedSearch.trim().toLowerCase();
                       const selectedFiltered = config.species_filter.selected_species.filter(sp => {
                         if (!selSearchLower) return true;
-                        return ['ebird_code', 'scientific_name', 'common_name'].some(f => sp[f] && sp[f].toLowerCase().includes(selSearchLower));
+                        return ['ebird_code', 'scientific_name', 'common_name', 'alpha'].some(f => sp[f] && sp[f].toLowerCase().includes(selSearchLower));
                       });
                       // All name columns beyond the native key field, in display order
                       const allExtraCols = ['scientific_name', 'common_name', 'ebird_code', 'alpha'].filter(f => f !== modelKeyField);
@@ -1323,7 +1363,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
                             const filtered = q.length > 0
                               ? classifierLabels.filter(sp =>
                                 !selectedKeys.has(getSpeciesKey(sp)) &&
-                                ['common_name', 'scientific_name', 'ebird_code', modelKeyField].some(f => sp[f] && sp[f].toLowerCase().includes(q))
+                                ['common_name', 'scientific_name', 'ebird_code', 'alpha', modelKeyField].some(f => sp[f] && sp[f].toLowerCase().includes(q))
                               ).slice(0, 50)
                               : [];
                             return (
@@ -1670,45 +1710,6 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
               </div>
             )}
 
-            {/* Standard inference settings — hidden for signal-processing methods */}
-            {(config.model_source === 'bmz' || config.model_source === 'local_file') && (<>
-              <div className="form-group">
-                <label>Clip Overlap (sec) <HelpIcon section="inference-overlap" /></label>
-                <input
-                  className="compact-input"
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={config.overlap}
-                  onChange={(e) => setConfig(prev => ({ ...prev, overlap: parseFloat(e.target.value) }))}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Batch Size <HelpIcon section="inference-batch-size" /></label>
-                <input
-                  className="compact-input"
-                  type="number"
-                  min="1"
-                  max="32"
-                  value={config.batch_size}
-                  onChange={(e) => setConfig(prev => ({ ...prev, batch_size: parseInt(e.target.value) }))}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Workers <HelpIcon section="inference-workers" /></label>
-                <input
-                  className="compact-input"
-                  type="number"
-                  min="1"
-                  max="8"
-                  value={config.worker_count}
-                  onChange={(e) => setConfig(prev => ({ ...prev, worker_count: parseInt(e.target.value) }))}
-                />
-              </div>
-            </>)}
           </div>
         )}
 

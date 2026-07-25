@@ -90,6 +90,15 @@ def run_inference(files, model, config_data):
                     files, model, config_data
                 )
             else:
+                # handle default batch size for GPU vs CPU
+                if config_data["inference_settings"]["batch_size"] is None:
+                    # cpu: 1, gpu: 64
+                    gpu_available = (
+                        torch.cuda.is_available() or torch.backends.mps.is_available()
+                    )
+                    config_data["inference_settings"]["batch_size"] = (
+                        64 if gpu_available else 1
+                    )
                 predictions = model.predict(files, **config_data["inference_settings"])
                 # subset classes if species_filter is enabled
                 if config_data.get("species_filter", {}).get("enabled", False):
