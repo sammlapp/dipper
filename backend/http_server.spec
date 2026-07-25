@@ -26,6 +26,14 @@ if os.path.exists(scripts_dir):
 birdnames_datas = collect_data_files('birdnames')
 certifi_datas = collect_data_files('certifi')
 
+# Include class name tables for all classifiers
+class_names_dir = os.path.join(spec_root, 'data', 'class_names')
+class_names_datas = []
+if os.path.exists(class_names_dir):
+    for f in os.listdir(class_names_dir):
+        if f.endswith('.csv'):
+            class_names_datas.append((os.path.join(class_names_dir, f), 'data/class_names'))
+
 # Include _secrets.py if present (generated from .env at build time, never committed)
 secrets_datas = []
 secrets_path = os.path.join(spec_root, '_secrets.py')
@@ -36,7 +44,7 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=script_datas + birdnames_datas + certifi_datas + secrets_datas,
+    datas=script_datas + birdnames_datas + certifi_datas + secrets_datas + class_names_datas,
     hiddenimports=[
         'aiohttp',
         'aiohttp_cors',

@@ -394,6 +394,9 @@ function App() {
             duration: theme.transitions.duration.leavingScreen,
           })
         }}>
+          {process.env.NODE_ENV === 'development' && (
+            <span className="status-dev-badge">DEV</span>
+          )}
           {runningTasks.length > 0 ? (
             <div className="status-running" onClick={() => setActiveTab('tasks')} style={{ cursor: 'pointer' }}>
               <span className="status-icon">🔄</span>

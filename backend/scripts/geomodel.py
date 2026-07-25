@@ -5,12 +5,17 @@ local_sp = geo(40.7128, -74.0060, 20) # Example for New York City, week 20
 subset_classifier_labels("HawkEars", local_sp)
 """
 
+import os
+import sys
 import numpy as np
 import onnxruntime as ort
 import pandas as pd
 import huggingface_hub
 
-# import birdnames
+# In a PyInstaller frozen build sys._MEIPASS is the extraction root;
+# in development __file__ is backend/scripts/geomodel.py so data is one level up.
+_BASE = getattr(sys, "_MEIPASS", os.path.join(os.path.dirname(__file__), ".."))
+_CLASS_TABLES_DIR = os.path.join(_BASE, "data", "class_names")
 
 
 def load_labels(labels_path):
@@ -23,81 +28,23 @@ def load_labels(labels_path):
     return labels
 
 
+def get_class_table(classifier_name):
+    """Return the full class name table for a classifier as a DataFrame.
+
+    The first column is the model's native class label (the value the model
+    actually outputs). Remaining columns are scientific_name, common_name,
+    ebird_code, alpha — with NaN where a mapping is unavailable.
+    """
+    csv_path = os.path.join(_CLASS_TABLES_DIR, f"{classifier_name}.csv")
+    if not os.path.exists(csv_path):
+        raise ValueError(f"No class table found for classifier: {classifier_name}")
+    return pd.read_csv(csv_path, dtype=str).fillna("")
+
+
 def get_classifier_labels(classifier_name):
-    """Get species labels for a given classifier"""
-    if classifier_name == "BirdNET":
-        labels_path = huggingface_hub.hf_hub_download(
-            repo_id="sammlapp/BirdNET_v2.4",
-            filename="V2.4/BirdNET_GLOBAL_6K_V2.4_Labels.txt",
-        )
-        with open(labels_path) as f:
-            labels = []
-            for line in f:  # format is sci name_common name
-                parts = line.strip().split("_")
-                labels.append(parts[0])  # scientific name
-    elif classifier_name == "BirdNET_V3.0.3":
-        labels_path = huggingface_hub.hf_hub_download(
-            repo_id="sammlapp/BirdNET_GeoModel",
-            filename="BirdNET+_Geomodel_V3.0.3_Global_12K_Labels.txt",
-        )
-        with open(labels_path) as f:
-            labels = []
-            for line in f:
-                parts = line.strip().split("\t")
-                labels.append(parts[1])  # scientific name
-                # labels.append({"code": parts[0], "sci": parts[1], "common": parts[2]})
-    elif classifier_name in ("Perch2", "Perch2LiteRT", "Perch2ONNX"):
-        labels_path = huggingface_hub.hf_hub_download(
-            repo_id="sammlapp/perch2-tflite",
-            filename="perch2_class_labels.txt",
-        )
-        with open(labels_path) as f:
-            labels = [line.strip() for line in f]
-
-    elif classifier_name == "Perch":
-        # ebird codes!
-        labels_path = huggingface_hub.hf_hub_download(
-            repo_id="sammlapp/Perch_V1",
-            filename="8/assets/label.csv",
-        )
-        with open(labels_path) as f:
-            # skip first line (header)
-            next(f)
-            labels = [line.strip() for line in f]
-    elif classifier_name in ("BirdSetConvNeXT", "BirdSetEfficientNetB1"):
-        # ebird codes!
-        labels_path = huggingface_hub.hf_hub_download(
-            repo_id="DBD-research-group/ConvNeXT-Base-BirdSet-XCL",
-            filename="config.json",
-        )
-        import json
-
-        with open(labels_path) as f:
-            config = json.load(f)
-            labels_dict = config["label2id"]
-            id2label = {v: k for k, v in labels_dict.items()}
-            labels = [id2label[i] for i in range(len(id2label))]
-
-    elif classifier_name == "HawkEars_v010":
-        # common names!
-        labels_path = huggingface_hub.hf_hub_download(
-            repo_id="sammlapp/HawkEars_v0.1.0",
-            filename="HawkEars_v0.1.0_class_labels.txt",
-        )
-        with open(labels_path) as f:
-            labels = [line.strip() for line in f]
-    elif classifier_name == "HawkEars":
-        # common names!
-        labels_path = huggingface_hub.hf_hub_download(
-            repo_id="sammlapp/HawkEars_v1.0.8",
-            filename="HawkEars_v1.0.8_classes.txt",
-        )
-        with open(labels_path) as f:
-            labels = [line.strip() for line in f]
-    else:
-        raise ValueError(f"Unknown classifier: {classifier_name}")
-
-    return labels
+    """Return the list of native class labels for a classifier (first CSV column)."""
+    df = get_class_table(classifier_name)
+    return df.iloc[:, 0].tolist()
 
 
 MODEL_CLASS_COL = {
@@ -110,15 +57,28 @@ MODEL_CLASS_COL = {
     "BirdSetEfficientNetB1": "ebird_code",
     "HawkEars_v010": "common_name",
     "HawkEars": "common_name",
-    "BirdNET": "scientific_name",
+    "BirdNET": "composite",
 }
 
 
-def subset_classifier_labels(classifier_name, class_table):
-    """Subset the labels for a given classifier to only include the specified scientific names"""
-    classifier_classes = get_classifier_labels(classifier_name)
-    column = MODEL_CLASS_COL.get(classifier_name)
-    return class_table[class_table[column].isin(classifier_classes)]
+def subset_classifier_labels(classifier_name, geo_df):
+    """Subset the class table to species present in the geomodel result.
+
+    The geomodel always produces scientific_name, so we join on that column
+    regardless of which column is the model's native class label.  The returned
+    DataFrame contains all class-table columns (native label, scientific_name,
+    common_name, ebird_code, alpha) plus the geomodel probability, sorted by
+    probability descending.
+    """
+    class_df = get_class_table(classifier_name)
+
+    # Join class table onto geomodel result via scientific_name
+    merged = class_df.merge(
+        geo_df[["scientific_name", "probability"]],
+        on="scientific_name",
+        how="inner",
+    )
+    return merged.sort_values("probability", ascending=False)
 
 
 class BirdNETGeomodel:

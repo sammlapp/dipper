@@ -101,7 +101,6 @@ common_to_sci = birdnames.Converter(
     soft_matching=True,
     fuzzy_matching=True,
 )
-# common_to_sci.convert('Kirtlands warbler')
 
 
 def is_process_alive(pid):
@@ -444,7 +443,6 @@ def check_environment(env_path):
         return {"status": "error", "error": str(e)}
 
 
-
 def extract_environment(archive_path, extract_dir):
     """Extract conda-pack environment from tar.gz archive"""
     try:
@@ -473,7 +471,8 @@ def extract_environment(archive_path, extract_dir):
             conda_unpack_exe = os.path.join(extract_dir, "Scripts", "conda-unpack.exe")
             result = subprocess.run(
                 [conda_unpack_exe],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
         else:
             # macOS/Linux: bin/python is a Mach-O/ELF binary whose shared library
@@ -485,14 +484,17 @@ def extract_environment(archive_path, extract_dir):
             activate = os.path.join(extract_dir, "bin", "activate")
             result = subprocess.run(
                 ["bash", "-c", f'. "{activate}" && conda-unpack'],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
         if result.returncode != 0:
-            error_msg = f"conda-unpack exited with code {result.returncode}: {result.stderr}"
+            error_msg = (
+                f"conda-unpack exited with code {result.returncode}: {result.stderr}"
+            )
             logger.error(error_msg)
             return {"status": "error", "error": error_msg}
         logger.info("conda-unpack complete")
-        
+
         # Mark extraction complete only after tar + conda-unpack both succeed.
         _write_extraction_status(extract_dir, "complete")
 
@@ -585,7 +587,7 @@ def setup_environment(env_dir=None):
         logger.info("Checking for cached environment archive...")
         archive_path = get_default_env_archive_path()
 
-        if os.path.exists(archive_path): #already downloaded
+        if os.path.exists(archive_path):  # already downloaded
             logger.info(f"Using cached archive: {archive_path}")
         else:
             # Download from Hugging Face
@@ -608,7 +610,7 @@ def setup_environment(env_dir=None):
             }
 
         # Extract the environment from the cached archive file
-        
+
         extract_result = extract_environment(archive_path, env_dir)
         logger.info(f"Extraction result: {extract_result}")
 
@@ -2152,6 +2154,7 @@ class DipperServer:
         if not os.path.exists(LOG_FILE_PATH):
             return web.Response(text="Log file not found", status=404)
         from datetime import datetime
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return web.FileResponse(
             LOG_FILE_PATH,
@@ -2379,6 +2382,7 @@ class DipperServer:
     async def remove_env(self, request):
         """Delete the default ML environment directory (POST /env/remove)."""
         import shutil
+
         env_dir = get_default_env_path()
         try:
             if os.path.exists(env_dir):
@@ -2415,7 +2419,11 @@ class DipperServer:
             if env_result["status"] != "ready":
                 logger.error(f"Environment not ready: {env_result}")
                 return web.json_response(
-                    {"status": "error", "error": "ML environment is not installed. Please install it from the Settings tab.", "env_status": env_result["status"]},
+                    {
+                        "status": "error",
+                        "error": "ML environment is not installed. Please install it from the Settings tab.",
+                        "env_status": env_result["status"],
+                    },
                     status=503,
                 )
             logger.info(f"Environment is ready: {env_result}")
@@ -2602,9 +2610,7 @@ class DipperServer:
                     {"status": "error", "error": str(e)}, status=400
                 )
 
-            records = sp_df[
-                ["ebird_code", "scientific_name", "common_name", "probability"]
-            ].to_dict(orient="records")
+            records = sp_df.to_dict(orient="records")
             for r in records:
                 r["probability"] = round(float(r["probability"]), 4)
 
@@ -2615,7 +2621,7 @@ class DipperServer:
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def get_classifier_labels(self, request):
-        """Return the list of scientific names for a given classifier."""
+        """Return the full class name table for a classifier as a list of records."""
         from scripts import geomodel
 
         try:
@@ -2625,8 +2631,15 @@ class DipperServer:
                 return web.json_response(
                     {"status": "error", "error": "classifier is required"}, status=400
                 )
-            labels = geomodel.get_classifier_labels(classifier)
-            return web.json_response({"status": "success", "labels": labels})
+            df = geomodel.get_class_table(classifier)
+            # First column is the model's native class label
+            native_col = df.columns[0]
+            records = df.to_dict(orient="records")
+            return web.json_response({
+                "status": "success",
+                "native_col": native_col,
+                "labels": records,
+            })
         except ValueError as e:
             return web.json_response({"status": "error", "error": str(e)}, status=400)
         except Exception as e:
@@ -2658,7 +2671,11 @@ class DipperServer:
             if env_result["status"] != "ready":
                 logger.error(f"Environment not ready: {env_result}")
                 return web.json_response(
-                    {"status": "error", "error": "ML environment is not installed. Please install it from the Settings tab.", "env_status": env_result["status"]},
+                    {
+                        "status": "error",
+                        "error": "ML environment is not installed. Please install it from the Settings tab.",
+                        "env_status": env_result["status"],
+                    },
                     status=503,
                 )
 
@@ -2858,7 +2875,11 @@ class DipperServer:
             if env_result["status"] != "ready":
                 logger.error(f"Environment not ready: {env_result}")
                 return web.json_response(
-                    {"status": "error", "error": "ML environment is not installed. Please install it from the Settings tab.", "env_status": env_result["status"]},
+                    {
+                        "status": "error",
+                        "error": "ML environment is not installed. Please install it from the Settings tab.",
+                        "env_status": env_result["status"],
+                    },
                     status=503,
                 )
 
