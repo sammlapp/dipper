@@ -1692,47 +1692,18 @@ class DipperServer:
                 tmp.write(audio_bytes)
                 raw_path = tmp.name
 
-            wav_path = None
             try:
-                if raw_suffix != ".wav":
-                    # Convert to WAV via ffmpeg so soundfile can read it
-                    wav_path = raw_path + ".wav"
-                    proc = subprocess.run(
-                        [
-                            "ffmpeg",
-                            "-y",
-                            "-i",
-                            raw_path,
-                            "-ar",
-                            "22050",
-                            "-ac",
-                            "1",
-                            wav_path,
-                        ],
-                        capture_output=True,
-                        timeout=30,
-                    )
-                    if proc.returncode != 0:
-                        raise RuntimeError(
-                            f"ffmpeg conversion failed: {proc.stderr.decode()[:200]}"
-                        )
-                    process_path = wav_path
-                else:
-                    process_path = raw_path
-
                 clip_data = {
-                    "file_path": process_path,
+                    "file_path": raw_path,
                     "start_time": 0,
                     "end_time": 6.0,
                 }
                 result = process_single_clip(clip_data, settings)
             finally:
-                for p in [raw_path, wav_path]:
-                    if p:
-                        try:
-                            os.unlink(p)
-                        except Exception:
-                            pass
+                try:
+                    os.unlink(raw_path)
+                except Exception:
+                    pass
 
             return web.json_response(result)
         except Exception as e:

@@ -1,4 +1,7 @@
 This project will create a cross-platform desktop app that runs pytorch machine learning models and allows users to train models in an active learning loop. 
+## 1.0.0 release items:
+- move backend check button and port display from settings panel of Review tab to full app Settings panel, with debugging log button
+- show dipper version number in settings panel
 
 ## claude start up prompt
 take a close look at this codebase, especially documentation markdowns such as readme.md claude.md build.md. We're going to work from plan.md but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, app.py, scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
