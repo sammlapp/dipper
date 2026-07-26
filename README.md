@@ -112,7 +112,7 @@ The application integrates with the [bioacoustics model zoo](https://github.com/
 - React 18, Material-UI 5, Tauri 2.x
 
 **Backend:**
-- Python 3.11, aiohttp, PyTorch, OpenSoundscape, librosa, pandas
+- Python 3.12, aiohttp, PyTorch, OpenSoundscape, SoundFile, pandas
 
 **Build:**
 - Tauri CLI, PyInstaller, conda-pack

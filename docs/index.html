@@ -123,6 +123,23 @@
       color: var(--accent);
     }
 
+    .header-actions {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .download-label {
+      margin: 18px 0 12px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
     /* ── Main ── */
     main {
       max-width: 900px;
@@ -210,7 +227,7 @@
       list-style: none;
       font-size: 0.85rem;
       color: var(--muted);
-      margin-bottom: 20px;
+      margin-bottom: 28px;
     }
 
     .feature-list li {
@@ -275,6 +292,31 @@
       opacity: 0.4;
       cursor: default;
       pointer-events: none;
+    }
+
+    .download-bar {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .download-bar .dl-btn {
+      min-width: 160px;
+      justify-content: center;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .download-bar .dl-btn .platform-name {
+      flex: 0 0 auto;
+    }
+
+    .download-bar .dl-btn .platform-detail {
+      display: inline;
     }
 
     /* ── Releases table ── */
@@ -472,31 +514,51 @@
       <span class="badge green">Open Source · MIT</span>
       <span class="badge blue">Efficient keyboard annotation</span>
     </div>
-    <a href="https://github.com/sammlapp/dipper" style="
-    display:inline-flex;align-items:center;gap:8px;
-    background:var(--surface);border:1px solid var(--border);
-    border-radius:8px;padding:10px 18px;font-size:0.9rem;color:var(--text);
-    transition:border-color 0.15s;
-  " onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-      <svg height="18" viewBox="0 0 16 16" fill="currentColor">
-        <path
-          d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-      </svg>
-      View on GitHub
-    </a>
+
+    <div class="download-label">Downloads</div>
+    <div class="header-actions">
+
+      <div class="download-bar" id="full-downloads">
+        <a class="dl-btn" id="full-macos" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+          <span class="platform-icon"></span>
+          <span class="platform-name">macOS</span>
+          <span class="platform-detail">Apple Silicon · DMG</span>
+        </a>
+        <a class="dl-btn" id="full-windows" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+          <span class="platform-icon">⊞</span>
+          <span class="platform-name">Windows</span>
+          <span class="platform-detail">x64 · NSIS Installer</span>
+        </a>
+        <a class="dl-btn" id="full-linux" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+          <span class="platform-icon">🐧</span>
+          <span class="platform-name">Linux</span>
+          <span class="platform-detail">x64 · AppImage</span>
+        </a>
+        <a class="dl-btn" href="https://github.com/sammlapp/dipper" target="_blank">
+          <svg height="18" viewBox="0 0 16 16" fill="currentColor"><path
+            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+        </svg>
+        <span class="platform-name">View Codebase</span>
+          <span class="platform-detail">GitHub</span>
+          
+
+        </a>
+      </div>
+    </div>
+    
   </header>
 
   <main>
 
     <!-- ── Download Section ── -->
     <section id="download">
-      <h2>Download</h2>
-      <p class="section-sub">Choose the edition that fits your workflow. Both editions run on macOS (Apple Silicon),
-        Windows (x64), and Linux (x64).</p>
 
-      <div class="editions">
+      <!-- <p class="section-sub">Choose the edition that fits your workflow. Both editions run on macOS (Apple Silicon),
+        Windows (x64), and Linux (x64).</p> -->
+
+      <!-- <div class="editions"> -->
         <!-- Review Edition -->
-        <div class="edition-card">
+        <!-- <div class="edition-card">
           <div class="edition-label blue">Dipper Review</div>
           <div class="edition-title">Review &amp; Annotate</div>
           <div class="edition-desc">Lightweight app for reviewing and annotating audio clips. Share with annotators who
@@ -528,44 +590,25 @@
               <span class="platform-detail">x64 · AppImage</span>
             </a>
           </div>
-        </div>
+        </div> -->
 
         <!-- Full Edition -->
-        <div class="edition-card featured">
-          <div class="edition-label green">Dipper Full</div>
-          <div class="edition-title">Full ML Toolkit</div>
-          <div class="edition-desc">Complete application with annotation, inference, and extraction. Automatically
-            installs a ~700 MB ML environment on first use.</div>
-          <ul class="feature-list">
-            <li>Everything in Dipper Review</li>
-            <li>Apply machine learning classifiers</li>
-            <li>Select clips for review</li>
-            <li class="no">Coming soon: Custom classifier training</li>
-          </ul>
-          <!-- <div class="edition-label green">Coming soon! <p>
-              (currently available in Server Mode)</div> -->
-          <div class="dl-grid" id="full-downloads">
-            <a class="dl-btn" id="full-macos" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
-              <span class="platform-icon"></span>
-              <span class="platform-name">macOS</span>
-              <span class="platform-detail">Apple Silicon · DMG</span>
-            </a>
-            <!-- <a class="dl-btn" id="full-windows" href="https://github.com/sammlapp/dipper/releases/latest"
-              target="_blank">
-              <span class="platform-icon">⊞</span>
-              <span class="platform-name">Windows</span>
-              <span class="platform-detail">x64 · NSIS Installer</span>
-            </a> -->
-            <a class="dl-btn"><span class="platform-detail">Windows Full App is currently being debugged! Contact Sam
-                for updates.</span></a>
-            <a class="dl-btn" id="full-linux" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
-              <span class="platform-icon">🐧</span>
-              <span class="platform-name">Linux</span>
-              <span class="platform-detail">x64 · AppImage</span>
-            </a>
-          </div>
-        </div>
+      <div class="edition-card featured">
+        <div class="edition-label green">Dipper Features</div>
+        <div class="edition-title">Machine Learning for Bioacoustics</div>
+        <div class="edition-desc">Complete application with annotation, inference, and extraction. Automatically
+          installs a ~700 MB ML environment on first use.</div>
+        <ul class="feature-list">
+          <li>Everything in Dipper Review</li>
+          <li>Apply machine learning classifiers</li>
+          <li>Select clips for review</li>
+          <li class="no">Coming soon: Custom classifier training</li>
+        </ul>
       </div>
+      <!-- </div> -->
+       <!-- space -->
+      <div style="height: 20px"></div>
+      
 
       <div class="info-grid">
         <div class="info-card">
@@ -578,16 +621,16 @@
           <h3>macOS note</h3>
           <p>On first launch, right-click → Open to bypass Gatekeeper if the app is unsigned.</p>
         </div> -->
-
+        <div class="info-card">
+          <h3>Model Support</h3>
+          <p>The app supports running all major foundation models for bioacoustics, including BirdNET, Perch V2, and HawkEars</p>
+        </div>
         <div class="info-card">
           <h3>Linux note</h3>
           <p>Make the AppImage executable: <code
               style="color:var(--accent);font-size:0.8rem">chmod +x Dipper*.AppImage</code>, then run it.</p>
         </div>
-        <div class="info-card">
-          <h3>ML environment</h3>
-          <p>The full app downloads its PyTorch environment (~700 MB) automatically on first use.</p>
-        </div>
+
       </div>
     </section>
 
