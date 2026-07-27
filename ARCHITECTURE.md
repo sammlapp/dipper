@@ -182,6 +182,16 @@ logging:
 - `POST /annotation/export` - Export annotations
 - `POST /annotation/stats` - Get annotation statistics
 
+### Classifier / Geomodel
+
+- `GET /geomodel/classifier_labels?classifier=<name>` - Get full class name table for a classifier (all naming columns)
+- `GET /geomodel/species_list?classifier=<name>&lat=<lat>&lon=<lon>&week=<week>` - Run BirdNET geomodel and return classifier-subset species list with probabilities
+
+### Xeno-Canto
+
+- `GET /xeno-canto/search` - Search Xeno-Canto recordings
+- `GET /xeno-canto/clip` - Fetch XC recording, return spectrogram + audio base64
+
 The `/clip` endpoint supports arbitrary `start_time`/`end_time` ranges. Focus mode uses this to load a configurable context window (default ±4 s) around each annotation clip. `FocusView` receives both the extended window bounds (`start_time`/`end_time`) and the original clip bounds (`clip_start_time`/`clip_end_time`), and renders a highlight overlay on the spectrogram with the audio cursor starting at the annotation clip's position within the wider window.
 
 ### File Management (Server Mode)
@@ -449,6 +459,13 @@ npm run tauri:dev
 - `load_model.py` - Model loading utilities
 - `file_selection.py` - Audio file resolution (glob patterns, file lists)
 - `config_utils.py` - Configuration file handling
+- `geomodel.py` - BirdNET geomodel for location-based species filtering; loads classifier class name tables from `backend/data/class_names/`
+
+**Class Name Tables:** `backend/data/class_names/`
+- CSV per classifier (e.g. `HawkEars.csv`, `BirdNET.csv`, `Perch2.csv`)
+- First column = model's native class label; remaining columns: `scientific_name`, `common_name`, `ebird_code`, `alpha`
+- Used by geomodel to join geographic species presence to classifier labels
+- Must be git-tracked (not gitignored); bundled into PyInstaller via `http_server.spec`
 
 ## Technology Stack
 
@@ -459,14 +476,15 @@ npm run tauri:dev
 - react-select 5.10.1
 
 **Backend:**
-- Python 3.11
+- Python 3.12
 - aiohttp (HTTP server)
 - PyTorch (ML framework)
 - OpenSoundscape (bioacoustics)
-- SoundFile
+- SoundFile (audio I/O including mp3/ogg)
 - pandas, numpy (data processing)
 - PyYAML (config files)
-- gdown (Google Drive downloads)
+- onnxruntime (geomodel inference)
+- huggingface_hub (model downloads)
 - appdirs (system paths)
 
 **Build Tools:**
