@@ -483,6 +483,102 @@
       color: var(--muted);
     }
 
+    .model-logos {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 14px;
+    }
+
+    .model-logos img {
+      height: 40px;
+      width: 40px;
+      object-fit: cover;
+      border-radius: 50%;
+      background: var(--surface2);
+    }
+
+    /* ── Video tutorials ── */
+    .tutorial-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .tutorial-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+    }
+
+    .tutorial-tab {
+      text-align: center;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+      line-height: 1.3;
+      flex: 1 1 200px;
+    }
+
+    .tutorial-tab:hover {
+      background: var(--surface2);
+      color: var(--text);
+    }
+
+    .tutorial-tab.active {
+      background: var(--surface2);
+      border-color: var(--accent);
+      color: var(--accent2);
+    }
+
+    .tutorial-player {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      width: 100%;
+    }
+
+    .tutorial-player:fullscreen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border-radius: 0;
+    }
+
+    .tutorial-player:fullscreen iframe {
+      aspect-ratio: auto;
+      width: 100%;
+      height: 100%;
+      border-radius: 0;
+    }
+
+    .tutorial-player iframe {
+      display: block;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      height: auto;
+      border: none;
+      border-radius: 6px;
+    }
+
+    @media (max-width: 720px) {
+      .tutorial-tab {
+        flex: 1 1 45%;
+      }
+    }
+
     /* ── Footer ── */
     footer {
       border-top: 1px solid var(--border);
@@ -596,12 +692,12 @@
       <div class="edition-card featured">
         <div class="edition-label green">Dipper Features</div>
         <div class="edition-title">Machine Learning for Bioacoustics</div>
-        <div class="edition-desc">Complete application with annotation, inference, and extraction. Automatically
-          installs a ~700 MB ML environment on first use.</div>
+        <div class="edition-desc">Get from audio datasets to verified species detection histories efficiently—without writing a line of code.</div>
         <ul class="feature-list">
-          <li>Everything in Dipper Review</li>
           <li>Apply machine learning classifiers</li>
-          <li>Select clips for review</li>
+          <li>Stratified selection of ML detections for review</li>
+          <li>Efficient keyboard-based annotation</li>
+          <li>Grid-view and Focus-view annotation layouts</li>
           <li class="no">Coming soon: Custom classifier training</li>
         </ul>
       </div>
@@ -622,11 +718,16 @@
           <p>On first launch, right-click → Open to bypass Gatekeeper if the app is unsigned.</p>
         </div> -->
         <div class="info-card">
-          <h3>Model Support</h3>
-          <p>The app supports running all major foundation models for bioacoustics, including BirdNET, Perch V2, and HawkEars</p>
+          <h3>ML Model Support</h3>
+          <p>The app includes all major foundation models for bioacoustics, including BirdNET, Perch V2, and HawkEars</p>
+          <div class="model-logos">
+            <img src="img/logos/birdnet.png" alt="BirdNET" title="BirdNET" />
+            <img src="img/logos/perch.png" alt="Perch V2" title="Perch V2" />
+            <img src="img/logos/hawkears.jpg" alt="HawkEars" title="HawkEars" />
+          </div>
         </div>
         <div class="info-card">
-          <h3>Linux note</h3>
+          <h3>Linux installation</h3>
           <p>Make the AppImage executable: <code
               style="color:var(--accent);font-size:0.8rem">chmod +x Dipper*.AppImage</code>, then run it.</p>
         </div>
@@ -666,36 +767,51 @@
 
     <section id="tutorials">
       <h2>Video Tutorials</h2>
-      <div class="info-grid">
-        <div class="info-card">
-          <a href="https://drive.google.com/file/d/17mMykp1Ki4KxNUKVl07vHkZDVyB6O8l8/view">Detect and review Ruffed Grouse drumming</a>
+      <br>
+      <p>Download demo datasets <a
+          href="https://drive.google.com/drive/folders/1khqBoNmXWaXUw3P6RT-qPjlK73YYIQ2n?usp=sharing">here</a></p>
+        <br>
+      <div class="tutorial-layout">
+        <div class="tutorial-nav" role="tablist" aria-label="Video tutorials">
+          <button class="tutorial-tab active" role="tab" aria-selected="true"
+            data-src="https://drive.google.com/file/d/17mMykp1Ki4KxNUKVl07vHkZDVyB6O8l8/preview">Detect and review
+            Ruffed Grouse drumming</button>
+          <button class="tutorial-tab" role="tab" aria-selected="false"
+            data-src="https://drive.google.com/file/d/1JSfkiSOju1JeOL3t6V905DDMyA8eFYam/preview">Basic
+            Annotation</button>
+          <button class="tutorial-tab" role="tab" aria-selected="false"
+            data-src="https://drive.google.com/file/d/1PGjZ7lxBVXkaiy1jJBCZNQr4MzlTDG6U/preview">Classifier-Guided
+            Listening</button>
+          <button class="tutorial-tab" role="tab" aria-selected="false"
+            data-src="https://drive.google.com/file/d/1Gy4gl7mWVbvwPlGeXL8t1eezI9ExViPk/preview">Configuration
+            and View Settings</button>
         </div>
-        <div class="info-card">
-          <a href="https://drive.google.com/file/d/1JSfkiSOju1JeOL3t6V905DDMyA8eFYam/view?t=3">Basic Annotation</a>
+        <div class="tutorial-player" id="tutorial-player">
+          <iframe id="tutorial-frame"
+            src="https://drive.google.com/file/d/17mMykp1Ki4KxNUKVl07vHkZDVyB6O8l8/preview" width="640" height="480"
+            allow="autoplay; fullscreen" allowfullscreen></iframe>
         </div>
-        <div class="info-card">
-          <a href="https://drive.google.com/file/d/1PGjZ7lxBVXkaiy1jJBCZNQr4MzlTDG6U/view">Classifier-Guided
-            Listening</a>
-        </div>
-        <div class="info-card">
-          <a href="https://drive.google.com/file/d/1Gy4gl7mWVbvwPlGeXL8t1eezI9ExViPk/view">Configuration
-            and View Settings</a>
-        </div>
-
       </div>
-      Find demo datasets <a href="https://drive.google.com/drive/folders/1khqBoNmXWaXUw3P6RT-qPjlK73YYIQ2n?usp=sharing">here</a></h2>
       
+      <script>
+        (function () {
+          const frame = document.getElementById('tutorial-frame');
+          const tabs = document.querySelectorAll('.tutorial-tab');
+          tabs.forEach(function (tab) {
+            tab.addEventListener('click', function () {
+              tabs.forEach(function (t) {
+                t.classList.remove('active');
+                t.setAttribute('aria-selected', 'false');
+              });
+              tab.classList.add('active');
+              tab.setAttribute('aria-selected', 'true');
+              frame.src = tab.dataset.src;
+            });
+          });
+        })();
+      </script>
     </section>
 
-
-    <!-- ── All Releases ── -->
-    <section id="releases">
-      <h2>All Releases</h2>
-      <p class="section-sub">Click any asset to download directly from GitHub Releases.</p>
-      <div id="releases-container">
-        <p class="releases-loading">Loading releases…</p>
-      </div>
-    </section>
 
     <!-- ── About ── -->
     <section id="about">
@@ -712,19 +828,20 @@
           <p>Run trained models over large audio datasets and review detections in the built-in reviewer.</p>
         </div>
         <div class="info-card">
-          <h3>Training</h3>
-          <p>Fine-tune or train bioacoustics classifiers using OpenSoundscape and PyTorch.</p>
-        </div>
-        <div class="info-card">
-          <h3>Cross-platform</h3>
-          <p>Built with Tauri + React. Native desktop experience on macOS, Windows, and Linux.</p>
-        </div>
-        <div class="info-card">
           <h3>Bugs and Feature Requests</h3>
           <p>Report issues or request new features on our <a href="https://github.com/sammlapp/dipper/issues">GitHub
               Issues</a> page.</p>
         </div>
 
+      </div>
+    </section>
+
+    <!-- ── All Releases ── -->
+    <section id="releases">
+      <h2>All Releases</h2>
+      <p class="section-sub">Click any asset to download directly from GitHub Releases.</p>
+      <div id="releases-container">
+        <p class="releases-loading">Loading releases…</p>
       </div>
     </section>
 
