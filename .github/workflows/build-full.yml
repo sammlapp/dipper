@@ -80,7 +80,7 @@ jobs:
             rust_target: x86_64-pc-windows-msvc
             pyinstaller_artifact: dipper-backend-windows-x64
           - platform: linux-x64
-            os: ubuntu-latest
+            os: ubuntu-22.04
             rust_target: x86_64-unknown-linux-gnu
             pyinstaller_artifact: dipper-backend-linux-x64
 
