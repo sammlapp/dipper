@@ -21,7 +21,7 @@ jobs:
             artifact_name: dipper-backend-macos-arm64
           - os: windows-latest
             artifact_name: dipper-backend-windows-x64
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             artifact_name: dipper-backend-linux-x64
 
     steps:
