@@ -2,6 +2,11 @@
 
 A cross-platform desktop application for bioacoustics machine learning with active learning capabilities. Built with Tauri and React for the frontend, and Python for the ML backend.
 
+[![DOI](https://zenodo.org/badge/1019894385.svg)](https://doi.org/10.5281/zenodo.21877119)
+
+Suggested citation:
+> Lapp, Sam, and Kitzes, Justin, 2026. Dipper version 0.2.0. DOI: 10.5281/zenodo.21877119
+
 ## Features
 
 - **Species Detection Inference**: Run pre-trained models from the bioacoustics model zoo
