@@ -33,7 +33,7 @@ function XCClipCard({ recording, backendUrl }) {
       url: audioUrl,
       spec_window_size: viz?.spec_window_size || 512,
       spectrogram_colormap: viz?.spectrogram_colormap || 'greys_r',
-      dB_range: JSON.stringify(viz?.dB_range || [-80, -20]),
+      dB_range: JSON.stringify(viz?.dB_range || [-110, -30]),
       use_bandpass: 'false',
       resize_images: 'true',
       image_width: 224,

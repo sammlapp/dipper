@@ -68,7 +68,7 @@ export const useHttpAudioLoader = (serverUrl) => {
       end_time: (end_time || start_time + 3).toString(),
       spec_window_size: (settings.spec_window_size || 512).toString(),
       spectrogram_colormap: settings.spectrogram_colormap || 'greys_r',
-      dB_range: JSON.stringify(settings.dB_range || [-80, -20]),
+      dB_range: JSON.stringify(settings.dB_range || [-110, -30]),
       use_bandpass: (settings.use_bandpass || false).toString(),
       bandpass_range: JSON.stringify(settings.bandpass_range || [500, 8000]),
       show_reference_frequency: (settings.show_reference_frequency || false).toString(),
@@ -76,7 +76,7 @@ export const useHttpAudioLoader = (serverUrl) => {
       resize_images: (settings.resize_images !== false).toString(),
       image_width: (settings.image_width || 224).toString(),
       image_height: (settings.image_height || 224).toString(),
-      normalize_audio: (settings.normalize_audio !== false).toString()
+      normalize_audio: (settings.normalize_audio === true).toString()
     });
 
     const startTime = performance.now();
@@ -151,7 +151,7 @@ export const useHttpAudioLoader = (serverUrl) => {
       const defaultSettings = {
         spec_window_size: 512,
         spectrogram_colormap: 'greys_r',
-        dB_range: [-80, -20],
+        dB_range: [-110, -30],
         use_bandpass: false,
         bandpass_range: [500, 8000],
         show_reference_frequency: false,
@@ -159,7 +159,7 @@ export const useHttpAudioLoader = (serverUrl) => {
         resize_images: true,
         image_width: 224,
         image_height: 224,
-        normalize_audio: true,
+        normalize_audio: false,
         max_workers: 4,
         ...settings
       };

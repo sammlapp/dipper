@@ -6,7 +6,7 @@ function DisplaySettings({ onSettingsChange }) {
   const [settings, setSettings] = useState({
     spec_window_size: 512,
     spectrogram_colormap: 'greys_r',
-    dB_range: [-80, -20],
+    dB_range: [-110, -30],
     use_bandpass: false,
     bandpass_range: [500, 8000],
     show_reference_frequency: false,
@@ -55,7 +55,7 @@ function DisplaySettings({ onSettingsChange }) {
     const defaults = {
       spec_window_size: 512,
       spectrogram_colormap: 'viridis',
-      dB_range: [-80, -20],
+      dB_range: [-110, -30],
       use_bandpass: false,
       bandpass_range: [500, 8000],
       show_reference_frequency: false,

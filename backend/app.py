@@ -1317,7 +1317,7 @@ def process_single_clip(clip_data, settings):
             samples = np.concatenate((samples, np.zeros(pad_length)))
 
         # Normalize audio if requested
-        if settings.get("normalize_audio", True):
+        if settings.get("normalize_audio", False):
             samples = samples / (np.max(np.abs(samples)) + 1e-8)
 
         # Create spectrogram
@@ -1667,7 +1667,7 @@ class DipperServer:
             "resize_images": params.get("resize_images", "true").lower() == "true",
             "image_width": int(params.get("image_width", 224)),
             "image_height": int(params.get("image_height", 224)),
-            "normalize_audio": params.get("normalize_audio", "true").lower() == "true",
+            "normalize_audio": params.get("normalize_audio", "false").lower() == "true",
         }
 
         try:
@@ -2042,7 +2042,7 @@ class DipperServer:
                 "resize_images": params.get("resize_images", "true").lower() == "true",
                 "image_width": int(params.get("image_width", 224)),
                 "image_height": int(params.get("image_height", 224)),
-                "normalize_audio": params.get("normalize_audio", "true").lower()
+                "normalize_audio": params.get("normalize_audio", "false").lower()
                 == "true",
             }
 
@@ -2606,11 +2606,13 @@ class DipperServer:
             # First column is the model's native class label
             native_col = df.columns[0]
             records = df.to_dict(orient="records")
-            return web.json_response({
-                "status": "success",
-                "native_col": native_col,
-                "labels": records,
-            })
+            return web.json_response(
+                {
+                    "status": "success",
+                    "native_col": native_col,
+                    "labels": records,
+                }
+            )
         except ValueError as e:
             return web.json_response({"status": "error", "error": str(e)}, status=400)
         except Exception as e:

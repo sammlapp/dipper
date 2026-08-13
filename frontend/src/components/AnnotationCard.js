@@ -329,7 +329,7 @@ const AnnotationCard = memo(function AnnotationCard({
           const settings = savedSettings ? JSON.parse(savedSettings) : {
             spec_window_size: 512,
             spectrogram_colormap: 'greys_r',
-            dB_range: [-80, -20],
+            dB_range: [-110, -30],
             use_bandpass: false,
             bandpass_range: [500, 8000],
             show_reference_frequency: false,

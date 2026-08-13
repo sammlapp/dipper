@@ -683,7 +683,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
           visualizationSettings = {
             spec_window_size: 512,
             spectrogram_colormap: 'greys_r',
-            dB_range: [-80, -20],
+            dB_range: [-110, -30],
             use_bandpass: false,
             bandpass_range: [500, 8000],
             show_reference_frequency: false,
@@ -720,7 +720,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
         if (visualizationSettings.dB_range[0] >= visualizationSettings.dB_range[1]) {
           console.error('Invalid dB range: dB_min must be less than dB_max', visualizationSettings.dB_range);
           // Auto-fix invalid range instead of throwing error
-          console.warn('Auto-fixing invalid dB range to default [-80, -20]');
+          console.warn('Auto-fixing invalid dB range to default [-110, -30]');
           visualizationSettings.dB_range = [-80, -20];
         }
 
@@ -2537,7 +2537,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
         visualizationSettings = {
           spec_window_size: 512,
           spectrogram_colormap: 'greys_r',
-          dB_range: [-80, -20],
+          dB_range: [-110, -30],
           use_bandpass: false,
           bandpass_range: [500, 8000],
           show_reference_frequency: false,

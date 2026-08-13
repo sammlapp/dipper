@@ -54,7 +54,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     // Spectrogram settings
     spec_window_size: 512,
     spectrogram_colormap: 'greys_r',
-    dB_range: [-80, -20],
+    dB_range: [-110, -30],
     use_bandpass: false,
     bandpass_range: [500, 8000],
     show_reference_frequency: false,
@@ -93,7 +93,10 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     clip_duration: 3.0,
 
     // Annotation column for binary mode
-    annotation_column: 'annotation'
+    annotation_column: 'annotation',
+
+    // Audio normalization
+    normalize_audio: false
   });
 
   // Local state for text inputs to allow editing
@@ -187,6 +190,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
       resize_images: newSettings.resize_images,
       image_width: newSettings.image_width,
       image_height: newSettings.image_height,
+      normalize_audio: newSettings.normalize_audio,
     };
     localStorage.setItem('visualization_settings', JSON.stringify(visualizationSettings));
 
@@ -207,7 +211,8 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
       key === 'resize_images' ||
       key === 'image_width' ||
       key === 'image_height' ||
-      key === 'focus_size';
+      key === 'focus_size' ||
+      key === 'normalize_audio';
 
     if (visualizationSettingsChanged) {
       // Clear cache to ensure fresh spectrograms
@@ -232,7 +237,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     const defaults = {
       spec_window_size: 512,
       spectrogram_colormap: 'greys_r', // Back to standard default
-      dB_range: [-80, -20],
+      dB_range: [-110, -30],
       use_bandpass: false,
       bandpass_range: [500, 8000],
       show_reference_frequency: false,
@@ -259,7 +264,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     const defaultVisualizationSettings = {
       spec_window_size: 512,
       spectrogram_colormap: 'greys_r', // Back to standard default
-      dB_range: [-80, -20],
+      dB_range: [-110, -30],
       use_bandpass: false,
       bandpass_range: [500, 8000],
       show_reference_frequency: false,
@@ -267,7 +272,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
       resize_images: true,
       image_width: 400,
       image_height: 200,
-      normalize_audio: true
+      normalize_audio: false
     };
 
     // Clear ALL localStorage keys related to settings
@@ -794,7 +799,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
               checked={settings.use_bandpass}
               onChange={(e) => handleSettingChange('use_bandpass', e.target.checked)}
             />
-            <span>Enable Bandpass Filter</span>
+            <span>Bandpass spectrograms</span>
           </label>
 
           <label className="toggle-label">
@@ -804,6 +809,15 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
               onChange={(e) => handleSettingChange('show_reference_frequency', e.target.checked)}
             />
             <span>Show Reference Frequency Line</span>
+          </label>
+
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={settings.normalize_audio === true}
+              onChange={(e) => handleSettingChange('normalize_audio', e.target.checked)}
+            />
+            <span>Normalize Audio</span>
           </label>
         </div>
       </div>
