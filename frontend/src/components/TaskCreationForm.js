@@ -56,7 +56,7 @@ const DEFAULT_VALUES = {
     model: 'Perch2',
     overlap: 0.0,
     batch_size: null,
-    worker_count: 0,
+    worker_count: null,
     output_dir: '',
     sparse_outputs_enabled: false,
     sparse_save_threshold: -3.,
@@ -119,6 +119,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
   const [fileCount, setFileCount] = useState(DEFAULT_VALUES.fileCount);
   const [firstFile, setFirstFile] = useState('');
   const [isCountingFiles, setIsCountingFiles] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState(null);
 
   // Available audio extensions with their descriptions
   const availableExtensions = [
@@ -134,6 +135,25 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
 
   // Selected extensions (default to most common)
   const [selectedExtensions, setSelectedExtensions] = useState(DEFAULT_VALUES.selectedExtensions);
+  const [otherExtensionsText, setOtherExtensionsText] = useState('');
+
+  const knownExts = availableExtensions.map(e => e.ext);
+  const otherExts = otherExtensionsText
+    .split(',')
+    .map(s => s.trim().toLowerCase().replace(/^\./, ''))
+    .filter(s => s.length > 0);
+  const handleOtherExtensionsChange = (text) => {
+    setOtherExtensionsText(text);
+    const exts = text
+      .split(',')
+      .map(s => s.trim().toLowerCase().replace(/^\./, ''))
+      .filter(s => s.length > 0);
+    setSelectedExtensions(prev => {
+      const next = [...new Set([...prev.filter(e => knownExts.includes(e)), ...exts])];
+      regeneratePatternsIfNeeded(next);
+      return next;
+    });
+  };
 
   const [config, setConfig] = useState(DEFAULT_VALUES.config);
 
@@ -281,12 +301,20 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
   };
 
 
-  const handleExtensionChange = (ext, checked) => {
-    if (checked) {
-      setSelectedExtensions(prev => [...prev, ext]);
-    } else {
-      setSelectedExtensions(prev => prev.filter(e => e !== ext));
+  const regeneratePatternsIfNeeded = (exts) => {
+    if (fileSelectionMode === 'folder' && selectedFolder) {
+      const patterns = generatePatternsForExtensions(selectedFolder, exts);
+      setConfig(prev => ({ ...prev, file_globbing_patterns: patterns }));
+      countFilesFromPatterns(patterns);
     }
+  };
+
+  const handleExtensionChange = (ext, checked) => {
+    setSelectedExtensions(prev => {
+      const next = checked ? [...new Set([...prev, ext])] : prev.filter(e => e !== ext);
+      regeneratePatternsIfNeeded(next);
+      return next;
+    });
   };
 
   const generatePatternsForExtensions = (basePath, extensions) => {
@@ -318,8 +346,9 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
     try {
       const folder = await selectFolder();
       if (folder && selectedExtensions.length > 0) {
+        setSelectedFolder(folder);
         // Create globbing patterns for selected extensions
-        const patterns = generatePatternsForExtensions(folder, selectedExtensions);
+        const patterns = generatePatternsForExtensions(folder, [...new Set(selectedExtensions)]);
 
         setConfig(prev => ({
           ...prev,
@@ -544,6 +573,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
     setFileCount(DEFAULT_VALUES.fileCount);
     setFirstFile('');
     setSelectedExtensions([...DEFAULT_VALUES.selectedExtensions]);
+    setOtherExtensionsText('');
     setConfig({
       ...DEFAULT_VALUES.config,
       ribbit_settings: { ...DEFAULT_VALUES.config.ribbit_settings, noise_bands: [[0, 200]] },
@@ -650,6 +680,8 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
           setFileSelectionMode(configData.file_selection_mode || 'files');
           setGlobPatterns(configData.glob_patterns_text || '');
           setSelectedExtensions(configData.selected_extensions || ['wav', 'mp3', 'flac']);
+          const loadedOther = (configData.selected_extensions || []).filter(e => !knownExts.includes(e));
+          if (loadedOther.length > 0) setOtherExtensionsText(loadedOther.join(', '));
 
           setConfig(prev => ({
             ...prev,
@@ -662,7 +694,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
             split_by_subfolder: configData.split_by_subfolder || false,
             overlap: configData.inference_settings?.clip_overlap || 0.0,
             batch_size: configData.inference_settings?.batch_size ?? null,
-            worker_count: configData.inference_settings?.num_workers ?? 0,
+            worker_count: configData.inference_settings?.num_workers !== undefined ? configData.inference_settings.num_workers : null,
             sparse_outputs_enabled: configData.sparse_outputs?.enabled || false,
             sparse_save_threshold: configData.sparse_outputs?.threshold || -3.0,
             use_custom_python_env: configData.python_environment?.use_custom || false,
@@ -809,6 +841,16 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
                             </span>
                           </label>
                         ))}
+                        <label className="extension-checkbox" style={{ alignItems: 'center' }}>
+                          <span className="extension-label">Other:</span>
+                          <input
+                            type="text"
+                            value={otherExtensionsText}
+                            onChange={(e) => handleOtherExtensionsChange(e.target.value)}
+                            placeholder="e.g. opus, wv"
+                            style={{ marginLeft: 4, width: 120, fontSize: '0.8rem', padding: '2px 5px', border: '1px solid var(--border-color)', borderRadius: 3, background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+                          />
+                        </label>
                       </div>
                     </div>
                     <div className="file-selection-buttons">
@@ -821,6 +863,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
                             setConfig(prev => ({ ...prev, file_globbing_patterns: [] }));
                             setFileCount(0);
                             setFirstFile('');
+                            setSelectedFolder(null);
                           }}
                           className="button-clear"
                           title="Clear selected folder"
@@ -856,6 +899,16 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
                             </span>
                           </label>
                         ))}
+                        <label className="extension-checkbox" style={{ alignItems: 'center' }}>
+                          <span className="extension-label">Other:</span>
+                          <input
+                            type="text"
+                            value={otherExtensionsText}
+                            onChange={(e) => handleOtherExtensionsChange(e.target.value)}
+                            placeholder="e.g. opus, wv"
+                            style={{ marginLeft: 4, width: 120, fontSize: '0.8rem', padding: '2px 5px', border: '1px solid var(--border-color)', borderRadius: 3, background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+                          />
+                        </label>
                       </div>
                     </div>
                     <textarea
@@ -1057,11 +1110,19 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label style={{ fontSize: '0.8rem' }}>Workers <HelpIcon section="inference-workers" /></label>
-                    <input className="compact-input" type="number" min="1" max="8"
-                      value={config.worker_count}
-                      onChange={(e) => setConfig(prev => ({ ...prev, worker_count: parseInt(e.target.value) }))}
-                      style={{ width: 70 }}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input type="checkbox"
+                        checked={config.worker_count === null}
+                        onChange={(e) => setConfig(prev => ({ ...prev, worker_count: e.target.checked ? null : 0 }))}
+                      />
+                      <span style={{ fontSize: '0.8rem' }}>Auto</span>
+                      <input className="compact-input" type="number" min="0" max="8"
+                        value={config.worker_count ?? ''}
+                        disabled={config.worker_count === null}
+                        onChange={(e) => setConfig(prev => ({ ...prev, worker_count: parseInt(e.target.value) || 0 }))}
+                        style={{ width: 60 }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

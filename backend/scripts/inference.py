@@ -92,10 +92,13 @@ def run_inference(files, model, config_data):
             else:
                 # handle default batch size for GPU vs CPU
                 if config_data["inference_settings"]["batch_size"] is None:
-                    (
-                        config_data["inference_settings"]["batch_size"],
-                        config_data["inference_settings"]["num_workers"],
-                    ) = get_default_inference_settings(config_data)
+                    config_data["inference_settings"]["batch_size"] = (
+                        get_default_batch_size(config_data)
+                    )
+                if config_data["inference_settings"]["num_workers"] is None:
+                    config_data["inference_settings"][
+                        "num_workers"
+                    ] = get_default_num_workers()
                 predictions = model.predict(files, **config_data["inference_settings"])
                 # subset classes if species_filter is enabled
                 if config_data.get("species_filter", {}).get("enabled", False):
@@ -590,34 +593,45 @@ def _get_cores():
         return os.cpu_count()
 
 
-def get_default_parameters(config_data):
+def get_default_batch_size(config_data):
     """select reasonable or empirically determined default parameters for inference based on the model name and available device"""
     # defaults for cpu: 1 batch size and 0 workers
+    # revisit these defaults as we gather more empirical data on inference performance across different models and hardware
     batch_size = 1
-    num_workers = 0
     device = _get_available_device()
     model_name = config_data.get("model_name")
     if device == "cuda":
         # defaults for CUDA GPU without model-specific tuning
         batch_size = 128
-        num_workers = _get_cores() // 2
         if model_name in ("HawkEars", "HawkEars2"):
             batch_size = 512
-        elif model_name in ("Perch2", "Perch2LiteRT", "Perch2ONNX"):
+        elif model_name in ("Perch", "Perch2", "Perch2LiteRT", "Perch2ONNX"):
             # larger model, stick to smaller batch size
             batch_size = 64
     elif device == "mps":
         # defaults for MPS (Apple Silicon GPU) without model-specific tuning
+        # empirically, workers=0 often fastest for inference on MPS
         batch_size = 128
-        num_workers = 0
         if model_name in ("HawkEars", "HawkEars2"):
             batch_size = 512
-        elif model_name in ("Perch2", "Perch2LiteRT", "Perch2ONNX"):
+        elif model_name in ("Perch", "Perch2", "Perch2LiteRT", "Perch2ONNX"):
             # larger model, stick to smaller batch size
             batch_size = 64
-        # workers=0 often fastest for inference on MPS
 
-    return batch_size, num_workers
+    return batch_size
+
+
+def get_default_num_workers(config_data):
+    device = _get_available_device()
+    num_workers = 0
+    if device == "cuda":
+        # typically on linux, using several workers optimizes performance for GPU inference
+        # up to about 8-12 workers
+        num_workers = min(_get_cores(), 10)
+    elif device == "mps":
+        # empirically, workers=0 often fastest for inference on MPS
+        num_workers = 0
+    return num_workers
 
 
 def main():

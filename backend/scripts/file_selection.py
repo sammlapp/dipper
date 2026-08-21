@@ -2,6 +2,22 @@ from pathlib import Path
 from glob import glob
 import os
 
+# Audio file extensions (case-insensitive)
+AUDIO_EXTENSIONS = {
+    ".wav",
+    ".mp3",
+    ".flac",
+    ".ogg",
+    ".m4a",
+    ".aac",
+    ".wma",
+    ".aiff",
+}
+
+
+def _is_audio_file(filepath):
+    return Path(filepath).suffix.lower() in AUDIO_EXTENSIONS
+
 
 def resolve_files_from_config(config_data, logger=None):
     """
@@ -19,17 +35,6 @@ def resolve_files_from_config(config_data, logger=None):
     Raises:
         ValueError: If multiple file selection methods are specified or none found
     """
-    # Audio file extensions (case-insensitive)
-    AUDIO_EXTENSIONS = {
-        ".wav",
-        ".mp3",
-        ".flac",
-        ".ogg",
-        ".m4a",
-        ".aac",
-        ".wma",
-        ".aiff",
-    }
 
     # Check which file selection methods are specified
     has_files = bool(config_data.get("files"))
@@ -72,7 +77,23 @@ def resolve_files_from_config(config_data, logger=None):
         for pattern in patterns:
             try:
                 matched_files = glob(pattern, recursive=True)
-                files.extend(matched_files)
+
+                # if pattern ends with wildcard, filter to audio files only
+                # to avoid including text/other files for ml inference
+                if pattern.endswith("*") or pattern.endswith("**"):
+                    # Filter by audio file extensions
+                    # this filters out custom user-specified extensions!
+                    filtered_files = [f for f in matched_files if _is_audio_file(f)]
+                    filtered_count = len(matched_files) - len(filtered_files)
+                    if filtered_count > 0:
+                        if logger:
+                            logger.info(
+                                f"Filtered out {filtered_count} non-audio files from pattern '{pattern}'"
+                            )
+                    files.extend(filtered_files)
+                else:
+                    files.extend(matched_files)
+
                 if logger:
                     logger.info(
                         f"Pattern '{pattern}' matched {len(matched_files)} files"
@@ -101,26 +122,15 @@ def resolve_files_from_config(config_data, logger=None):
                 logger.error(f"Failed to read file list '{file_list_path}': {e}")
             raise ValueError(f"Failed to read file list '{file_list_path}': {e}")
 
-    # Filter by audio file extensions
-    def is_audio_file(filepath):
-        return Path(filepath).suffix.lower() in AUDIO_EXTENSIONS
-
-    audio_files = [f for f in files if is_audio_file(f)]
-    filtered_count = len(files) - len(audio_files)
-
-    if filtered_count > 0:
-        if logger:
-            logger.info(f"Filtered out {filtered_count} non-audio files")
-
     # Remove duplicates while preserving order
     seen = set()
     unique_files = []
-    for f in audio_files:
+    for f in files:
         if f not in seen:
             seen.add(f)
             unique_files.append(f)
 
-    duplicates_removed = len(audio_files) - len(unique_files)
+    duplicates_removed = len(files) - len(unique_files)
     if duplicates_removed > 0:
         if logger:
             logger.info(f"Removed {duplicates_removed} duplicate files")
