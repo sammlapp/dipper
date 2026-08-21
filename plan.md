@@ -1,6 +1,19 @@
 This project will create a cross-platform desktop app that runs pytorch machine learning models and allows users to train models in an active learning loop. 
+
+## Projects
+
+We're going to introduce a new conceptual layer to the user experience: projects.
+A project is mechanically just a folder on the user's disk. The project will wrap several aspects of the workflow:
+- when creating a project, the user selects a classifier and defines a class list (same UI currently in Model Config)
+- opening a project is an app-wide operation; we can add a Project Tab where the user opens/creates/configures project settings
+- when no project is open, the app behavior matches current behavior
+- when a project is open:
+1. the project folder because the default location to save inference and extraction job outputs: project/classifier_predictions/ and project/review_tasks. User can over-ride, but the field is no longer required and defaults to the project-specific output directory. 
+2. The classifier and model config default to project config
+3. A summary of the classifier predictions (project/classifier_predictions) and of the review tasks (project/review_tasks) is visible in the Project tab. User can click on one of the project's review tasks to open it in the Review Tab. 
+
+
 ## 1.0.0 release items:
-- move backend check button and port display from settings panel of Review tab to full app Settings panel, with debugging log button
 - show dipper version number in settings panel
 
 ## claude start up prompt
