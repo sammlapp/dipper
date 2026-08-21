@@ -418,9 +418,6 @@ function App() {
                   • {taskHistory.filter(t => t.status === 'queued').length} queued
                 </span>
               )}
-              <span className="server-status">
-                • Backend: {backendUrl ? backendUrl.replace('http://localhost:', 'port ') : 'connecting...'}
-              </span>
             </div>
           )}
         </div>

@@ -326,6 +326,21 @@ function SettingsTab({ onEnvReady }) {
         </CardContent>
       </Card>
 
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            About
+          </Typography>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="body2" color="text.secondary">
+            <strong>Version:</strong> {process.env.REACT_APP_VERSION || require('../../package.json').version}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            <strong>Backend:</strong> {backendUrl || 'connecting…'}
+          </Typography>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
