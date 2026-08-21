@@ -424,8 +424,17 @@ const ServerFileBrowser = ({
         )}
 
         {/* Current path display */}
-        <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-          <Typography variant="caption" color="text.secondary">
+        <Box
+          sx={{
+            mt: 2,
+            p: 1,
+            bgcolor: 'var(--panel-bg)',
+            color: 'var(--text-secondary)',
+            borderRadius: 1,
+            border: '1px solid var(--border-color)'
+          }}
+        >
+          <Typography variant="caption" sx={{ color: 'inherit' }}>
             Current path: {currentPath || '/'}
           </Typography>
         </Box>
