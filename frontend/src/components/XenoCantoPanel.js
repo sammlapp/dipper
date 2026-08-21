@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Modal, Box, FormControl, Select, MenuItem } from '@mui/material';
+import { Modal, Box, FormControl, Select, MenuItem, CircularProgress } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import SearchIcon from '@mui/icons-material/Search';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
 import { useBackendUrl } from '../hooks/useBackendUrl';
 
 function getVizSettings() {
@@ -68,13 +76,13 @@ function XCClipCard({ recording, backendUrl }) {
   return (
     <div className="xc-clip-card">
       <div className="xc-clip-spectrogram" onClick={togglePlay}>
-        {loading && <div className="xc-clip-loading"><span className="material-symbols-outlined">hourglass_empty</span></div>}
-        {error && <div className="xc-clip-error"><span className="material-symbols-outlined">error</span><small>{error}</small></div>}
+        {loading && <div className="xc-clip-loading"><CircularProgress size={16} /></div>}
+        {error && <div className="xc-clip-error"><ErrorOutlineIcon /><small>{error}</small></div>}
         {spectrogram && !loading && (
           <>
             <img src={`data:image/png;base64,${spectrogram}`} alt="Spectrogram" className="annotation-spectrogram" />
             <div className={`xc-play-icon${isPlaying ? ' playing' : ''}`}>
-              <span className="material-symbols-outlined">{isPlaying ? 'pause' : 'play_arrow'}</span>
+              {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
             </div>
           </>
         )}
@@ -97,7 +105,7 @@ function XCClipCard({ recording, backendUrl }) {
           {recording.cnt && <span className="xc-clip-loc">{recording.cnt}</span>}
         </div>
         <a href={xcUrl} target="_blank" rel="noreferrer" className="xc-link">
-          <span className="material-symbols-outlined" style={{ fontSize: '13px', verticalAlign: 'middle' }}>open_in_new</span>
+          <OpenInNewIcon sx={{ fontSize: '13px', verticalAlign: 'middle' }} />
           {' '}XC{recording.id}
         </a>
       </div>
@@ -216,7 +224,7 @@ export default function XenoCantoPanel({ open, onClose }) {
             Xeno-Canto Reference
           </div>
           <button className="toolbar-btn" onClick={onClose} title="Close">
-            <span className="material-symbols-outlined">close</span>
+            <CloseIcon />
           </button>
         </div>
 
@@ -287,9 +295,7 @@ export default function XenoCantoPanel({ open, onClose }) {
               onClick={handleSearch}
               disabled={loading || (!genus.trim() && !species.trim() && !englishName.trim()) || (!!englishName.trim() && !!(genus.trim() || species.trim()))}
             >
-              {loading
-                ? <span className="material-symbols-outlined xc-spin">progress_activity</span>
-                : <span className="material-symbols-outlined">search</span>}
+              {loading ? <CircularProgress size={14} className="xc-spin" /> : <SearchIcon />}
               Search
             </button>
           </div>
@@ -321,11 +327,11 @@ export default function XenoCantoPanel({ open, onClose }) {
         {results && visibleRecordings.length > 0 && (
           <div className="xc-pagination">
             <button className="toolbar-btn" onClick={handlePrev} disabled={!canPrev}>
-              <span className="material-symbols-outlined">chevron_left</span>
+              <ChevronLeftIcon />
             </button>
             <span className="xc-page-info">Page {currentSubPage} of {totalSubPages}</span>
             <button className="toolbar-btn" onClick={handleNext} disabled={!canNextInPage && !canNextXcPage}>
-              <span className="material-symbols-outlined">chevron_right</span>
+              <ChevronRightIcon />
             </button>
           </div>
         )}

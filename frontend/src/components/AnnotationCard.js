@@ -1,6 +1,12 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { basename } from 'pathe';
 import Select from 'react-select';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import QuestionMarkIcon from '@mui/icons-material/QuestionMark';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import BoundingBoxOverlay from './BoundingBoxOverlay';
 import SpectrogramContextMenu from './SpectrogramContextMenu';
 
@@ -444,7 +450,11 @@ const AnnotationCard = memo(function AnnotationCard({
                   onClick={() => handleBinaryAnnotationChange(option.value)}
                   title={option.label}
                 >
-                  <span className="material-symbols-outlined">{option.symbol}</span>
+                  {option.symbol === 'check_circle' && <CheckCircleIcon />}
+                  {option.symbol === 'cancel' && <CancelIcon />}
+                  {option.symbol === 'help' && <HelpOutlineIcon />}
+                  {option.symbol === 'question_mark' && <QuestionMarkIcon />}
+                  {option.symbol === 'restart_alt' && <RestartAltIcon />}
                 </button>
               );
             })}
@@ -554,7 +564,10 @@ const AnnotationCard = memo(function AnnotationCard({
                   onClick={() => handleAnnotationStatusChange(option.value)}
                   title={option.label}
                 >
-                  <span className="material-symbols-outlined">{option.symbol}</span>
+                  {option.symbol === 'check_circle' && <CheckCircleIcon />}
+                  {option.symbol === 'help' && <HelpOutlineIcon />}
+                  {option.symbol === 'question_mark' && <QuestionMarkIcon />}
+                  {option.symbol === 'radio_button_unchecked' && <RadioButtonUncheckedIcon />}
                 </button>
               ))}
             </div>

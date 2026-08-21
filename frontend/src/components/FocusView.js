@@ -1,6 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { basename } from 'pathe';
 import Select from 'react-select';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import DownloadIcon from '@mui/icons-material/Download';
+import PauseIcon from '@mui/icons-material/Pause';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import SkipPreviousIcon from '@mui/icons-material/SkipPrevious';
+import SkipNextIcon from '@mui/icons-material/SkipNext';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import BoundingBoxOverlay from './BoundingBoxOverlay';
 import SpectrogramContextMenu from './SpectrogramContextMenu';
 
@@ -507,7 +518,7 @@ function FocusView({
                     onMouseLeave={() => setHoveredZone(null)}
                     title="Page backward"
                   >
-                    <span className="material-symbols-outlined focus-page-strip-arrow">chevron_left</span>
+                    <ChevronLeftIcon className="focus-page-strip-arrow" />
                   </div>
                   <div
                     className={`focus-page-strip focus-page-strip-right ${hoveredZone === 'right' ? 'hovered' : ''}`}
@@ -516,7 +527,7 @@ function FocusView({
                     onMouseLeave={() => setHoveredZone(null)}
                     title="Page forward"
                   >
-                    <span className="material-symbols-outlined focus-page-strip-arrow">chevron_right</span>
+                    <ChevronRightIcon className="focus-page-strip-arrow" />
                   </div>
                 </>
               )}
@@ -621,23 +632,21 @@ function FocusView({
                       className="audio-btn"
                       title={isPlaying ? 'Pause (space)' : 'Play (space)'}
                     >
-                      <span className="material-symbols-outlined">
-                        {isPlaying ? 'pause' : 'play_arrow'}
-                      </span>
+                      {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
                     </button>
                     <button
                       onClick={handleRestart}
                       className="audio-btn"
                       title={viewOffset !== 0 ? 'Re-center on clip' : 'Restart to clip start'}
                     >
-                      <span className="material-symbols-outlined">restart_alt</span>
+                      <RestartAltIcon />
                     </button>
                     <button
                       onClick={handleDownloadCurrentClip}
                       className="audio-btn"
                       title="Download current clip audio"
                     >
-                      <span className="material-symbols-outlined">download</span>
+                      <DownloadIcon />
                     </button>
                   </div>
                 )}
@@ -660,11 +669,7 @@ function FocusView({
                       onClick={() => handleAnnotationChangeWithAdvance(option.value === 'unlabeled' ? '' : option.value)}
                     >
                       <span className="segmented-key">({option.key})</span>
-                      {option.value === 'unlabeled' ? (
-                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>restart_alt</span>
-                      ) : (
-                        <span className="segmented-label">{option.label}</span>
-                      )}
+                        {option.value === 'unlabeled' ? <RestartAltIcon /> : <span className="segmented-label">{option.label}</span>}
                     </button>
                   ))}
                 </div>
@@ -690,23 +695,21 @@ function FocusView({
                       className="audio-btn"
                       title={isPlaying ? 'Pause (space)' : 'Play (space)'}
                     >
-                      <span className="material-symbols-outlined">
-                        {isPlaying ? 'pause' : 'play_arrow'}
-                      </span>
+                      {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
                     </button>
                     <button
                       onClick={handleRestart}
                       className="audio-btn"
                       title={viewOffset !== 0 ? 'Re-center on clip' : 'Restart to clip start'}
                     >
-                      <span className="material-symbols-outlined">restart_alt</span>
+                      <RestartAltIcon />
                     </button>
                     <button
                       onClick={handleDownloadCurrentClip}
                       className="audio-btn"
                       title="Download current clip audio"
                     >
-                      <span className="material-symbols-outlined">download</span>
+                      <DownloadIcon />
                     </button>
                   </div>
                 )}
@@ -779,7 +782,9 @@ function FocusView({
                           onClick={() => handleAnnotationStatusChange(option.value)}
                           title={option.label}
                         >
-                          <span className="material-symbols-outlined">{option.symbol}</span>
+                          {option.symbol === 'check_circle' && <CheckCircleIcon />}
+                          {option.symbol === 'help' && <HelpOutlineIcon />}
+                          {option.symbol === 'radio_button_unchecked' && <RadioButtonUncheckedIcon />}
                           <span className="status-label">{option.label}</span>
                         </button>
                       ))}
@@ -792,14 +797,14 @@ function FocusView({
                     onClick={() => onNavigate('previous')}
                     title="Previous clip (j)"
                   >
-                    <span className="material-symbols-outlined">skip_previous</span>j
+                      <SkipPreviousIcon />j
                   </button>
                   <button
                     className="nav-btn"
                     onClick={() => onNavigate('next')}
                     title="Next clip (k)"
                   >
-                    k<span className="material-symbols-outlined">skip_next</span>
+                      k<SkipNextIcon />
                   </button>
                 </div>
                 <div className="focus-comments-right">

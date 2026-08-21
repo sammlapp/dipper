@@ -299,7 +299,7 @@ body {
 
 /* Force consistent app typography over legacy per-component font declarations */
 #root,
-#root *:not(.material-symbols-outlined):not(.material-icons):not(code):not(pre):not(kbd):not(.error-details):not(.time-info):not(.audio-time):not(.audio-time-new):not(.audio-time-compact),
+#root *:not(code):not(pre):not(kbd):not(.error-details):not(.time-info):not(.audio-time):not(.audio-time-new):not(.audio-time-compact),
 button,
 input,
 select,
@@ -429,7 +429,7 @@ small {
   will-change: background-color, color;
 }
 
-.segmented-control .segment .material-symbols-outlined {
+.segmented-control .segment .MuiSvgIcon-root {
   font-size: 14px;
 }
 
@@ -3329,7 +3329,7 @@ body.dark-mode .react-select__placeholder {
   border-color: var(--dark-accent);
 }
 
-.focus-toggle-btn .material-symbols-outlined {
+.focus-toggle-btn .MuiSvgIcon-root {
   font-size: 1.1rem;
 }
 
@@ -3661,7 +3661,7 @@ body.dark-mode .react-select__placeholder {
   transition: all 0.2s ease;
 }
 
-.focus-play-button .material-symbols-outlined {
+.focus-play-button .MuiSvgIcon-root {
   font-size: 2.5rem;
 }
 
@@ -3915,8 +3915,8 @@ body.dark-mode .react-select__placeholder {
   border-color: var(--dark-accent);
 }
 
-.audio-play-button .material-symbols-outlined,
-.audio-restart-button .material-symbols-outlined {
+.audio-play-button .MuiSvgIcon-root,
+.audio-restart-button .MuiSvgIcon-root {
   font-size: 1.2rem;
 }
 
@@ -3952,7 +3952,7 @@ body.dark-mode .react-select__placeholder {
   transform: translateY(0);
 }
 
-.focus-nav-button .material-symbols-outlined {
+.focus-nav-button .MuiSvgIcon-root {
   font-size: 1.1rem;
 }
 
@@ -4023,7 +4023,7 @@ body.dark-mode .react-select__placeholder {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.focus-status-button .material-symbols-outlined {
+.focus-status-button .MuiSvgIcon-root {
   font-size: 1rem;
 }
 
@@ -4091,7 +4091,7 @@ body.dark-mode .react-select__placeholder {
   border-color: var(--dark-accent);
 }
 
-.audio-btn .material-symbols-outlined {
+.audio-btn .MuiSvgIcon-root {
   font-size: 1rem;
 }
 
@@ -4164,7 +4164,7 @@ body.dark-mode .react-select__placeholder {
   border-color: var(--dark-accent);
 }
 
-.nav-btn .material-symbols-outlined {
+.nav-btn .MuiSvgIcon-root {
   font-size: 1.1rem;
 }
 
@@ -4252,16 +4252,16 @@ body.dark-mode .react-select__placeholder {
   padding: 0.25rem;
 }
 
-.save-status-indicator .material-symbols-outlined {
+.save-status-indicator .MuiSvgIcon-root {
   font-size: 1.2rem;
   transition: color 0.3s ease;
 }
 
-.save-status-indicator .material-symbols-outlined.unsaved {
+.save-status-indicator .MuiSvgIcon-root.unsaved {
   color: #f59e0b;
 }
 
-.save-status-indicator .material-symbols-outlined.saved {
+.save-status-indicator .MuiSvgIcon-root.saved {
   color: var(--yes);
 }
 
@@ -4601,7 +4601,7 @@ body.dark-mode .react-select__placeholder {
   transform: scale(1.1);
 }
 
-.focus-play-button-new .material-symbols-outlined {
+.focus-play-button-new .MuiSvgIcon-root {
   font-size: 2rem;
 }
 
@@ -4666,7 +4666,7 @@ body.dark-mode .react-select__placeholder {
   border-color: var(--dark-accent);
 }
 
-.nav-btn-new .material-symbols-outlined {
+.nav-btn-new .MuiSvgIcon-root {
   font-size: 1.2rem;
 }
 
@@ -4702,7 +4702,7 @@ body.dark-mode .react-select__placeholder {
   transform: translateY(-1px);
 }
 
-.audio-btn-new .material-symbols-outlined {
+.audio-btn-new .MuiSvgIcon-root {
   font-size: 1.2rem;
 }
 
@@ -4794,7 +4794,7 @@ body.dark-mode .react-select__placeholder {
   font-size: 0.8rem;
 }
 
-.focus-binary-btn .material-symbols-outlined {
+.focus-binary-btn .MuiSvgIcon-root {
   font-size: 0.9rem;
 }
 
@@ -4831,7 +4831,7 @@ body.dark-mode .react-select__placeholder {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.focus-status-btn-new .material-symbols-outlined {
+.focus-status-btn-new .MuiSvgIcon-root {
   font-size: 1rem;
 }
 
@@ -4965,7 +4965,7 @@ body.dark-mode .react-select__placeholder {
   border-color: var(--dark-accent);
 }
 
-.toolbar-btn .material-symbols-outlined {
+.toolbar-btn .MuiSvgIcon-root {
   font-size: 1.2rem;
 }
 
@@ -6425,7 +6425,7 @@ body.dark-mode .bin-status-display.complete {
   transform: translateY(0);
 }
 
-.jump-incomplete-btn .material-symbols-outlined {
+.jump-incomplete-btn .MuiSvgIcon-root {
   font-size: 18px;
 }
 

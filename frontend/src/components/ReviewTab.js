@@ -3,7 +3,35 @@ import ReactSelect from 'react-select';
 
 const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(`--${name}`).trim();
 import { Drawer, IconButton, Modal, Box, Typography, FormControl, Select, MenuItem, Slider } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import {
+  BarChart as BarChartIcon,
+  Cancel as CancelIcon,
+  CheckCircle as CheckCircleIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  DarkMode as DarkModeIcon,
+  Edit as EditIcon,
+  FilterAlt as FilterAltIcon,
+  FolderOpen as FolderOpenIcon,
+  Fullscreen as FullscreenIcon,
+  GridView as GridViewIcon,
+  Comment as CommentIcon,
+  HelpOutline as HelpOutlineIcon,
+  Keyboard as KeyboardIcon,
+  LightMode as LightModeIcon,
+  Menu as MenuIcon,
+  PauseCircle as PauseCircleIcon,
+  PlayCircle as PlayCircleIcon,
+  RestartAlt as RestartAltIcon,
+  Save as SaveIcon,
+  SaveAs as SaveAsIcon,
+  Settings as SettingsIcon,
+  Sort as SortIcon,
+  Sync as SyncIcon,
+  SyncDisabled as SyncDisabledIcon,
+  Close as CloseIcon,
+  FastForward as FastForwardIcon
+} from '@mui/icons-material';
 import AnnotationCard from './AnnotationCard';
 import ReviewSettings from './ReviewSettings';
 import XenoCantoPanel from './XenoCantoPanel';
@@ -2835,7 +2863,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                 disabled={allBinsComplete}
                 title={allBinsComplete ? "All bins complete" : "Jump to next incomplete bin (⌘⇧K)"}
               >
-                <span className="material-symbols-outlined">fast_forward</span>
+                <FastForwardIcon />
                 Next Incomplete (N)
               </button>
             </div>
@@ -3824,7 +3852,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
               className="toolbar-btn"
               title="Load Annotation Task"
             >
-              <span className="material-symbols-outlined">menu</span>
+              <MenuIcon fontSize="small" />
             </button>
 
             {/* File Operations */}
@@ -3834,7 +3862,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
               title="Open Annotation File"
               disabled={loading}
             >
-              <span className="material-symbols-outlined">folder_open</span>
+              <FolderOpenIcon fontSize="small" />
             </button>
 
             {/* Save button */}
@@ -3844,7 +3872,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
               title={currentSavePath ? `Save to ${basename(currentSavePath)}` : "Save (will open save dialog)"}
               disabled={annotationData.length === 0}
             >
-              <span className="material-symbols-outlined">save</span>
+              <SaveIcon fontSize="small" />
             </button>
 
             {/* Save As button */}
@@ -3854,7 +3882,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
               title="Save As..."
               disabled={annotationData.length === 0}
             >
-              <span className="material-symbols-outlined">save_as</span>
+              <SaveAsIcon fontSize="small" />
             </button>
 
             {/* Auto-save controls */}
@@ -3864,19 +3892,17 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
               title={`Auto-save ${autoSaveEnabled ? 'ON' : 'OFF'}`}
               disabled={annotationData.length === 0}
             >
-              <span className="material-symbols-outlined">
-                {autoSaveEnabled ? 'sync' : 'sync_disabled'}
-              </span>
+              {autoSaveEnabled ? <SyncIcon fontSize="small" /> : <SyncDisabledIcon fontSize="small" />}
             </button>
 
             {/* Save Status Indicator */}
             {annotationData.length > 0 && (
               <div className="save-status-indicator">
                 <span
-                  className={`material-symbols-outlined ${hasUnsavedChanges ? 'unsaved' : 'saved'}`}
+                  className={hasUnsavedChanges ? 'unsaved' : 'saved'}
                   title={hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved'}
                 >
-                  {hasUnsavedChanges ? 'edit' : 'check_circle'}
+                  {hasUnsavedChanges ? <EditIcon fontSize="small" /> : <CheckCircleIcon fontSize="small" />}
                 </span>
                 {hasUnsavedChanges && (
                   <span className="unsaved-label">Unsaved Changes</span>
@@ -3894,9 +3920,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                   onClick={() => setIsFocusMode(!isFocusMode)}
                   title={isFocusMode ? 'Switch to Grid View (Esc)' : 'Switch to Focus Mode (Esc)'}
                 >
-                  <span className="material-symbols-outlined">
-                    {isFocusMode ? 'grid_view' : 'fullscreen'}
-                  </span>
+                  {isFocusMode ? <GridViewIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
                 </button>
 
                 {/* Bulk Annotation Controls - Only show in Grid mode for binary mode */}
@@ -3912,7 +3936,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                         title={`Mark ${unlabeledCount} unlabeled clip${unlabeledCount !== 1 ? 's' : ''} on this page as Yes`}
                         style={{ color: 'rgb(145, 180, 135)' }}
                       >
-                        <span className="material-symbols-outlined">check_circle</span>
+                        <CheckCircleIcon fontSize="small" />
                       </button>
                       <button
                         className="toolbar-btn bulk-btn"
@@ -3920,7 +3944,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                         title={`Mark ${unlabeledCount} unlabeled clip${unlabeledCount !== 1 ? 's' : ''} on this page as No`}
                         style={{ color: 'rgb(207, 122, 107)' }}
                       >
-                        <span className="material-symbols-outlined">cancel</span>
+                        <CancelIcon fontSize="small" />
                       </button>
                       <button
                         className="toolbar-btn bulk-btn"
@@ -3928,7 +3952,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                         title={`Mark ${unlabeledCount} unlabeled clip${unlabeledCount !== 1 ? 's' : ''} on this page as Uncertain`}
                         style={{ color: 'rgb(237, 223, 177)' }}
                       >
-                        <span className="material-symbols-outlined">help</span>
+                        <HelpOutlineIcon fontSize="small" />
                       </button>
                       <button
                         className="toolbar-btn bulk-btn"
@@ -3936,7 +3960,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                         title={`Mark all ${currentPageData.length} clip${currentPageData.length !== 1 ? 's' : ''} on this page as Unlabeled`}
                         style={{ color: 'rgb(223, 223, 223)' }}
                       >
-                        <span className="material-symbols-outlined">restart_alt</span>
+                        <RestartAltIcon fontSize="small" />
                       </button>
                     </div>
                   );
@@ -3949,7 +3973,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                     onClick={() => handleSettingsChange({ ...settings, show_comments: !settings.show_comments })}
                     title="Toggle Comments Visibility"
                   >
-                    <span className="material-symbols-outlined">comment</span>
+                    <CommentIcon fontSize="small" />
                   </button>
                 )}
 
@@ -3960,9 +3984,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                     onClick={() => setGridModeAutoplay(!gridModeAutoplay)}
                     title={`Grid Autoplay ${gridModeAutoplay ? 'ON' : 'OFF'}: Auto-play when advancing to next clip`}
                   >
-                    <span className="material-symbols-outlined">
-                      {gridModeAutoplay ? 'play_circle' : 'pause_circle'}
-                    </span>
+                    {gridModeAutoplay ? <PlayCircleIcon fontSize="small" /> : <PauseCircleIcon fontSize="small" />}
                   </button>
                 )}
 
@@ -3973,9 +3995,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                     onClick={() => handleSettingsChange({ ...settings, focus_mode_autoplay: !settings.focus_mode_autoplay })}
                     title="Toggle Autoplay in Focus Mode"
                   >
-                    <span className="material-symbols-outlined">
-                      {settings.focus_mode_autoplay ? 'play_circle' : 'pause_circle'}
-                    </span>
+                    {settings.focus_mode_autoplay ? <PlayCircleIcon fontSize="small" /> : <PauseCircleIcon fontSize="small" />}
                   </button>
                 )}
 
@@ -3991,7 +4011,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                           disabled={currentBinIndex === 0}
                           title="Previous Bin"
                         >
-                          <span className="material-symbols-outlined">chevron_left</span>
+                          <ChevronLeftIcon fontSize="small" />
                         </button>
 
                         <FormControl size="small" sx={{ minWidth: 90 }}>
@@ -4014,7 +4034,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                           disabled={currentBinIndex >= stratifiedBins.length - 1}
                           title="Next Bin"
                         >
-                          <span className="material-symbols-outlined">chevron_right</span>
+                          <ChevronRightIcon fontSize="small" />
                         </button>
                       </div>
                     ) : (
@@ -4027,7 +4047,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                             disabled={currentPage === 0}
                             title="Previous Page"
                           >
-                            <span className="material-symbols-outlined">chevron_left</span>
+                            <ChevronLeftIcon fontSize="small" />
                           </button>
 
                           <FormControl size="small" sx={{ minWidth: 100 }}>
@@ -4050,7 +4070,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                             disabled={currentPage >= totalPages - 1}
                             title="Next Page"
                           >
-                            <span className="material-symbols-outlined">chevron_right</span>
+                            <ChevronRightIcon fontSize="small" />
                           </button>
                         </div>
                       )
@@ -4069,7 +4089,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                 className="toolbar-btn"
                 title="Score Histogram"
               >
-                <span className="material-symbols-outlined">bar_chart</span>
+                <BarChartIcon fontSize="small" />
               </button>
             )}
 
@@ -4080,7 +4100,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                 className={`toolbar-btn ${(visibleClipIds !== null || hasActiveFilters(filters)) ? 'active' : ''}`}
                 title="Filter Clips"
               >
-                <span className="material-symbols-outlined">filter_alt</span>
+                <FilterAltIcon fontSize="small" />
               </button>
             )}
 
@@ -4091,7 +4111,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                 className={`toolbar-btn ${classifierGuidedMode.enabled ? 'active' : ''}`}
                 title="Classifier-Guided Listening"
               >
-                <span className="material-symbols-outlined">sort</span>
+                <SortIcon fontSize="small" />
               </button>
             )}
 
@@ -4101,7 +4121,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
               className="toolbar-btn"
               title="Keyboard Shortcuts"
             >
-              <span className="material-symbols-outlined">keyboard</span>
+              <KeyboardIcon fontSize="small" />
             </button>
 
             {/* Dark / Light Mode Toggle */}
@@ -4110,9 +4130,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
               className="toolbar-btn"
               title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
-              <span className="material-symbols-outlined">
-                {darkMode ? 'light_mode' : 'dark_mode'}
-              </span>
+              {darkMode ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
             </button>
 
             {/* Xeno-Canto Reference Button */}
@@ -4130,7 +4148,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
               className="toolbar-btn"
               title="Settings"
             >
-              <span className="material-symbols-outlined">settings</span>
+              <SettingsIcon fontSize="small" />
             </button>
           </div>
         </div>
@@ -4231,7 +4249,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                               disabled={focusAllBinsComplete}
                               title={focusAllBinsComplete ? "All bins complete" : "Jump to next incomplete bin (⌘⇧K)"}
                             >
-                              <span className="material-symbols-outlined">fast_forward</span>
+                              <FastForwardIcon />
                               Next Incomplete
                             </button>
                           </div>
