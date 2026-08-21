@@ -289,7 +289,7 @@ Managed through Settings tab, saved/loaded via HTTP endpoints.
 7. **Python version must match**: PyInstaller backend and conda-pack ML env must both use **Python 3.12**. A mismatch (e.g. PyInstaller built with 3.11, conda env on 3.12) causes `python311.dll conflicts` when multiprocessing spawns DataLoader workers on Windows. CI workflow (`build-full.yml`) must use `python-version: '3.12'`.
 8. **Class name CSVs must be git-tracked**: `backend/data/class_names/*.csv` are required for classifier label lookup (geomodel filtering etc.). The `*.csv` gitignore pattern must not apply to this directory.
 9. **Testing PyInstaller backend standalone is insufficient for Windows DLL issues**: Some multiprocessing/DLL conflicts only manifest in the full built app, not when running `dipper-backend.exe` directly.
-10. **num_workers defaults to 0**: DataLoader `num_workers > 0` spawns subprocesses on Windows which is fragile. Default is 0 (main-process loading).
+10. **num_workers default is auto-selected**: DataLoader `num_workers > 0` spawns subprocesses on Windows which is fragile. Default is 0 when gpu not available, but we should check the behavior of num_workers>0 with windows + gpu if this is even supported. 
 11. **soundfile handles mp3/ogg natively** (as of 2026) — no ffmpeg conversion needed for XC audio clips.
 
 ## Dependencies

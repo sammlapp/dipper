@@ -42,6 +42,12 @@ Notes:
 
 Use this for fully offline/distributable builds without runtime font CDNs.
 
+## Icons
+
+- Prefer `@mui/icons-material` SVG icons for all new UI work.
+- Avoid ligature-based icon fonts for app controls; they introduce fallback and weight inconsistencies.
+- Keep icon sizing in CSS, but source the glyphs from MUI components.
+
 ## Colors and theming
 
 ### Where to edit
@@ -57,6 +63,11 @@ Use this for fully offline/distributable builds without runtime font CDNs.
 	- helper text,
 	- selected vs unselected controls,
 	- button text states.
+
+## Component surfaces
+
+- Use theme tokens for small status/info surfaces as well, including server-mode file browser path bars.
+- Prefer `--panel-bg`, `--text-secondary`, and `--border-color` over fixed greys so the same element works in light and dark mode.
 
 ### Common tokens
 - Backgrounds: `--bg`, `--bg-surface`, `--bg-elevated`, `--panel-bg`

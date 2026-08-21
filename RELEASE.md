@@ -31,7 +31,7 @@ git push origin main
 git tag -a v0.0.13 -m "Release v0.0.13"
 git push origin v0.0.13
 
-# Full app build (includes ML environment, ~50-90 min)
+# Full app build (includes ML environment, ~45 min)
 # Uses the build-full.yml workflow — tag format: vX.Y.Z (no suffix)
 ```
 
