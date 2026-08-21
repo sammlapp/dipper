@@ -89,8 +89,29 @@ pip install -r requirements-backend.txt
 echo -e "${GREEN}  ✓ Python dependencies installed${NC}"
 echo ""
 
+# Build PyInstaller backend
+echo -e "${BLUE}[2/4] Building Python backend executable...${NC}"
+cd "$PROJECT_ROOT/backend"
+
+# Check for PyInstaller
+if ! $PYTHON_CMD -m PyInstaller --version &> /dev/null; then
+    echo "  Installing PyInstaller..."
+    pip install pyinstaller
+fi
+
+echo "  Running PyInstaller (this may take a few minutes)..."
+$PYTHON_CMD build_pyinstaller.py
+
+if [ ! -f "$PROJECT_ROOT/frontend/python-dist/dipper-backend" ]; then
+    echo -e "${RED}✗ PyInstaller build failed — dipper-backend not found${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}  ✓ Python backend built${NC}"
+echo ""
+
 # Install Node.js dependencies
-echo -e "${BLUE}[2/3] Installing Node.js dependencies...${NC}"
+echo -e "${BLUE}[3/4] Installing Node.js dependencies...${NC}"
 cd "$PROJECT_ROOT/frontend"
 
 if [ ! -f "package.json" ]; then
@@ -107,9 +128,10 @@ npm install -g serve
 
 echo -e "${GREEN}  ✓ Node.js dependencies installed${NC}"
 echo ""
+echo ""
 
 # Build React app
-echo -e "${BLUE}[3/3] Building React app for server mode...${NC}"
+echo -e "${BLUE}[4/4] Building React app for server mode...${NC}"
 cd "$PROJECT_ROOT/frontend"
 
 echo "  Building with REACT_APP_MODE=server..."

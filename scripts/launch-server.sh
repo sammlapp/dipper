@@ -104,12 +104,16 @@ echo ""
 if [ ! -d "$PROJECT_ROOT/frontend/build" ]; then
     echo -e "${YELLOW}! React build not found, building now...${NC}"
     cd "$PROJECT_ROOT/frontend"
-    # Pass backend port via both REACT_APP_* (for CRA build-time injection)
-    # and DIPPER_BACKEND_PORT (for potential runtime overrides in the browser).
-    REACT_APP_MODE=server REACT_APP_BACKEND_PORT=$PYTHON_PORT DIPPER_BACKEND_PORT=$PYTHON_PORT npm run build
+    REACT_APP_MODE=server npm run build
     echo -e "${GREEN}✓ React build complete${NC}"
     echo ""
 fi
+
+# Write runtime config so the frontend knows the backend port without a rebuild
+echo "{\"backend_port\": $PYTHON_PORT}" > "$PROJECT_ROOT/frontend/build/server-launch-config.json"
+echo "{\"backend_port\": $PYTHON_PORT}" > "$PROJECT_ROOT/frontend/public/server-launch-config.json"
+echo -e "${GREEN}✓ Runtime config written (backend port: $PYTHON_PORT)${NC}"
+echo ""
 
 # Check if pyinstaller executable backend exists
 if [ ! -f "$PROJECT_ROOT/frontend/python-dist/dipper-backend" ]; then
@@ -142,7 +146,7 @@ cd "$PROJECT_ROOT/frontend/python-dist/"
 PYTHON_PID=$!
 
 # Wait a bit for Python to start
-sleep 2
+sleep 4
 
 # Check if Python is still running
 if ! ps -p $PYTHON_PID > /dev/null; then

@@ -419,7 +419,7 @@ function App() {
                 </span>
               )}
               <span className="server-status">
-                • Backend: {backendUrl.replace('http://localhost:', 'port ')}
+                • Backend: {backendUrl ? backendUrl.replace('http://localhost:', 'port ') : 'connecting...'}
               </span>
             </div>
           )}

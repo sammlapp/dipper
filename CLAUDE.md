@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Note:** When making significant changes to the project (new features, architecture changes, setup requirements), also update [README.md](README.md) to keep the public-facing documentation current.
 
+No dumb hard-coded fallbacks! These make things harder rather than easier to maintain, debug, and refactor. 
+
 ## Project Overview
 
 Dipper is a bioacoustics machine learning desktop application built with:

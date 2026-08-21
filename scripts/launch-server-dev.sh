@@ -120,13 +120,14 @@ fi
 
 echo -e "${GREEN}  ✓ Python backend started (PID: $PYTHON_PID)${NC}"
 
+# Write runtime config to public/ so CRA dev server serves it as a static file
+echo "{\"backend_port\": $PYTHON_PORT}" > "$PROJECT_ROOT/frontend/public/server-launch-config.json"
+echo -e "${GREEN}  ✓ Runtime config written (backend port: $PYTHON_PORT)${NC}"
+
 # Start frontend dev server
 echo -e "${YELLOW}[2/2] Starting frontend dev server...${NC}"
 cd "$PROJECT_ROOT/frontend"
-# Pass backend port both as a REACT_APP_* env var (for CRA) and via a
-# runtime global (DIPPER_BACKEND_PORT) that the frontend can read if
-# process.env injection is not working in this environment.
-REACT_APP_MODE=server REACT_APP_BACKEND_PORT=$PYTHON_PORT DIPPER_BACKEND_PORT=$PYTHON_PORT PORT=$STATIC_PORT npm start > "$PROJECT_ROOT/frontend-dev.log" 2>&1 &
+REACT_APP_MODE=server PORT=$STATIC_PORT npm start > "$PROJECT_ROOT/frontend-dev.log" 2>&1 &
 FRONTEND_PID=$!
 sleep 3
 

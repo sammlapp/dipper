@@ -92,13 +92,10 @@ def run_inference(files, model, config_data):
             else:
                 # handle default batch size for GPU vs CPU
                 if config_data["inference_settings"]["batch_size"] is None:
-                    # cpu: 1, gpu: 64
-                    gpu_available = (
-                        torch.cuda.is_available() or torch.backends.mps.is_available()
-                    )
-                    config_data["inference_settings"]["batch_size"] = (
-                        64 if gpu_available else 1
-                    )
+                    (
+                        config_data["inference_settings"]["batch_size"],
+                        config_data["inference_settings"]["num_workers"],
+                    ) = get_default_inference_settings(config_data)
                 predictions = model.predict(files, **config_data["inference_settings"])
                 # subset classes if species_filter is enabled
                 if config_data.get("species_filter", {}).get("enabled", False):
@@ -566,6 +563,61 @@ def classify_from_hoplite_embeddings(files, classifier, config_data):
 
     preds = classifier(torch.tensor(train_embeddings)).detach().numpy()
     return pd.DataFrame(preds, index=clips.index, columns=classifier.class_names)
+
+
+# define a table of default inference settings
+# fall back to higher defaults when less specific defaults are not defined
+
+import os
+import subprocess
+import platform
+
+
+def _get_available_device():
+    if torch.cuda.is_available():
+        return "cuda"
+    elif torch.backends.mps.is_available():
+        return "mps"
+    else:
+        return "cpu"
+
+
+def _get_cores():
+    try:
+        # on slurm clusters, get allocated cores instead of total cores
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return os.cpu_count()
+
+
+def get_default_parameters(config_data):
+    """select reasonable or empirically determined default parameters for inference based on the model name and available device"""
+    # defaults for cpu: 1 batch size and 0 workers
+    batch_size = 1
+    num_workers = 0
+    device = _get_available_device()
+    model_name = config_data.get("model_name")
+    if device == "cuda":
+        # defaults for CUDA GPU without model-specific tuning
+        batch_size = 128
+        num_workers = _get_cores() // 2
+        if model_name in ("HawkEars", "HawkEars2"):
+            batch_size = 512
+        elif model_name in ("Perch2", "Perch2LiteRT", "Perch2ONNX"):
+            # larger model, stick to smaller batch size
+            batch_size = 64
+    elif device == "mps":
+        # defaults for MPS (Apple Silicon GPU) without model-specific tuning
+        batch_size = 128
+        num_workers = 0
+        if model_name in ("HawkEars", "HawkEars2"):
+            batch_size = 512
+        elif model_name in ("Perch2", "Perch2LiteRT", "Perch2ONNX"):
+            # larger model, stick to smaller batch size
+            batch_size = 64
+        # workers=0 often fastest for inference on MPS
+
+    return batch_size, num_workers
 
 
 def main():

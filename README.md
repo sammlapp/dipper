@@ -106,10 +106,9 @@ See [QUICKSTART_SERVER.md](QUICKSTART_SERVER.md) for detailed server mode instru
 
 The application integrates with the [bioacoustics model zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/) and includes:
 
+- **Perch, Perch V2**: Global bird species (and more) classification
 - **BirdNET**: Global bird species classification
-- **Perch**: Global bird species classification
 - **HawkEars**: Canadian bird classification CNN
-- **RanaSierraeCNN**: Frog call detection
 
 ## Dependencies
 

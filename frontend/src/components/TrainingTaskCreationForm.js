@@ -639,7 +639,7 @@ function TrainingTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady
                     value={config.model}
                     onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
                   >
-                    <MenuItem value="HawkEars_Embedding">HawkEars Embed/Transfer Learning</MenuItem>
+                    <MenuItem value="Perch2">Perch V2 acoustic embedding model</MenuItem>
                     <MenuItem value="BirdNET">BirdNET Global bird species classifier</MenuItem>
                     <MenuItem value="BirdSetEfficientNetB1">BirdSet Global bird species classifier EfficientNetB1</MenuItem>
                     <MenuItem value="Perch">Perch Global bird species classifier </MenuItem>

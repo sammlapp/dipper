@@ -384,7 +384,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
   const fileInputRef = useRef(null);
 
   // HTTP-based loader (fast and reliable)
-  const httpLoader = useHttpAudioLoader(`${backendUrl}`);
+  const httpLoader = useHttpAudioLoader(backendUrl);
 
   // Helper function to get image dimensions based on focus size setting
   const getFocusImageDimensions = (focusSize) => {
