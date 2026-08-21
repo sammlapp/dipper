@@ -24,16 +24,16 @@ function MapClickHandler({ onMapClick }) {
 
 // Which field in a species object is the class label string for each classifier (mirrors geomodel.MODEL_CLASS_COL)
 const MODEL_CLASS_COL = {
-  'BirdNET_V3.0.3': 'scientific_name',
-  'Perch2': 'scientific_name',
-  'Perch2LiteRT': 'scientific_name',
-  'Perch2ONNX': 'scientific_name',
-  'Perch': 'ebird_code',
-  'BirdSetConvNeXT': 'ebird_code',
-  'BirdSetEfficientNetB1': 'ebird_code',
-  'HawkEars_v010': 'common_name',
-  'HawkEars': 'common_name',
-};
+    "BirdNET": "composite",  
+    "Perch": "ebird_code",
+    "Perch2": "scientific_name",
+    "Perch2LiteRT": "scientific_name",
+    "Perch2ONNX": "scientific_name",
+    "BirdSetConvNeXT": "ebird_code",
+    "BirdSetEfficientNetB1": "ebird_code",
+    "HawkEars": "common_name",
+    "HawkEars_Low_Band": "common_name",
+}
 
 // Flatten a selected_species object array to a string[] of class labels for the given model
 function flattenSpeciesForConfig(selected_species, model) {
