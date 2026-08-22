@@ -19,6 +19,7 @@ const AnnotationCard = memo(function AnnotationCard({
   availableClasses = [],
   showComments = false,
   showFileName = true,
+  showDetectedClass = false,
   showBinaryControls = true, // Show yes/no/uncertain controls in binary mode
   isActive = false, // Primary active clip
   isSelected = false, // In multi-select set (not necessarily primary)
@@ -59,6 +60,7 @@ const AnnotationCard = memo(function AnnotationCard({
     audio_base64 = null,
     frequency_range = null,
     time_range = null,
+    class: detectedClass = null,
   } = clipData || {};
 
   // Read annotation and bbox from dynamic column keys based on annotationColumn prop
@@ -658,6 +660,14 @@ const AnnotationCard = memo(function AnnotationCard({
 
       {/* Card content */}
       <div className="annotation-card-content">
+        {/* Detected class */}
+        {showDetectedClass && detectedClass && (
+          <div className="detected-class" style={{
+            color: annotation === 'yes' ? colorYes : annotation === 'no' ? colorNo : annotation === 'uncertain' ? colorUncertain : cssVar('unlabeled-text'),
+            borderLeftColor: annotation === 'yes' ? colorYes : annotation === 'no' ? colorNo : annotation === 'uncertain' ? colorUncertain : colorUnlabeled,
+          }}>{detectedClass}</div>
+        )}
+
         {/* File info */}
         {showFileName && (
           <div className="file-info">

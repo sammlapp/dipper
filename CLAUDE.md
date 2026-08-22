@@ -158,6 +158,11 @@ Backend reads these files and returns via status endpoints. Frontend displays in
 ### Focus Mode Context Window (ReviewTab)
 Focus mode loads a configurable amount of audio before and after each annotation clip (default ±4 s, set via "Focus mode: context (seconds)" in ReviewSettings). `loadFocusClipSpectrogram` in ReviewTab expands `start_time`/`end_time` and passes the original clip bounds as `clip_start_time`/`clip_end_time`. `FocusView` uses these to draw a highlight overlay on the spectrogram, position the playback cursor at the annotation clip start, and display original clip times in the info row. No backend changes are needed — `/clip` already accepts arbitrary time windows.
 
+### Project Review Config Auto-Save (ReviewTab)
+When a project is open, ReviewTab auto-saves `{ view_settings, cgl_settings }` to `<project_folder>/review_config.json` on every settings or classifier-guided-listening change, debounced 1 second. On project open, if the file exists it is loaded and applied (same code path as the manual "Load Config" button). This uses `writeFile`/`readFile` from `fileOperations.js` so it works in both Tauri and server mode.
+
+**Caveat:** if GUI slowdown is observed, reduce save frequency (increase debounce) or switch to save-on-project-close only instead of save-on-change.
+
 ### Environment Management
 - **Backend env**: PyInstaller executable (bundled with app, ~50MB)
 - **Heavy env**: Conda environment with PyTorch (auto-downloaded on first use, ~700MB)

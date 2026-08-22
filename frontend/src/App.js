@@ -21,11 +21,13 @@ import ColorizeIcon from '@mui/icons-material/Colorize';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ListAltIcon from '@mui/icons-material/PlaylistPlay'
 import BubbleChartIcon from '@mui/icons-material/BubbleChart';
+import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import './App.css';
 import SongSpaceTab from './components/SongSpaceTab';
 import ReviewTab from './components/ReviewTab';
 import HelpTab from './components/HelpTab';
 import SettingsTab from './components/SettingsTab';
+import ProjectTab from './components/ProjectTab';
 import TaskCreationForm from './components/TaskCreationForm';
 import TrainingTaskCreationForm from './components/TrainingTaskCreationForm';
 import ExtractionTaskCreationForm from './components/ExtractionTaskCreationForm';
@@ -120,11 +122,14 @@ function App() {
     return null;
   })();
   const [extractionPredictionsFolder, setExtractionPredictionsFolder] = useState(null); // {folder, ts}
+  const [openProject, setOpenProject] = useState(null);
+  const [pendingReviewTask, setPendingReviewTask] = useState(null);
   const backendUrl = useBackendUrl();
 
   const [envReady, setEnvReady] = useState(false);
 
   const tabs = [
+    { id: 'project',    name: 'Project',     icon: <FolderSpecialIcon /> },
     { id: 'inference',  name: 'Inference',   icon: <PlayArrowIcon /> },
     ENABLE_TRAINING  && { id: 'training',  name: 'Training',    icon: <SchoolIcon /> },
     { id: 'extraction', name: 'Extraction',  icon: <ColorizeIcon /> },
@@ -210,6 +215,11 @@ function App() {
     // Wrap in object with timestamp so the effect always re-fires, even for the same folder
     setExtractionPredictionsFolder({ folder: jobFolder, ts: Date.now() });
     setActiveTab('extraction');
+  };
+
+  const handleOpenReviewTask = (task) => {
+    setPendingReviewTask(task);
+    setActiveTab('review');
   };
 
   // If review-only mode, render only the ReviewTab without drawer
@@ -332,11 +342,21 @@ function App() {
         minHeight: '100vh'
       }}>
         {/* Keep all tabs mounted to preserve state - only hide/show with CSS */}
+        <div style={{ display: activeTab === 'project' ? 'block' : 'none' }}>
+          <ProjectTab
+            openProject={openProject}
+            onProjectOpen={setOpenProject}
+            onProjectClose={() => setOpenProject(null)}
+            onOpenReviewTask={handleOpenReviewTask}
+          />
+        </div>
+
         <div className="tab-content" style={{ display: activeTab === 'inference' ? 'block' : 'none' }}>
           <TaskCreationForm
             onTaskCreate={handleTaskCreate}
             onTaskCreateAndRun={handleTaskCreateAndRun}
             mlEnvReady={envReady}
+            openProject={openProject}
           />
         </div>
 
@@ -357,6 +377,7 @@ function App() {
             onTaskCreateAndRunInline={handleTaskCreateAndRun}
             initialPredictionsFolder={extractionPredictionsFolder}
             mlEnvReady={envReady}
+            openProject={openProject}
           />
         </div>
 
@@ -365,7 +386,7 @@ function App() {
         </div>
 
         <div style={{ display: activeTab === 'review' ? 'block' : 'none' }}>
-          <ReviewTab drawerOpen={isDrawerOpen} isActive={activeTab === 'review'} />
+          <ReviewTab drawerOpen={isDrawerOpen} isActive={activeTab === 'review'} pendingReviewTask={pendingReviewTask} openProject={openProject} />
         </div>
 
         {ENABLE_SONGSPACE && (

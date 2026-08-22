@@ -40,7 +40,7 @@ const DEFAULT_VALUES = {
   }
 };
 
-function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, onTaskCreateAndRunInline, initialPredictionsFolder, mlEnvReady }) {
+function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, onTaskCreateAndRunInline, initialPredictionsFolder, mlEnvReady, openProject }) {
   const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
   const [settingsTab, setSettingsTab] = useState(0);
   const [config, setConfig] = useState(DEFAULT_VALUES.config);
@@ -56,6 +56,12 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, onTaskCr
     }
     // eslint-disable-next-line
   }, [initialPredictionsFolder]);
+
+  // Apply project default output_dir
+  useEffect(() => {
+    if (!openProject) return;
+    setConfig(prev => ({ ...prev, output_dir: prev.output_dir || openProject.reviewTasksDir }));
+  }, [openProject]);
 
   const handlePredictionsFolderSelection = async () => {
     try {
@@ -159,7 +165,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, onTaskCr
       return;
     }
 
-    if (!config.output_dir) {
+    if (!config.output_dir && !openProject) {
       alert('Please select an output directory');
       return;
     }
@@ -184,14 +190,15 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, onTaskCr
 
     const finalTaskName = taskName.trim() || null;
 
+    const resolvedOutputDir = config.output_dir || (openProject ? openProject.reviewTasksDir : '');
     if (createAndRun === 'inline') {
-      const taskConfig = { ...config, task_type: 'extraction_inline' };
+      const taskConfig = { ...config, output_dir: resolvedOutputDir, task_type: 'extraction_inline' };
       onTaskCreateAndRunInline(taskConfig, finalTaskName);
     } else if (createAndRun) {
-      const taskConfig = { ...config, task_type: 'extraction' };
+      const taskConfig = { ...config, output_dir: resolvedOutputDir, task_type: 'extraction' };
       onTaskCreateAndRun(taskConfig, finalTaskName);
     } else {
-      const taskConfig = { ...config, task_type: 'extraction' };
+      const taskConfig = { ...config, output_dir: resolvedOutputDir, task_type: 'extraction' };
       onTaskCreate(taskConfig, finalTaskName);
     }
   };
@@ -846,7 +853,7 @@ function ExtractionTaskCreationForm({ onTaskCreate, onTaskCreateAndRun, onTaskCr
           <button
             className="button-secondary"
             onClick={() => handleSubmit(false)}
-            disabled={!config.predictions_folder || config.class_list.length === 0 || !config.output_dir}
+            disabled={!config.predictions_folder || config.class_list.length === 0 || (!config.output_dir && !openProject)}
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
           >
             Create Task

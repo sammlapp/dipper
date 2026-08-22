@@ -311,7 +311,7 @@ function MultiSelectBar({ selectedCount, availableClasses, selectedClipIndices, 
   );
 }
 
-function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }) {
+function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true, pendingReviewTask = null, openProject = null }) {
   const backendUrl = useBackendUrl();
   const { darkMode, toggle: toggleDarkMode } = useDarkMode();
 
@@ -326,6 +326,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     grid_columns: 4,
     show_comments: false,
     show_file_name: false,
+    show_detected_class: false,
     show_binary_controls: true,
     enable_bounding_boxes: false,
     resize_images: true,
@@ -433,6 +434,53 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     view_settings: settings,
     cgl_settings: classifierGuidedMode
   });
+
+  // Auto-save review config to project folder on settings/CGL change (debounced)
+  useEffect(() => {
+    if (!openProject) return;
+    const configPath = `${openProject.folder}/review_config.json`;
+    const timer = setTimeout(async () => {
+      try {
+        const config = { view_settings: settings, cgl_settings: classifierGuidedMode };
+        await writeFile(configPath, JSON.stringify(config, null, 2));
+      } catch (e) {
+        console.warn('Failed to auto-save review config to project:', e);
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [settings, classifierGuidedMode, openProject]); // eslint-disable-line
+
+  // Load review config from project folder when project opens
+  useEffect(() => {
+    if (!openProject) return;
+    const configPath = `${openProject.folder}/review_config.json`;
+    (async () => {
+      try {
+        const content = await readFile(configPath);
+        const config = JSON.parse(content);
+        if (config.view_settings && config.cgl_settings) {
+          setSettings(config.view_settings);
+          setClassifierGuidedMode(config.cgl_settings);
+          saveConfigToLocalStorage(config);
+          const vs = config.view_settings;
+          localStorage.setItem('visualization_settings', JSON.stringify({
+            spec_window_size: vs.spec_window_size,
+            spectrogram_colormap: vs.spectrogram_colormap,
+            dB_range: vs.dB_range,
+            use_bandpass: vs.use_bandpass,
+            bandpass_range: vs.bandpass_range,
+            show_reference_frequency: vs.show_reference_frequency,
+            reference_frequency: vs.reference_frequency,
+            resize_images: vs.resize_images,
+            image_width: vs.image_width,
+            image_height: vs.image_height,
+          }));
+        }
+      } catch (e) {
+        // No saved config yet for this project — use current settings
+      }
+    })();
+  }, [openProject]); // eslint-disable-line
 
   const saveConfigToLocalStorage = (config) => {
     localStorage.setItem('review_unified_config', JSON.stringify(config));
@@ -1150,6 +1198,21 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
     const config = getUnifiedConfig();
     saveConfigToLocalStorage(config);
   }, [settings, classifierGuidedMode]);
+
+  // Open load dialog when a review task is requested programmatically (e.g. from ProjectTab)
+  useEffect(() => {
+    if (!pendingReviewTask?.path) return;
+    const filePath = pendingReviewTask.path;
+    (async () => {
+      let headers = [];
+      try {
+        const text = await readFile(filePath);
+        const firstLine = text.split('\n')[0];
+        headers = firstLine.split(',').map(h => h.trim().replace(/"/g, ''));
+      } catch (e) { /* show dialog with empty headers */ }
+      setLoadDialog({ open: true, filePath, headers });
+    })();
+  }, [pendingReviewTask]); // eslint-disable-line
 
   const handleLoadAnnotationTask = async () => {
     try {
@@ -2910,6 +2973,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
                   availableClasses={availableClasses}
                   showComments={settings.show_comments}
                   showFileName={settings.show_file_name}
+                  showDetectedClass={settings.show_detected_class}
                   showBinaryControls={settings.show_binary_controls}
                   isActive={isActive}
                   isSelected={isSelected}
@@ -2947,7 +3011,7 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
         </div>
       </>
     );
-  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, selectedClipIndices, isModifierHeld, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridDimensions, settings.review_mode, settings.annotation_column, availableClasses, settings.show_comments, settings.show_file_name, settings.show_binary_controls, settings.enable_bounding_boxes, handleAnnotationChange, handleCommentChange, handleBoundingBoxChange, handleCardClick, classifierGuidedMode, stratifiedBins]);
+  }, [currentPage, lastRenderedPage, currentBinIndex, lastRenderedBinIndex, currentPageData, lastRenderedPageData, loadedPageData, activeClipIndexOnPage, selectedClipIndices, isModifierHeld, httpLoader.isLoading, isPageTransitioning, httpLoader.progress, getGridDimensions, settings.review_mode, settings.annotation_column, availableClasses, settings.show_comments, settings.show_file_name, settings.show_detected_class, settings.show_binary_controls, settings.enable_bounding_boxes, handleAnnotationChange, handleCommentChange, handleBoundingBoxChange, handleCardClick, classifierGuidedMode, stratifiedBins]);
 
   return (
     <div className="review-tab-layout">

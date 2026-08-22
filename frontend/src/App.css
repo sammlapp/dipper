@@ -19,6 +19,7 @@
   --uncertain: rgb(237, 223, 177);
   --no: rgb(207, 122, 107);
   --unlabeled: rgb(223, 223, 223);
+  --unlabeled-text: rgb(183, 183, 183);
 
   /* Semantic theme tokens (light defaults) */
   --bg: var(--light-bg);
@@ -35,6 +36,7 @@
   --panel-shadow: rgba(57, 87, 86, 0.12);
   --surface: #ffffff;
   --surface-secondary: #f3f3f3;
+  --hover-bg: #f0f0f0;
   --input-bg: #ffffff;
   --input-border: #d1d5db;
   --dropdown-bg: #ffffff;
@@ -77,6 +79,7 @@ body.dark-mode {
   --uncertain: #877448;
   --no: #744848;
   --unlabeled: #3a3f55;
+  --unlabeled-text: #5b627f;
 
   --bg: #0f1117;
   --bg-surface: #1a1d27;
@@ -92,6 +95,7 @@ body.dark-mode {
   --panel-shadow: rgba(0, 0, 0, 0.4);
   --surface: #222636;
   --surface-secondary: #1a1d27;
+  --hover-bg: #2d3148;
   --input-bg: #222636;
   --input-border: #2e3348;
   --dropdown-bg: #222636;
@@ -2638,6 +2642,17 @@ button:disabled {
   flex-direction: column;
   gap: 0.75rem;
   padding: 5px
+}
+
+.detected-class {
+  font-size: 0.8rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-left: 3px solid;
+  padding-left: 5px;
+  margin-bottom: 2px;
 }
 
 .file-info {

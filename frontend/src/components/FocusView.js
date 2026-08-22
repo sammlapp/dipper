@@ -57,6 +57,7 @@ function FocusView({
     time_range = null,
     clip_start_time = null,
     clip_end_time = null,
+    class: detectedClass = null,
   } = clipData || {};
 
   // Context window: start_time/end_time are the loaded (extended) window.
@@ -822,6 +823,14 @@ function FocusView({
             )}
 
 
+
+            {/* Detected class */}
+            {settings?.show_detected_class && detectedClass && (
+              <div className="detected-class" style={{
+                color: annotation === 'yes' ? 'var(--yes)' : annotation === 'no' ? 'var(--no)' : annotation === 'uncertain' ? 'var(--uncertain)' : 'var(--unlabeled-text)',
+                borderLeftColor: annotation === 'yes' ? 'var(--yes)' : annotation === 'no' ? 'var(--no)' : annotation === 'uncertain' ? 'var(--uncertain)' : 'var(--unlabeled)',
+              }}>{detectedClass}</div>
+            )}
 
             {/* File info row — always shows original annotation clip times */}
             <div className="focus-info-row">

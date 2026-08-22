@@ -219,6 +219,21 @@ async fn read_text_file(file_path: String) -> Result<String, String> {
         .map_err(|e| format!("Failed to read file: {}", e))
 }
 
+/// Create a directory (and all parents)
+#[tauri::command]
+async fn mkdir(path: String) -> Result<(), String> {
+    fs::create_dir_all(&path).map_err(|e| format!("Failed to create directory: {}", e))
+}
+
+/// Return the user's Documents directory
+#[tauri::command]
+async fn get_documents_dir(app: tauri::AppHandle) -> Result<String, String> {
+    app.path()
+        .document_dir()
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| format!("Failed to get documents directory: {}", e))
+}
+
 /// Generate a unique folder name by appending numeric suffix if needed
 #[tauri::command]
 async fn generate_unique_folder_name(base_path: String, folder_name: String) -> Result<String, String> {
@@ -593,6 +608,8 @@ fn main() {
             open_file,
             read_text_file,
             generate_unique_folder_name,
+            mkdir,
+            get_documents_dir,
             get_backend_port
         ])
         .build(tauri::generate_context!())

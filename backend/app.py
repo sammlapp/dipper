@@ -1528,6 +1528,7 @@ class DipperServer:
 
         # System info routes
         self.app.router.add_get("/system/tempdir", self.get_temp_dir)
+        self.app.router.add_get("/system/documents-dir", self.get_documents_dir)
 
         # New config and process management routes
         self.app.router.add_post("/config/save", self.save_config)
@@ -1575,6 +1576,7 @@ class DipperServer:
         self.app.router.add_post("/files/browse", self.browse_files)
         self.app.router.add_post("/files/save", self.save_file_server)
         self.app.router.add_post("/files/read", self.read_file_server)
+        self.app.router.add_post("/files/mkdir", self.mkdir_server)
         self.app.router.add_post("/files/unique-name", self.generate_unique_name)
         self.app.router.add_get("/files/download", self.download_file)
 
@@ -1770,6 +1772,46 @@ class DipperServer:
         except Exception as e:
             logger.error(f"Error getting temp directory: {e}")
             return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def get_documents_dir(self, request):
+        """Return the user's Documents directory via platformdirs"""
+        try:
+            from platformdirs import PlatformDirs
+            docs_dir = PlatformDirs("Dipper", "Dipper").user_documents_dir
+            return web.json_response({"status": "success", "documents_dir": docs_dir})
+        except Exception as e:
+            logger.error(f"Error getting documents directory: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
+    async def mkdir_server(self, request):
+        """Create a directory (server mode)"""
+        try:
+            data = await request.json()
+            path = data.get("path")
+            if not path:
+                return web.json_response({"error": "Missing path"}, status=400)
+
+            allowed_paths = [
+                os.path.expanduser("~"),
+                "/data",
+                "/mnt",
+                "/media",
+                "/Users",
+                "/home",
+            ]
+            normalized = os.path.normpath(os.path.abspath(path))
+            is_allowed = any(
+                normalized.startswith(os.path.normpath(os.path.abspath(base)))
+                for base in allowed_paths
+            )
+            if not is_allowed:
+                return web.json_response({"error": "Access denied to this location"}, status=403)
+
+            os.makedirs(normalized, exist_ok=True)
+            return web.json_response({"status": "success", "path": normalized})
+        except Exception as e:
+            logger.error(f"Error creating directory: {e}")
+            return web.json_response({"error": str(e)}, status=500)
 
     async def scan_folder(self, request):
         """Scan folder for audio files"""

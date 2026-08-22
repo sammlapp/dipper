@@ -67,6 +67,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
     // Display settings
     show_comments: false,
     show_file_name: false,
+    show_detected_class: false,
     show_binary_controls: true, // Show yes/no/uncertain controls in grid mode
     enable_bounding_boxes: false, // Enable click-drag bounding box selection
 
@@ -246,6 +247,7 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
       grid_columns: 4,
       show_comments: false,
       show_file_name: true,
+      show_detected_class: false,
       show_binary_controls: true,
       enable_bounding_boxes: false,
       resize_images: true,
@@ -511,6 +513,16 @@ function ReviewSettings({ onSettingsChange, onReRenderSpectrograms, onClearCache
               onChange={(e) => handleSettingChange('show_comments', e.target.checked)}
             />
             <span>Show Comments Field</span>
+          </label>
+
+          <label className="toggle-label" style={{ opacity: csvColumns.includes('class') ? 1 : 0.45 }}>
+            <input
+              type="checkbox"
+              checked={settings.show_detected_class}
+              disabled={!csvColumns.includes('class')}
+              onChange={(e) => handleSettingChange('show_detected_class', e.target.checked)}
+            />
+            <span>Show Detected Class{!csvColumns.includes('class') ? ' (no class column)' : ''}</span>
           </label>
 
           <label className="toggle-label">

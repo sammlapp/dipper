@@ -1,45 +1,10 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { basename } from 'pathe';
 import { FormControl, Select, MenuItem, Tabs, Tab, Box, Checkbox, Menu } from '@mui/material';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import HelpIcon from './HelpIcon';
-import { selectFiles, selectFolder, selectTextFiles, selectModelFiles, saveFile, selectJSONFiles, writeFile, readFile } from '../utils/fileOperations';
+import SpeciesFilterPanel, { MODEL_CLASS_COL, flattenSpeciesForConfig } from './SpeciesFilterPanel';
+import { selectFiles, selectFolder, selectTextFiles, selectModelFiles, saveFile, selectJSONFiles } from '../utils/fileOperations';
 import { getBackendUrl } from '../utils/backendConfig';
-
-// Fix leaflet default marker icon (broken by webpack)
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
-  iconUrl: require('leaflet/dist/images/marker-icon.png'),
-  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
-});
-
-
-function MapClickHandler({ onMapClick }) {
-  useMapEvents({ click: (e) => onMapClick(e.latlng.lat, e.latlng.lng) });
-  return null;
-}
-
-// Which field in a species object is the class label string for each classifier (mirrors geomodel.MODEL_CLASS_COL)
-const MODEL_CLASS_COL = {
-    "BirdNET": "composite",  
-    "Perch": "ebird_code",
-    "Perch2": "scientific_name",
-    "Perch2LiteRT": "scientific_name",
-    "Perch2ONNX": "scientific_name",
-    "BirdSetConvNeXT": "ebird_code",
-    "BirdSetEfficientNetB1": "ebird_code",
-    "HawkEars": "common_name",
-    "HawkEars_Low_Band": "common_name",
-}
-
-// Flatten a selected_species object array to a string[] of class labels for the given model
-function flattenSpeciesForConfig(selected_species, model) {
-  const col = MODEL_CLASS_COL[model] || 'scientific_name';
-  return selected_species.map(s => s[col] || s.scientific_name);
-}
 
 // Default values for inference form
 const DEFAULT_VALUES = {
@@ -113,7 +78,7 @@ const RUGR_CWT_DEFAULTS = {
   points_range: [9, 100],
 };
 
-function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady }) {
+function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady, openProject }) {
   const [taskName, setTaskName] = useState(DEFAULT_VALUES.taskName);
   const [settingsTab, setSettingsTab] = useState(0);
   const [fileSelectionMode, setFileSelectionMode] = useState(DEFAULT_VALUES.fileSelectionMode);
@@ -159,149 +124,19 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
 
   const [config, setConfig] = useState(DEFAULT_VALUES.config);
 
-  // Species filter UI state (not persisted to config)
-  const [geoLat, setGeoLat] = useState('');
-  const [geoLon, setGeoLon] = useState('');
-  const [geoWeek, setGeoWeek] = useState(1);
-  const [geoMinProb, setGeoMinProb] = useState(0.05);
-  const [speciesLoading, setSpeciesLoading] = useState(false);
-  const [speciesError, setSpeciesError] = useState('');
-  const [classifierLabels, setClassifierLabels] = useState([]);
-  const [geoFilteredClasses, setGeoFilteredClasses] = useState(null); // null = show all; array = geomodel result
-  const [availableSearch, setAvailableSearch] = useState('');
-  const [selectedSearch, setSelectedSearch] = useState('');
-  const [addSearchInput, setAddSearchInput] = useState('');
-  const addSearchRef = useRef(null);
-
-  // Fetch classifier label list whenever the model changes (and species filter is supported)
+  // Apply project defaults when a project is opened
   useEffect(() => {
-    const classifierKey = config.model;
-    setClassifierLabels([]);
-    setGeoFilteredClasses(null);
-    setConfig(prev => ({ ...prev, species_filter: { ...prev.species_filter, selected_species: [] } }));
-    if (!classifierKey) return;
-    let cancelled = false;
-    getBackendUrl().then(backendUrl =>
-      fetch(`${backendUrl}/geomodel/classifier_labels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ classifier: classifierKey }),
-      })
-    ).then(r => r.json()).then(result => {
-      if (!cancelled && result.status === 'success') setClassifierLabels(result.labels); // array of {common_name, scientific_name, ebird_code, alpha, ...}
-    }).catch(() => { });
-    return () => { cancelled = true; };
-  }, [config.model]);
-
-  const handleMapClick = useCallback((lat, lon) => {
-    setGeoLat(lat.toFixed(5));
-    setGeoLon(lon.toFixed(5));
-  }, []);
-
-  const handleLoadSpecies = async () => {
-    const lat = parseFloat(geoLat);
-    const lon = parseFloat(geoLon);
-    const week = parseInt(geoWeek);
-    if (isNaN(lat) || isNaN(lon) || isNaN(week)) {
-      setSpeciesError('Please enter valid lat, lon, and week values.');
-      return;
-    }
-    const classifierKey = config.model;
-    if (!classifierKey) {
-      setSpeciesError('Selected model does not support species filtering.');
-      return;
-    }
-    setSpeciesLoading(true);
-    setSpeciesError('');
-    try {
-      const backendUrl = await getBackendUrl();
-      const response = await fetch(`${backendUrl}/geomodel/species_list`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lon, week, min_probability: geoMinProb, classifier: classifierKey }),
-      });
-      const result = await response.json();
-      if (result.status === 'success') {
-        setGeoFilteredClasses(result.species);
-      } else {
-        setSpeciesError(result.error || 'Failed to load species list.');
-      }
-    } catch (err) {
-      setSpeciesError('Error contacting backend: ' + err.message);
-    } finally {
-      setSpeciesLoading(false);
-    }
-  };
-
-  // The canonical identity key for a species object is the model's native label field.
-  const modelKeyField = MODEL_CLASS_COL[config.model] || 'scientific_name';
-
-  const getSpeciesKey = (sp) => sp[modelKeyField] || sp.scientific_name || sp.common_name || sp.ebird_code || '';
-
-  const handleRemoveSpecies = (key) => {
+    if (!openProject) return;
     setConfig(prev => ({
       ...prev,
-      species_filter: {
-        ...prev.species_filter,
-        selected_species: prev.species_filter.selected_species.filter(s => getSpeciesKey(s) !== key),
-      },
+      model: openProject.classifier,
+      model_source: 'bmz',
+      output_dir: prev.output_dir || openProject.predictionsDir,
+      species_filter: openProject.species_filter
+        ? { enabled: (openProject.species_filter.selected_species || []).length > 0, ...openProject.species_filter }
+        : prev.species_filter,
     }));
-  };
-
-  const handleAddSpecies = (sp) => {
-    if (!sp) return;
-    const key = getSpeciesKey(sp);
-    if (config.species_filter.selected_species.some(s => getSpeciesKey(s) === key)) {
-      setAddSearchInput('');
-      return;
-    }
-    setConfig(prev => ({
-      ...prev,
-      species_filter: {
-        ...prev.species_filter,
-        selected_species: [sp, ...prev.species_filter.selected_species],
-      },
-    }));
-    setAddSearchInput('');
-  };
-
-  const handleClearAllSpecies = () => {
-    setConfig(prev => ({ ...prev, species_filter: { ...prev.species_filter, selected_species: [] } }));
-  };
-
-  const handleUseAllClasses = () => {
-    setConfig(prev => ({ ...prev, species_filter: { ...prev.species_filter, selected_species: classifierLabels } }));
-    setGeoFilteredClasses(null);
-  };
-
-  const handleSaveSpeciesList = async () => {
-    try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const defaultName = `species_list_${timestamp}.txt`;
-      const filePath = await saveFile(defaultName);
-      if (!filePath) return;
-      const lines = config.species_filter.selected_species.map(s => getSpeciesKey(s)).join('\n');
-      await writeFile(filePath, lines);
-      console.log(`Species list saved to: ${basename(filePath)}`);
-    } catch (err) {
-      console.error('Failed to save species list: ' + err.message);
-    }
-  };
-
-  const handleLoadSpeciesList = async () => {
-    try {
-      const files = await selectTextFiles();
-      if (!files || files.length === 0) return;
-      const content = await readFile(files[0]);
-      const loaded = content.split('\n').map(l => l.trim()).filter(Boolean)
-        .map(label => ({ ebird_code: '', scientific_name: '', common_name: '', [modelKeyField]: label, probability: null }));
-      setConfig(prev => ({ ...prev, species_filter: { ...prev.species_filter, selected_species: loaded } }));
-      console.log(`Loaded ${loaded.length} species from ${basename(files[0])}`);
-    } catch (err) {
-      console.error('Failed to load species list: ' + err.message);
-    }
-  };
-
+  }, [openProject]);
 
   const regeneratePatternsIfNeeded = (exts) => {
     if (fileSelectionMode === 'folder' && selectedFolder) {
@@ -536,7 +371,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
       if (!proceed) return;
     }
 
-    if (!config.output_dir) {
+    if (!config.output_dir && !openProject) {
       console.log('Please select an output directory');
       return;
     }
@@ -607,7 +442,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
           file_globbing_patterns: config.file_globbing_patterns,
           file_list: config.file_list,
           glob_patterns_text: globPatterns,
-          output_dir: config.output_dir,
+          output_dir: config.output_dir || (openProject ? openProject.predictionsDir : ''),
           split_by_subfolder: config.split_by_subfolder,
           inference_settings: {
             clip_overlap: config.overlap,
@@ -1065,10 +900,12 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
             {config.model_source === 'bmz' && (
               <div className="form-group">
                 <label>Model <HelpIcon section="inference-models" /></label>
+                {openProject && <small style={{ display: 'block', color: 'var(--medium-gray)', marginBottom: 4 }}>Locked to project classifier</small>}
                 <FormControl size="small" sx={{ mt: 0.5, minWidth: 320, maxWidth: '100%' }}>
                   <Select
                     value={config.model}
                     onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
+                    disabled={!!openProject}
                   >
                     <MenuItem value="Perch2">Perch V2 Global Classifier</MenuItem>
                     <MenuItem value="Perch2LiteRT">Perch V2 (LiteRT)</MenuItem>
@@ -1145,335 +982,15 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
                   Filter output to a species list
                 </label>
                 <small style={{ display: 'block', marginTop: 2, color: 'var(--medium-gray)' }}>
-                  Only retain scores for selected species in the output CSV
+                  Only retain scores for selected species in the output CSV · powered by BirdNET GeoModel
                 </small>
-                <small style={{ display: 'block', marginTop: 2, color: 'var(--medium-gray)' }}>
-                  powered by BirdNET GeoModel
-                </small>
-
-
-
                 {config.species_filter.enabled && (
-                  <div style={{ marginTop: 12, marginLeft: 4, display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-                    {/* Geo location picker */}
-                    {config.model_source === 'bmz' && config.model ? (
-                      <>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>
-                          Load species list by location &amp; week
-                        </div>
-
-                        {/* Map */}
-                        <div style={{ height: 220, maxWidth: '700px', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                          <MapContainer
-                            center={[geoLat || 40, geoLon || -95]}
-                            zoom={3}
-                            style={{ height: '100%', width: '100%' }}
-                          >
-                            <TileLayer
-                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                            />
-                            <MapClickHandler onMapClick={handleMapClick} />
-                            {geoLat !== '' && geoLon !== '' && (
-                              <Marker position={[parseFloat(geoLat), parseFloat(geoLon)]} />
-                            )}
-                          </MapContainer>
-
-                        </div>
-
-                        {/* Lat/lon/week/prob inputs */}
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                          <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label style={{ fontSize: '0.8rem' }}>Latitude</label>
-                            <input
-                              className="compact-input"
-                              type="number"
-                              min="-90" max="90" step="0.0001"
-                              value={geoLat}
-                              onChange={(e) => setGeoLat(e.target.value)}
-                              placeholder="e.g. 40.71"
-                              style={{ width: 100 }}
-                            />
-                          </div>
-                          <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label style={{ fontSize: '0.8rem' }}>Longitude</label>
-                            <input
-                              className="compact-input"
-                              type="number"
-                              min="-180" max="180" step="0.0001"
-                              value={geoLon}
-                              onChange={(e) => setGeoLon(e.target.value)}
-                              placeholder="e.g. -74.01"
-                              style={{ width: 100 }}
-                            />
-                          </div>
-                          <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label style={{ fontSize: '0.8rem' }}>Week of year (1–52)</label>
-                            <input
-                              className="compact-input"
-                              type="number"
-                              min="1" max="52"
-                              value={geoWeek}
-                              onChange={(e) => setGeoWeek(parseInt(e.target.value))}
-                              style={{ width: 60 }}
-                            />
-                          </div>
-                          <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label style={{ fontSize: '0.8rem' }}>Min occurrence probability</label>
-                            <input
-                              className="compact-input"
-                              type="number"
-                              min="0" max="1" step="0.01"
-                              value={geoMinProb}
-                              onChange={(e) => setGeoMinProb(parseFloat(e.target.value))}
-                              style={{ width: 70 }}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleLoadSpecies}
-                            disabled={speciesLoading}
-                            style={{ alignSelf: 'flex-end', marginBottom: 1 }}
-                          >
-                            {speciesLoading ? 'Loading…' : 'Get Species List'}
-                          </button>
-                        </div>
-
-                        {speciesError && (
-                          <div style={{ fontSize: '0.8rem', color: 'var(--error-color, #c00)' }}>{speciesError}</div>
-                        )}
-                      </>
-                    ) : (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--medium-gray)' }}>
-                        Geographic species list generation is not currently supported for this model. You can still load a species list from a .txt file below.
-                      </div>
-                    )}
-
-                    {/* Two-table class list UI */}
-                    {(() => {
-                      const selectedKeys = new Set(config.species_filter.selected_species.map(s => getSpeciesKey(s)));
-                      // Available pool: geomodel result if active, otherwise all classifier labels as minimal objects
-                      // classifierLabels is now an array of full record objects
-                      const availablePool = geoFilteredClasses !== null ? geoFilteredClasses : classifierLabels;
-                      const searchLower = availableSearch.trim().toLowerCase();
-                      const availableFiltered = availablePool.filter(sp => {
-                        if (selectedKeys.has(getSpeciesKey(sp))) return false;
-                        if (!searchLower) return true;
-                        return ['ebird_code', 'scientific_name', 'common_name', 'alpha'].some(f => sp[f] && sp[f].toLowerCase().includes(searchLower));
-                      });
-                      const selSearchLower = selectedSearch.trim().toLowerCase();
-                      const selectedFiltered = config.species_filter.selected_species.filter(sp => {
-                        if (!selSearchLower) return true;
-                        return ['ebird_code', 'scientific_name', 'common_name', 'alpha'].some(f => sp[f] && sp[f].toLowerCase().includes(selSearchLower));
-                      });
-                      // All name columns beyond the native key field, in display order
-                      const allExtraCols = ['scientific_name', 'common_name', 'ebird_code', 'alpha'].filter(f => f !== modelKeyField);
-                      // Only show extra columns when at least one row has data in them
-                      const hasExtraData = (pool) => allExtraCols.some(f => pool.some(sp => sp[f] && sp[f] !== sp[modelKeyField]));
-                      const availHasExtra = hasExtraData(availablePool);
-                      const selHasExtra = hasExtraData(config.species_filter.selected_species);
-
-                      // borderCollapse causes scroll bleed through sticky headers; use border-separate + box-shadow instead
-                      const tableStyle = { width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.8rem' };
-                      const thStyle = { padding: '4px 8px', textAlign: 'left', whiteSpace: 'nowrap', background: 'var(--surface-secondary, #f5f5f5)', position: 'sticky', top: 0, boxShadow: 'inset 0 -1px 0 var(--border-color)' };
-                      const tdStyle = { padding: '3px 8px', borderTop: '1px solid var(--border-color)' };
-                      const rowStyle = { cursor: 'pointer' };
-                      const panelStyle = { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', border: '1px solid var(--border-color)', borderRadius: 4, overflow: 'hidden' };
-                      const colLabel = { scientific_name: 'Scientific Name', common_name: 'Common Name', ebird_code: 'eBird Code', alpha: 'Alpha' };
-                      const isItalic = (f) => f === 'scientific_name';
-
-                      const renderRow = (sp, onClick, showExtra, allExtraCols) => {
-                        const key = getSpeciesKey(sp);
-                        return (
-                          <tr key={key} style={rowStyle} onClick={onClick}
-                            onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg, #f0f0f0)'}
-                            onMouseLeave={e => e.currentTarget.style.background = ''}
-                          >
-                            <td style={{ ...tdStyle, fontStyle: isItalic(modelKeyField) ? 'italic' : 'normal' }}>{sp[modelKeyField] || '—'}</td>
-                            {showExtra && allExtraCols.map(f => (
-                              <td key={f} style={{ ...tdStyle, color: 'var(--medium-gray)', fontStyle: isItalic(f) ? 'italic' : 'normal' }}>
-                                {sp[f] && sp[f] !== sp[modelKeyField] ? sp[f] : '—'}
-                              </td>
-                            ))}
-                            {sp.probability != null && <td style={{ ...tdStyle, color: 'var(--medium-gray)', whiteSpace: 'nowrap' }}>{sp.probability.toFixed(3)}</td>}
-                          </tr>
-                        );
-                      };
-
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {/* Tip */}
-                          <div style={{ fontSize: '0.75rem', color: 'var(--medium-gray)', fontStyle: 'italic' }}>
-                            Tip: You can save the selected list as a plain text file (one class per line, no header), edit it, and reload it with Load List.
-                          </div>
-
-                          {/* Side-by-side tables */}
-                          <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
-
-                            {/* Left: Available */}
-                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                              {/* above-panel controls aligned to right */}
-                              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 4, minHeight: '1.6rem' }}>
-                                {geoFilteredClasses !== null && (
-                                  <button type="button" className="button-secondary" style={{ fontSize: '0.8rem', padding: '2px 8px' }} onClick={() => setGeoFilteredClasses(null)}>
-                                    Reset to All Classes
-                                  </button>
-                                )}
-                              </div>
-                              <div style={{ ...panelStyle, flex: 1 }}>
-                              <div style={{ padding: '4px 8px', background: 'var(--surface-secondary, #f5f5f5)', borderBottom: '1px solid var(--border-color)', fontSize: '0.8rem', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>
-                                  Available
-                                  {geoFilteredClasses !== null && <span style={{ fontWeight: 400, color: 'var(--medium-gray)', marginLeft: 6 }}>(geo-filtered to {geoFilteredClasses.length} species)</span>}
-                                </span>
-                                <button
-                                  type="button" className="button-secondary"
-                                  style={{ fontSize: '0.75rem', padding: '2px 8px' }}
-                                  onClick={() => setConfig(prev => ({ ...prev, species_filter: { ...prev.species_filter, selected_species: [...prev.species_filter.selected_species, ...availableFiltered] } }))}
-                                  title="Add all visible available classes to selected"
-                                >
-                                  Add All →
-                                </button>
-                              </div>
-                              <div style={{ overflowY: 'auto', maxHeight: 260 }}>
-                                <div style={{ position: 'sticky', top: 0, background: 'var(--surface, #fff)', zIndex: 1, padding: '4px', borderBottom: '1px solid var(--border-color)' }}>
-                                  <input
-                                    type="text" value={availableSearch} onChange={e => setAvailableSearch(e.target.value)}
-                                    placeholder="Filter…"
-                                    style={{ width: '100%', boxSizing: 'border-box', padding: '3px 6px', fontSize: '0.8rem', border: '1px solid var(--border-color)', borderRadius: 3 }}
-                                  />
-                                </div>
-                                <table style={tableStyle}>
-                                  {availHasExtra && (
-                                    <thead>
-                                      <tr>
-                                        <th style={thStyle}>{colLabel[modelKeyField]}</th>
-                                        {allExtraCols.map(f => <th key={f} style={thStyle}>{colLabel[f]}</th>)}
-                                        {availablePool.some(sp => sp.probability != null) && <th style={thStyle}>Prob.</th>}
-                                      </tr>
-                                    </thead>
-                                  )}
-                                  <tbody>
-                                    {availableFiltered.map(sp => renderRow(sp, () => handleAddSpecies(sp), availHasExtra, allExtraCols))}
-                                    {availableFiltered.length === 0 && (
-                                      <tr><td colSpan={99} style={{ ...tdStyle, color: 'var(--medium-gray)' }}>
-                                        {availablePool.length === 0 ? 'No classes available — select a model or run geo filter' : 'All classes selected'}
-                                      </td></tr>
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                              </div>{/* end inner panelStyle */}
-                            </div>{/* end Available column */}
-
-                            {/* Right: Selected */}
-                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                              {/* above-panel controls for Selected */}
-                              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 4, minHeight: '1.6rem' }}>
-                                <button type="button" className="button-secondary" style={{ fontSize: '0.8rem', padding: '2px 8px' }} onClick={handleSaveSpeciesList}>
-                                  Save List (.txt)
-                                </button>
-                                <button type="button" className="button-secondary" style={{ fontSize: '0.8rem', padding: '2px 8px' }} onClick={handleLoadSpeciesList}>
-                                  Load List (.txt)
-                                </button>
-                              </div>
-                            <div style={panelStyle}>
-                              <div style={{ padding: '4px 8px', background: 'var(--surface-secondary, #f5f5f5)', borderBottom: '1px solid var(--border-color)', fontSize: '0.8rem', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>Selected ({config.species_filter.selected_species.length})</span>
-                                <button
-                                  type="button" className="button-clear"
-                                  style={{ fontSize: '0.75rem', padding: '2px 8px' }}
-                                  onClick={handleClearAllSpecies}
-                                  title="Remove all selected classes"
-                                >
-                                  ← Remove All
-                                </button>
-                              </div>
-                              <div style={{ overflowY: 'auto', maxHeight: 260 }}>
-                                <div style={{ position: 'sticky', top: 0, background: 'var(--surface, #fff)', zIndex: 1, padding: '4px', borderBottom: '1px solid var(--border-color)' }}>
-                                  <input
-                                    type="text" value={selectedSearch} onChange={e => setSelectedSearch(e.target.value)}
-                                    placeholder="Filter…"
-                                    style={{ width: '100%', boxSizing: 'border-box', padding: '3px 6px', fontSize: '0.8rem', border: '1px solid var(--border-color)', borderRadius: 3 }}
-                                  />
-                                </div>
-                                <table style={tableStyle}>
-                                  {selHasExtra && (
-                                    <thead>
-                                      <tr>
-                                        <th style={thStyle}>{colLabel[modelKeyField]}</th>
-                                        {allExtraCols.map(f => <th key={f} style={thStyle}>{colLabel[f]}</th>)}
-                                        {config.species_filter.selected_species.some(sp => sp.probability != null) && <th style={thStyle}>Prob.</th>}
-                                      </tr>
-                                    </thead>
-                                  )}
-                                  <tbody>
-                                    {selectedFiltered.map(sp => renderRow(sp, () => handleRemoveSpecies(getSpeciesKey(sp)), selHasExtra, allExtraCols))}
-                                    {selectedFiltered.length === 0 && (
-                                      <tr><td colSpan={99} style={{ ...tdStyle, color: 'var(--medium-gray)' }}>
-                                        {config.species_filter.selected_species.length === 0 ? 'No classes selected' : 'No matches'}
-                                      </td></tr>
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>{/* end inner panelStyle */}
-                            </div>{/* end Selected column */}
-                          </div>
-
-                          {/* Search-to-add from full classifier labels (for adding classes not in geo filter) */}
-                          {classifierLabels.length > 0 && (() => {
-                            const q = addSearchInput.trim().toLowerCase();
-                            const filtered = q.length > 0
-                              ? classifierLabels.filter(sp =>
-                                !selectedKeys.has(getSpeciesKey(sp)) &&
-                                ['common_name', 'scientific_name', 'ebird_code', 'alpha', modelKeyField].some(f => sp[f] && sp[f].toLowerCase().includes(q))
-                              ).slice(0, 50)
-                              : [];
-                            return (
-                              <div style={{ position: 'relative' }} ref={addSearchRef}>
-                                <input
-                                  type="text"
-                                  value={addSearchInput}
-                                  onChange={(e) => setAddSearchInput(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Escape') setAddSearchInput('');
-                                    if (e.key === 'Enter' && filtered.length > 0) { handleAddSpecies(filtered[0]); setAddSearchInput(''); }
-                                  }}
-                                  placeholder="Search full model class list to add…"
-                                  style={{ width: '100%', maxWidth: 360, padding: '3px 6px', fontSize: '0.8rem' }}
-                                />
-                                {filtered.length > 0 && (
-                                  <div style={{
-                                    position: 'absolute', zIndex: 100, background: 'var(--surface, #fff)',
-                                    border: '1px solid var(--border-color)', borderRadius: 4,
-                                    maxHeight: 200, overflowY: 'auto', width: '100%', maxWidth: 360,
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                  }}>
-                                    {filtered.map(sp => {
-                                      const key = getSpeciesKey(sp);
-                                      const secondary = ['common_name', 'scientific_name', 'ebird_code'].filter(f => f !== modelKeyField && sp[f] && sp[f] !== sp[modelKeyField]);
-                                      return (
-                                        <div key={key}
-                                          onClick={() => { handleAddSpecies(sp); setAddSearchInput(''); }}
-                                          style={{ padding: '5px 10px', cursor: 'pointer', fontSize: '0.8rem' }}
-                                          onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg, #f0f0f0)'}
-                                          onMouseLeave={e => e.currentTarget.style.background = ''}
-                                        >
-                                          <span style={{ fontStyle: isItalic(modelKeyField) ? 'italic' : 'normal' }}>{sp[modelKeyField]}</span>
-                                          {secondary.length > 0 && <span style={{ color: 'var(--medium-gray)', marginLeft: 6, fontSize: '0.75rem', fontStyle: isItalic(secondary[0]) ? 'italic' : 'normal' }}>{sp[secondary[0]]}</span>}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      );
-                    })()}
+                  <div style={{ marginTop: 12, marginLeft: 4 }}>
+                    <SpeciesFilterPanel
+                      model={config.model}
+                      speciesFilter={config.species_filter}
+                      onChange={(sf) => setConfig(prev => ({ ...prev, species_filter: sf }))}
+                    />
                   </div>
                 )}
               </div>
@@ -1952,7 +1469,7 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
           <button
             className="button-secondary"
             onClick={() => handleSubmit(false)}
-            disabled={(fileCount === 0) || !config.output_dir}
+            disabled={(fileCount === 0) || (!config.output_dir && !openProject)}
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
           >
             Create Task
@@ -2080,7 +1597,7 @@ function ResumeInferenceTask({ onResumeTask }) {
 }
 
 // Wrapper component with tabs for creating or resuming inference tasks
-function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady }) {
+function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady, openProject }) {
   const [tabValue, setTabValue] = useState(0);
 
   const handleTabChange = (_event, newValue) => {
@@ -2103,6 +1620,7 @@ function TaskCreationForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady }) {
             onTaskCreate={onTaskCreate}
             onTaskCreateAndRun={onTaskCreateAndRun}
             mlEnvReady={mlEnvReady}
+            openProject={openProject}
           />
         )}
       </div>
