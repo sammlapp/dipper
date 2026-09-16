@@ -1,0 +1,45 @@
+[workspace]
+authors = ["sammlapp <sammlapp@gmail.com>"]
+channels = ["conda-forge"]
+name = "backend"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = "3.12.*"
+
+[environments]
+dev = ["dev"]
+
+[environments.default.pypi-dependencies]
+pyinstaller = ">=6.14.2"
+numpy = ">=1.21.0"
+pandas = ">=3.0.0"
+scipy = ">=1.7.0"
+soundfile = ">=0.10.0"
+resampy = ">=0.3.0"
+aru-metadata-parser = ">=1.0.0"
+birdnames = ">=0.1.3"
+huggingface-hub = "*"
+onnxruntime = "*"
+pillow = ">=8.0.0"
+matplotlib = ">=3.5.0"
+seaborn = ">=0.11.0"
+h5py = ">=3.0.0"
+pyyaml = ">=6.0"
+psutil = ">=5.8.0"
+tqdm = ">=4.60.0"
+pathlib2 = ">=2.3.0"
+platformdirs = ">=3.0.0"
+python-dotenv = ">=1.0.0"
+aiohttp = ">=3.8.0"
+aiohttp-cors = ">=0.7.0"
+certifi = ">=2024.0.0"
+pydantic = ">=1.8.0"
+click = ">=8.0.0"
+python-dateutil = ">=2.8.0"
+
+[feature.dev.dependencies]
+black = "*"

@@ -6,6 +6,7 @@ Reads JSON-RPC messages from stdin (one per line), dispatches to songspace_utils
 writes JSON responses to stdout (one per line).  Keeps SongSpace instances alive
 in memory between calls.
 """
+
 import sys
 import os
 import json
@@ -61,13 +62,20 @@ def main():
                     sys.stdout = _real_stdout
         except Exception as e:
             sys.stdout = _real_stdout
-            result = {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+            result = {
+                "status": "error",
+                "error": str(e),
+                "traceback": traceback.format_exc(),
+            }
 
         try:
             _real_stdout.write(json.dumps(result) + "\n")
             _real_stdout.flush()
         except Exception as e:
-            _real_stdout.write(json.dumps({"status": "error", "error": f"Serialization error: {e}"}) + "\n")
+            _real_stdout.write(
+                json.dumps({"status": "error", "error": f"Serialization error: {e}"})
+                + "\n"
+            )
             _real_stdout.flush()
 
 

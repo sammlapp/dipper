@@ -123,7 +123,9 @@ def load_scores(file_path, max_rows=None):
                     for column in df.columns:
                         # Convert NaN to None for JSON serialization
                         values = df[column].values
-                        scores[column] = [None if pd.isna(val) else val for val in values]
+                        scores[column] = [
+                            None if pd.isna(val) else val for val in values
+                        ]
 
                     # Get file info from index
                     file_info = []

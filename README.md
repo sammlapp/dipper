@@ -68,6 +68,47 @@ Output: Platform-specific installers in `frontend/src-tauri/target/release/bundl
 
 ## Developer Setup
 
+Briefly:
+1. Create a python env for the backend. For instance, with pixi:
+```
+pixi init
+pixi import --format=pypi-txt requirements-backend.txt --environment=default
+pixi add python=3.12
+```
+
+2. Install npm then run `npm-install`
+
+3. Install rust
+
+4. create placeholder sidecar
+
+```
+cd frontend
+mkdir -p src-tauri/bin
+touch src-tauri/bin/dipper-backend-aarch64-apple-darwin
+chmod +x src-tauri/bin/dipper-backend-aarch64-apple-darwin
+```
+
+5. Launch backend and frontend from separate terminals:
+
+**Backend:**
+
+```sh
+cd backend
+pixi shell
+python app.py
+```
+(wait until you see that the backend has launched and is ready)
+
+**Frontend:**
+
+```sh
+cd frontend
+npm install
+npm run tauri:dev
+```
+
+
 See [CLAUDE.md](CLAUDE.md) for comprehensive developer setup instructions including:
 - Platform-specific prerequisites (Windows, macOS, Linux)
 - Rust/Cargo installation

@@ -1,5 +1,6 @@
 import json
 
+
 def load_config_file(config_path, logger=None):
     """Load inference configuration from YAML or JSON file"""
     try:

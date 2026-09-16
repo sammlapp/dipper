@@ -246,7 +246,10 @@ def _run_ribbit(files, config_data):
 
     for path in files:
         try:
-            spec = Spectrogram.from_audio(Audio.from_file(path))
+            spec = Spectrogram.from_audio(
+                Audio.from_file(path, sample_rate=rs.get("audio_sample_rate", 32000)),
+                window_samples=rs.get("spec_window_samples", 512),
+            )
             score_df = ribbit(
                 spec,
                 pulse_rate_range=rs["pulse_rate_range"],

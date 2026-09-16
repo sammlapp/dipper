@@ -24,6 +24,8 @@ const HELP_TOOLTIPS = {
   'ribbit-pulse-rate': 'Expected range of pulses per second (repetition rate) for the target species. Check a spectrogram to measure this.',
   'ribbit-clip-duration': 'Length of each analysis window (sec). Should be ~2× the call duration, or long enough to contain at least 5 pulses.',
   'ribbit-clip-overlap': 'Overlap between consecutive windows (sec). Increasing overlap reduces the chance of a call being split across two windows.',
+  'ribbit-spec-window-samples': 'FFT window size (samples) used to compute the spectrogram. Larger values give finer frequency resolution but coarser time resolution; smaller values do the opposite. Default is 512.',
+  'ribbit-audio-sample-rate': 'Audio is resampled to this rate (Hz) before spectrogram computation. Choose ≥2× the highest frequency of interest (signal band or noise bands). Default is 32000.',
   'ribbit-noise-bands': 'Frequency ranges to subtract from the signal band. Use low-frequency bands (0–200 Hz) to suppress mic pops/clicks. Add bands around confusion species.',
 
   // CWT Detector

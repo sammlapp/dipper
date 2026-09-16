@@ -76,6 +76,8 @@ const DEFAULT_VALUES = {
       pulse_rate_range: [5, 20],
       clip_duration: 2.0,
       clip_overlap: 0.0,
+      spec_window_samples: 512,
+      audio_sample_rate: 32000,
     },
     cwt_settings: {
       class_name: '',
@@ -701,7 +703,9 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
             custom_python_env_path: configData.python_environment?.custom_path || '',
             testing_mode_enabled: configData.testing_mode?.enabled || false,
             subset_size: configData.testing_mode?.subset_size || 10,
-            ribbit_settings: configData.ribbit_settings || DEFAULT_VALUES.config.ribbit_settings,
+            ribbit_settings: configData.ribbit_settings
+              ? { ...DEFAULT_VALUES.config.ribbit_settings, ...configData.ribbit_settings }
+              : DEFAULT_VALUES.config.ribbit_settings,
             cwt_settings: configData.cwt_settings || DEFAULT_VALUES.config.cwt_settings,
             species_filter: configData.species_filter
               ? { enabled: configData.species_filter.enabled || false, selected_species: configData.species_filter.selected_species || [] }
@@ -1558,6 +1562,22 @@ function CreateInferenceTaskForm({ onTaskCreate, onTaskCreateAndRun, mlEnvReady 
                       <input className="compact-input" type="number" min="0" max="60" step="0.1"
                         value={config.ribbit_settings.clip_overlap}
                         onChange={(e) => setConfig(prev => ({ ...prev, ribbit_settings: { ...prev.ribbit_settings, clip_overlap: parseFloat(e.target.value) } }))}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Spectrogram Window Size (samples) <HelpIcon section="ribbit-spec-window-samples" /></label>
+                      <input className="compact-input" type="number" min="32" max="8192" step="32"
+                        value={config.ribbit_settings.spec_window_samples}
+                        onChange={(e) => setConfig(prev => ({ ...prev, ribbit_settings: { ...prev.ribbit_settings, spec_window_samples: parseInt(e.target.value) } }))}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Audio Sample Rate (Hz) <HelpIcon section="ribbit-audio-sample-rate" /></label>
+                      <input className="compact-input" type="number" min="1000" max="192000" step="1000"
+                        value={config.ribbit_settings.audio_sample_rate}
+                        onChange={(e) => setConfig(prev => ({ ...prev, ribbit_settings: { ...prev.ribbit_settings, audio_sample_rate: parseInt(e.target.value) } }))}
                       />
                     </div>
                   </div>

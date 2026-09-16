@@ -160,7 +160,7 @@ async def monitor_parent_process(parent_pid, shutdown_callback, check_interval=2
         check_count += 1
 
         is_alive = is_process_alive(parent_pid)
-        if check_count <= 3:  # Log first few checks for debugging
+        if check_count <= 1:  # Log first check for debugging
             logger.info(
                 f"Parent process check #{check_count}: PID {parent_pid} alive={is_alive}"
             )

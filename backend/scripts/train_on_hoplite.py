@@ -3,8 +3,6 @@ import logging
 import sys
 import numpy as np
 
-
-
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -14,7 +12,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 random_state = 2025
-
 
 
 def main():

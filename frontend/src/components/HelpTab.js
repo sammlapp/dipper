@@ -160,6 +160,17 @@ function HelpTab() {
           <h4 id="ribbit-clip-overlap">Clip Overlap</h4>
           <p>How much consecutive windows overlap (seconds). Zero overlap is fastest. Overlap reduces the chance of a call being split across two window boundaries, at the cost of more computation.</p>
 
+          <h4 id="ribbit-spec-window-samples">Spectrogram Window Size</h4>
+          <p>The FFT window size (in samples) used to compute the spectrogram that RIBBIT analyzes. This trades off frequency resolution against time resolution:</p>
+          <ul>
+            <li>Larger values give finer frequency resolution (helpful for narrow signal/noise bands) but coarser time resolution.</li>
+            <li>Smaller values give finer time resolution (helpful for fast pulse rates) but coarser frequency resolution.</li>
+            <li>Default is 512 samples, which works well for most species.</li>
+          </ul>
+
+          <h4 id="ribbit-audio-sample-rate">Audio Sample Rate</h4>
+          <p>All audio is resampled to this rate (Hz) before RIBBIT processing. Choose a rate at least 2× the highest frequency of interest — including any noise bands, not just the signal band. Default is 32000 Hz.</p>
+
           <h4 id="ribbit-noise-bands">Noise Bands</h4>
           <p>Frequency ranges to subtract from the signal band energy. Sounds in these bands are treated as noise and reduce the score. Use noise bands to suppress:</p>
           <ul>

@@ -3,6 +3,7 @@
 Training script for bioacoustics models
 Handles model training with active learning capabilities
 """
+
 import argparse
 import logging
 import pandas as pd
@@ -40,6 +41,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
+
 
 def write_status(job_folder, status, stage=None, progress=None, message=None):
     """Write status update to .status file in job directory"""
@@ -326,7 +328,13 @@ def run_training(config):
         with open(config_save_path, "w") as f:
             json.dump(config, f, indent=4)
 
-        write_status(out_dir, "running", stage="starting", progress=0, message="Starting training...")
+        write_status(
+            out_dir,
+            "running",
+            stage="starting",
+            progress=0,
+            message="Starting training...",
+        )
 
         # Log training start information
         logger.info("=" * 80)
@@ -342,7 +350,13 @@ def run_training(config):
         logger.info(f"Training settings: \n{train_cfg}")
 
         # Load and process annotation data
-        write_status(out_dir, "running", stage="loading_data", progress=5, message="Loading annotation data...")
+        write_status(
+            out_dir,
+            "running",
+            stage="loading_data",
+            progress=5,
+            message="Loading annotation data...",
+        )
         logger.info("Processing labels from fully annotated files...")
         labels = process_fully_annotated_files(config, logger=logger)
 
@@ -385,7 +399,13 @@ def run_training(config):
         # Load pre-trained model
         model_name = config.get("model")
         logger.info(f"Loading backbone model: {model_name}")
-        write_status(out_dir, "running", stage="loading_model", progress=10, message=f"Loading model: {model_name}...")
+        write_status(
+            out_dir,
+            "running",
+            stage="loading_model",
+            progress=10,
+            message=f"Loading model: {model_name}...",
+        )
         model = load_model(config, logger)
 
         logger.info(f" Using device: {model.device}")
@@ -421,8 +441,13 @@ def run_training(config):
         n_eval = len(evaluation_df)
         epochs = train_cfg.get("epochs", 20)
         if config["mode"] == "train_on_embeddings":
-            write_status(out_dir, "running", stage="training", progress=20,
-                         message=f"Training on {n_train} samples ({n_eval} validation)...")
+            write_status(
+                out_dir,
+                "running",
+                stage="training",
+                progress=20,
+                message=f"Training on {n_train} samples ({n_eval} validation)...",
+            )
             metrics = train_hoplite(
                 model=model,
                 train_labels=train_df,
@@ -430,8 +455,13 @@ def run_training(config):
                 config=config,
             )
         elif config["mode"] == "train_on_audio":
-            write_status(out_dir, "running", stage="training", progress=20,
-                         message=f"Training on {n_train} samples, {epochs} epochs ({n_eval} validation)...")
+            write_status(
+                out_dir,
+                "running",
+                stage="training",
+                progress=20,
+                message=f"Training on {n_train} samples, {epochs} epochs ({n_eval} validation)...",
+            )
             metrics = train_on_audio(
                 model=model,
                 train_labels=train_df,
@@ -442,7 +472,9 @@ def run_training(config):
             raise ValueError(f"Unsupported mode: {config['mode']}")
 
         logger.info("Training completed successfully!")
-        write_status(out_dir, "running", stage="saving", progress=95, message="Saving results...")
+        write_status(
+            out_dir, "running", stage="saving", progress=95, message="Saving results..."
+        )
 
         # Log and save validation metrics
         logger.info(f"Final validation metrics: {metrics}")
@@ -470,7 +502,13 @@ def run_training(config):
         logger.info(f"Final timestamp: {datetime.datetime.now().isoformat()}")
         logger.info(f"Final validation metrics: {metrics}")
         logger.info("=" * 80)
-        write_status(out_dir, "completed", stage="done", progress=100, message="Training complete")
+        write_status(
+            out_dir,
+            "completed",
+            stage="done",
+            progress=100,
+            message="Training complete",
+        )
         print(json.dumps(summary))
 
     except Exception as e:
@@ -487,7 +525,9 @@ def run_training(config):
         error_summary = {"status": "error", "error": str(e)}
         # out_dir may not be defined if error happened early
         try:
-            write_status(out_dir, "error", stage="failed", message=f"Training failed: {str(e)}")
+            write_status(
+                out_dir, "error", stage="failed", message=f"Training failed: {str(e)}"
+            )
         except Exception:
             pass
         print(json.dumps(error_summary))
