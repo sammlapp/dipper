@@ -10,12 +10,18 @@ on:
 
 jobs:
   test-uv-env:
-    name: uv sync - ${{ matrix.os }}
+    name: uv sync - ${{ matrix.os }} - ${{ matrix.variant }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-22.04]
+        # macOS ignores the extras (always PyPI torch with MPS), so only cpu runs there.
+        include:
+          - {os: macos-latest, variant: cpu}
+          - {os: windows-latest, variant: cpu}
+          - {os: windows-latest, variant: cuda}
+          - {os: ubuntu-22.04, variant: cpu}
+          - {os: ubuntu-22.04, variant: cuda}
     defaults:
       run:
         shell: bash
@@ -35,11 +41,29 @@ jobs:
       - name: Install environment from lockfile
         run: |
           start=$(date +%s)
-          uv sync --frozen --python 3.12 --managed-python
+          uv sync --frozen --python 3.12 --managed-python --extra ${{ matrix.variant }}
           echo "uv sync took $(( $(date +%s) - start ))s"
 
       - name: Environment size
         run: du -sh .venv
+
+      # CI runners have no GPU: this checks which torch build was installed, not
+      # that CUDA works.
+      - name: Verify torch build matches variant
+        run: |
+          if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=.venv/Scripts/python.exe; fi
+          VARIANT="${{ matrix.variant }}" "$PY" - <<'PYEOF'
+          import os, sys, torch
+          variant = os.environ["VARIANT"]
+          print("torch", torch.__version__, "| torch.version.cuda =", torch.version.cuda)
+          if sys.platform == "darwin":
+              ok = "+" not in torch.__version__ and torch.version.cuda is None
+          elif variant == "cpu":
+              ok = torch.__version__.endswith("+cpu") and torch.version.cuda is None
+          else:
+              ok = torch.__version__.endswith("+cu126") and torch.version.cuda.startswith("12.6")
+          raise SystemExit(0 if ok else f"unexpected torch build for variant {variant}")
+          PYEOF
 
       # Each module is imported in its own process so a hard abort in one (e.g. an
       # LLVM symbol clash between bundled native libraries) doesn't hide the rest.

@@ -30,5 +30,40 @@ dependencies = [
     "kagglehub",            # Perch and Perch v2
 ]
 
+# The torch variant is chosen at install time:  uv sync --frozen --extra cpu|cuda
+# Both are locked. PyPI's default torch is CPU-only on Windows and CUDA 13.2 on
+# Linux, so the PyTorch index is used explicitly for both variants. macOS always
+# uses PyPI (CPU + MPS) and ignores the extras.
+[project.optional-dependencies]
+cpu = ["torch", "torchvision", "torchaudio"]
+cuda = ["torch", "torchvision", "torchaudio"]
+
 [tool.uv]
 package = false
+# 2.14.1 is the newest torch published on both the cpu and cu126 indexes.
+constraint-dependencies = ["torch==2.14.1"]
+conflicts = [[{ extra = "cpu" }, { extra = "cuda" }]]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu126", extra = "cuda", marker = "sys_platform != 'darwin'" },
+]
+torchvision = [
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu126", extra = "cuda", marker = "sys_platform != 'darwin'" },
+]
+torchaudio = [
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu126", extra = "cuda", marker = "sys_platform != 'darwin'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
