@@ -41,27 +41,32 @@ jobs:
       - name: Environment size
         run: du -sh .venv
 
-      # PYTHONHOME/PYTHONPATH set to a nonexistent dir mimic packaged launchers
-      # (see the Linux AppImage conda-unpack failure); python must be launched
-      # by path from a cleaned environment as the backend does.
-      - name: Import check
+      # Each module is imported in its own process so a hard abort in one (e.g. an
+      # LLVM symbol clash between bundled native libraries) doesn't hide the rest.
+      - name: Import check (each module separately)
         run: |
           if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=.venv/Scripts/python.exe; fi
           "$PY" --version
-          env -u PYTHONHOME -u PYTHONPATH "$PY" - <<'PYEOF'
+          failed=0
+          for m in torch tensorflow opensoundscape bioacoustics_model_zoo timm cv2 \
+                   ai_edge_litert transformers kagglehub h5py yaml psutil aiohttp \
+                   aiohttp_cors pkg_resources; do
+            if env -u PYTHONHOME -u PYTHONPATH "$PY" -u -c "import $m; print('OK: $m', getattr($m, '__version__', ''))" 2>&1 | grep -v "^20"; then
+              [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "FAIL: $m"; failed=1; }
+            fi
+          done
+          exit $failed
+
+      # Importing packages together in one process: reveals native library clashes
+      # that individual imports miss. Pairs involving torch and tensorflow first.
+      - name: Import check (combined, in order)
+        run: |
+          if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=.venv/Scripts/python.exe; fi
+          env -u PYTHONHOME -u PYTHONPATH "$PY" -X faulthandler -u - <<'PYEOF'
           import importlib
-          mods = ["torch", "tensorflow", "opensoundscape", "bioacoustics_model_zoo",
-                  "timm", "cv2", "ai_edge_litert", "transformers", "kagglehub",
-                  "h5py", "yaml", "psutil", "aiohttp", "aiohttp_cors", "pkg_resources"]
-          failed = []
-          for m in mods:
-              try:
-                  mod = importlib.import_module(m)
-                  print("OK:", m, getattr(mod, "__version__", ""))
-              except Exception as e:
-                  print("FAIL:", m, repr(e))
-                  failed.append(m)
-          import torch
-          print("torch cuda available:", torch.cuda.is_available())
-          raise SystemExit(1 if failed else 0)
+          for m in ["torch", "tensorflow", "opensoundscape", "bioacoustics_model_zoo",
+                    "timm", "cv2", "ai_edge_litert", "transformers", "kagglehub"]:
+              print("importing", m, flush=True)
+              importlib.import_module(m)
+          print("all imported together")
           PYEOF
