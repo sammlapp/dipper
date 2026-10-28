@@ -269,7 +269,7 @@ def validate_audio_files(file_list):
 # user's machine, and uv downloads its own managed Python, so nothing needs to be
 # installed on the system.
 
-ML_PYTHON_VERSION = "3.12"
+ML_PYTHON_VERSION = "3.13"
 
 # The torch build is chosen at install time and maps to the `cpu` / `cuda` extras
 # in ml_env/pyproject.toml.

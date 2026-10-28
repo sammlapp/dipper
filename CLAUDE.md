@@ -165,7 +165,7 @@ Focus mode loads a configurable amount of audio before and after each annotation
 - **Backend env**: PyInstaller executable (bundled with app, ~50MB)
 - **Heavy env**: uv-managed venv with PyTorch, TensorFlow, opensoundscape etc., installed on first use (3-9 GB depending on the torch build)
 - **Definition**: `backend/ml_env/pyproject.toml` + `uv.lock` (bundled into the PyInstaller backend together with the `uv` executable). The lockfile pins every package, so no resolution happens on user machines. After changing dependencies: `cd backend/ml_env && uv lock`, commit both files.
-- **Install**: `install_environment()` in `app.py` runs `uv sync --frozen --extra <cpu|cuda>`; uv downloads its own managed Python 3.12, so nothing is needed on the system
+- **Install**: `install_environment()` in `app.py` runs `uv sync --frozen --extra <cpu|cuda>`; uv downloads its own managed Python 3.13, so nothing is needed on the system
 - **Torch build**: `cpu` or `cuda` extra. `detect_torch_variant()` picks `cuda` on Windows/Linux when `nvidia-smi` reports a driver >= `CUDA_MIN_DRIVER` (CUDA 12.6 wheels), else `cpu`; macOS always uses the standard PyPI build (MPS). The user can override in Settings. Always pass an extra — a plain `uv sync` on Linux/Windows would give the PyPI default torch.
 - **Import order**: TensorFlow bundles its own LLVM and clashes with numba/llvmlite on Linux if imported *before* opensoundscape (`LLVM ERROR: ... registered more than once`). Import opensoundscape/bioacoustics_model_zoo first.
 - **Location**: `~/Library/Caches/Dipper/envs/ml_env` (macOS); uv's package cache and managed Python are in `uv-cache/` and `python/` in the same cache dir. Install state is in `ml_env.install_status` / `ml_env.torch_variant` next to the env dir.
@@ -293,7 +293,7 @@ Managed through Settings tab, saved/loaded via HTTP endpoints.
 4. **Subprocess isolation**: Each job runs in separate Python process
 5. **Review-only build**: Conditional rendering based on REACT_APP_REVIEW_ONLY
 6. **Desktop vs Server mode**: Desktop uses Tauri wrapper, server mode runs React + backend without Tauri
-7. **Python version must match**: PyInstaller backend and the ML env must both use **Python 3.12**. A mismatch (e.g. PyInstaller built with 3.11, ML env on 3.12) causes `python311.dll conflicts` when multiprocessing spawns DataLoader workers on Windows. CI workflow (`build-full.yml`) must use `python-version: '3.12'`.
+7. **Python version must match**: PyInstaller backend and the ML env must both use **Python 3.13**. A mismatch (e.g. PyInstaller built with 3.11, ML env on 3.13) causes `python311.dll conflicts` when multiprocessing spawns DataLoader workers on Windows. CI workflow (`build-full.yml`) must use `python-version: '3.13'`.
 8. **Class name CSVs must be git-tracked**: `backend/data/class_names/*.csv` are required for classifier label lookup (geomodel filtering etc.). The `*.csv` gitignore pattern must not apply to this directory.
 9. **Testing PyInstaller backend standalone is insufficient for Windows DLL issues**: Some multiprocessing/DLL conflicts only manifest in the full built app, not when running `dipper-backend.exe` directly.
 10. **num_workers defaults to 0**: DataLoader `num_workers > 0` spawns subprocesses on Windows which is fragile. Default is 0 (main-process loading).
@@ -305,7 +305,7 @@ Managed through Settings tab, saved/loaded via HTTP endpoints.
 - React 18.3.1, Material-UI 5.15.0, Tauri 2.x
 
 **Backend:**
-- Python 3.12, aiohttp, PyTorch, OpenSoundscape, SoundFile, pandas
+- Python 3.13, aiohttp, PyTorch, OpenSoundscape, SoundFile, pandas
 
 **Build:**
 - Tauri CLI, PyInstaller, uv

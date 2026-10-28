@@ -3,7 +3,7 @@
 [project]
 name = "dipper-ml-env"
 version = "0.0.0"
-requires-python = "==3.12.*"
+requires-python = "==3.13.*"
 dependencies = [
     # General app and IO framework
     "pyyaml>=6.0",

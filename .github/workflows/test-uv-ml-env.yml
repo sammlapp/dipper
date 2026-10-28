@@ -41,7 +41,7 @@ jobs:
       - name: Install environment from lockfile
         run: |
           start=$(date +%s)
-          uv sync --frozen --python 3.12 --managed-python --extra ${{ matrix.variant }}
+          uv sync --frozen --python 3.13 --managed-python --extra ${{ matrix.variant }}
           echo "uv sync took $(( $(date +%s) - start ))s"
 
       - name: Environment size

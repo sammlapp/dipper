@@ -476,7 +476,7 @@ npm run tauri:dev
 - react-select 5.10.1
 
 **Backend:**
-- Python 3.12
+- Python 3.13
 - aiohttp (HTTP server)
 - PyTorch (ML framework)
 - OpenSoundscape (bioacoustics)
