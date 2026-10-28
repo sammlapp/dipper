@@ -1,4 +1,4 @@
-name: Build Full App
+name: Build Linux App
 
 on:
   push:
