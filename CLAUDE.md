@@ -6,9 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 No dumb hard-coded fallbacks! These make things harder rather than easier to maintain, debug, and refactor. 
 
+Do NOT confuse the "backend", which builds a pyinstaller executable for app.py, with the python ml environment, which is built as conda-pack enviornment and used by python scripts for background machine learning processes.
+
 ## Project Overview
 
 Dipper is a bioacoustics machine learning desktop application built with:
+
 - **Frontend**: Tauri + React with Material-UI
 - **Backend**: Python HTTP server (aiohttp) on port 8000
 - **Communication**: HTTP REST API (frontend → backend)

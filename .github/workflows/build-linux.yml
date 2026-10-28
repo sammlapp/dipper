@@ -1,0 +1,220 @@
+name: Build Full App
+
+on:
+  push:
+    # branches: [ main, develop ]
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'  # Only version tags without suffix (e.g., v0.0.6)
+  # pull_request:
+  #   branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-pyinstaller:
+    name: Build PyInstaller Backend - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            artifact_name: dipper-backend-linux-x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build PyInstaller executable
+        shell: bash
+        run: |
+          cd backend
+          printf 'XC_API_KEY = "%s"\n' "$XC_DIPPER_API_KEY" > _secrets.py
+          python build_pyinstaller.py
+        env:
+          PYTHONIOENCODING: utf-8
+          XC_DIPPER_API_KEY: ${{ secrets.XC_DIPPER_API_KEY }}
+
+      - name: Verify executable exists
+        shell: bash
+        run: |
+          if [ -f "frontend/python-dist/dipper-backend" ] || [ -f "frontend/python-dist/dipper-backend.exe" ]; then
+            echo "[SUCCESS] PyInstaller executable built successfully"
+          else
+            echo "[ERROR] PyInstaller executable not found"
+            exit 1
+          fi
+
+      - name: Upload PyInstaller artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            frontend/python-dist/dipper-backend*
+          retention-days: 7
+
+  test-built-backend:
+    name: Test built backend env install - ${{ matrix.os }}
+    needs: build-pyinstaller
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            artifact_name: dipper-backend-linux-x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Runs the test script only; it removes this Python from the backend's PATH.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download PyInstaller artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: built-backend/
+
+      - name: Install ML environment via built backend
+        shell: bash
+        run: |
+          EXE=$(ls built-backend/dipper-backend*)
+          chmod +x "$EXE"
+          python backend/tests/test_built_backend.py "$PWD/$EXE"
+
+  build-tauri-full:
+    name: Build Tauri Full App - ${{ matrix.platform }}
+    needs: build-pyinstaller
+    runs-on: ${{ matrix.os }}
+    # Run even if some PyInstaller builds failed (but not if they were cancelled/skipped)
+    if: success() || failure()
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            os: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-gnu
+            pyinstaller_artifact: dipper-backend-linux-x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux-x64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Download PyInstaller artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.pyinstaller_artifact }}
+          path: frontend/src-tauri/bin/
+        continue-on-error: true
+        id: download_pyinstaller
+
+      - name: Check if PyInstaller artifact exists
+        if: steps.download_pyinstaller.outcome == 'failure'
+        run: |
+          echo "::error::PyInstaller artifact for ${{ matrix.platform }} not found. Skipping Tauri build."
+          exit 1
+
+      - name: Rename and prepare PyInstaller executable (Unix)
+        if: matrix.platform != 'windows-x64'
+        shell: bash
+        run: |
+          cd frontend/src-tauri/bin
+          # Rename to include target triple as Tauri expects
+          mv dipper-backend dipper-backend-${{ matrix.rust_target }}
+          chmod +x dipper-backend-${{ matrix.rust_target }}
+          ls -lh
+
+      - name: Rename and prepare PyInstaller executable (Windows)
+        if: matrix.platform == 'windows-x64'
+        shell: bash
+        run: |
+          cd frontend/src-tauri/bin
+          # Rename to include target triple as Tauri expects
+          mv dipper-backend.exe dipper-backend-${{ matrix.rust_target }}.exe
+          ls -lh
+
+      - name: Verify artifacts
+        shell: bash
+        run: |
+          echo "PyInstaller backend:"
+          ls -lh frontend/src-tauri/bin/
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Set product name
+        working-directory: frontend
+        run: node ../scripts/set-product-name.js full
+
+      - name: Build React app (full)
+        working-directory: frontend
+        run: npm run build
+
+      - name: Check disk space (macOS)
+        if: startsWith(matrix.platform, 'macos')
+        run: df -h
+
+      - name: Build Tauri app
+        working-directory: frontend
+        # Use tauri build directly (not tauri:build:all) — PyInstaller was already
+        # built in the build-pyinstaller job and placed in src-tauri/bin/.
+        run: npx tauri build --verbose
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: List build artifacts
+        shell: bash
+        run: |
+          echo "Build artifacts:"
+          find frontend/src-tauri/target/release/bundle -type f
+
+      - name: Upload Linux AppImage
+        if: matrix.platform == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dipper-full-${{ matrix.platform }}-appimage
+          path: frontend/src-tauri/target/release/bundle/appimage/*.AppImage
+          retention-days: 30
