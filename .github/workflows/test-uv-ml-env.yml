@@ -57,16 +57,26 @@ jobs:
           done
           exit $failed
 
-      # Importing packages together in one process: reveals native library clashes
-      # that individual imports miss. Pairs involving torch and tensorflow first.
-      - name: Import check (combined, in order)
+      # Native libraries can clash when loaded into one process (TensorFlow and
+      # numba/llvmlite each bundle LLVM). First: the order the app uses
+      # (scripts/load_model.py imports bmz, opensoundscape, torch; TensorFlow is
+      # loaded later when a Perch model loads).
+      - name: Import check (combined, app order)
         run: |
           if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=.venv/Scripts/python.exe; fi
           env -u PYTHONHOME -u PYTHONPATH "$PY" -X faulthandler -u - <<'PYEOF'
           import importlib
-          for m in ["torch", "tensorflow", "opensoundscape", "bioacoustics_model_zoo",
-                    "timm", "cv2", "ai_edge_litert", "transformers", "kagglehub"]:
+          for m in ["bioacoustics_model_zoo", "opensoundscape", "torch", "timm", "cv2",
+                    "ai_edge_litert", "transformers", "kagglehub", "tensorflow"]:
               print("importing", m, flush=True)
               importlib.import_module(m)
           print("all imported together")
           PYEOF
+
+      # Reverse order (TensorFlow before opensoundscape): known to abort on Linux
+      # with an LLVM option clash. Informational; documents the hazard.
+      - name: Import check (combined, TensorFlow first)
+        continue-on-error: true
+        run: |
+          if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=.venv/Scripts/python.exe; fi
+          env -u PYTHONHOME -u PYTHONPATH "$PY" -X faulthandler -u -c "import tensorflow; import opensoundscape; print('ok')"
