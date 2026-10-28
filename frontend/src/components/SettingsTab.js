@@ -85,9 +85,14 @@ function SettingsTab({ onEnvReady }) {
         .then(state => {
           setEnvStatus(state.stage);
           setEnvMessage(state.message || '');
-          if (state.stage === 'ready' || state.stage === 'error') {
+          if (state.stage === 'ready') {
             clearInterval(envPollRef.current);
             checkEnv();
+          } else if (state.stage === 'error') {
+            // keep the install error visible; checkEnv would replace it with a bare "Not installed"
+            clearInterval(envPollRef.current);
+            setEnvStatus('error');
+            setEnvMessage(state.message || 'Install failed');
           }
         })
         .catch(() => { });
@@ -280,7 +285,7 @@ function SettingsTab({ onEnvReady }) {
           </Typography>
           <Divider sx={{ my: 2 }} />
 
-          <Alert severity={envStatusColor} sx={{ mb: 2 }}>
+          <Alert severity={envStatusColor} sx={{ mb: 2, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
             <strong>Status: {envStatusLabel}</strong>
             {envMessage ? ` — ${envMessage}` : ''}
           </Alert>

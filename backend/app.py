@@ -306,7 +306,13 @@ def get_uv_executable():
             _bundle_dir(), "uv", "uv.exe" if os.name == "nt" else "uv"
         )
     else:
-        from uv import find_uv_bin
+        try:
+            from uv import find_uv_bin
+        except ImportError as e:
+            raise RuntimeError(
+                "The 'uv' package is not installed in the backend's Python environment. "
+                "Run: pip install -r backend/requirements-backend.txt"
+            ) from e
 
         uv_path = find_uv_bin()
     if not os.path.isfile(uv_path):
