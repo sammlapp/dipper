@@ -61,6 +61,44 @@ jobs:
             frontend/python-dist/dipper-backend*
           retention-days: 7
 
+  test-built-backend:
+    name: Test built backend env install - ${{ matrix.os }}
+    needs: build-pyinstaller
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact_name: dipper-backend-macos-arm64
+          - os: windows-latest
+            artifact_name: dipper-backend-windows-x64
+          - os: ubuntu-22.04
+            artifact_name: dipper-backend-linux-x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Runs the test script only; it removes this Python from the backend's PATH.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download PyInstaller artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: built-backend/
+
+      - name: Install ML environment via built backend
+        shell: bash
+        run: |
+          EXE=$(ls built-backend/dipper-backend*)
+          chmod +x "$EXE"
+          python backend/tests/test_built_backend.py "$PWD/$EXE"
+
   build-tauri-full:
     name: Build Tauri Full App - ${{ matrix.platform }}
     needs: build-pyinstaller
@@ -217,7 +255,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: build-tauri-full
+    needs: [build-tauri-full, test-built-backend]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:

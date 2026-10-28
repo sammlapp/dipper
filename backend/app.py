@@ -380,6 +380,22 @@ def _read_extraction_status(env_path):
         return None
 
 
+# Python interpreter variables that redirect which stdlib/site-packages an
+# interpreter loads. Packaged launches (e.g. a Linux AppImage's AppRun) set these
+# to point at their own bundled Python, and children inherit them, which breaks the
+# conda env's Python ("No module named 'encodings'").
+_PYTHON_ENV_VARS = ("PYTHONHOME", "PYTHONPATH", "PYTHONUSERBASE", "PYTHONSTARTUP")
+
+
+def env_python_subprocess_env():
+    """Environment for subprocesses running the conda env's Python.
+
+    Inherits the current environment minus variables that would point the env's
+    interpreter at a different Python installation.
+    """
+    return {k: v for k, v in os.environ.items() if k not in _PYTHON_ENV_VARS}
+
+
 def _write_extraction_status(env_path, status):
     """Write extraction status: 'in_progress' or 'complete'."""
     os.makedirs(env_path, exist_ok=True)
@@ -405,7 +421,10 @@ def check_environment(env_path):
             if not os.path.exists(python_path):
                 return {"status": "missing", "python_path": None}
             result = subprocess.run(
-                [python_path, "--version"], capture_output=True, text=True
+                [python_path, "--version"],
+                capture_output=True,
+                text=True,
+                env=env_python_subprocess_env(),
             )
             if result.returncode == 0:
                 # Old valid env — write status file so future checks are fast
@@ -429,7 +448,10 @@ def check_environment(env_path):
             }
 
         result = subprocess.run(
-            [python_path, "--version"], capture_output=True, text=True
+            [python_path, "--version"],
+            capture_output=True,
+            text=True,
+            env=env_python_subprocess_env(),
         )
         if result.returncode == 0:
             return {
@@ -473,6 +495,7 @@ def extract_environment(archive_path, extract_dir):
                 [conda_unpack_exe],
                 capture_output=True,
                 text=True,
+                env=env_python_subprocess_env(),
             )
         else:
             # macOS/Linux: bin/python is a Mach-O/ELF binary whose shared library
@@ -486,6 +509,7 @@ def extract_environment(archive_path, extract_dir):
                 ["bash", "-c", f'. "{activate}" && conda-unpack'],
                 capture_output=True,
                 text=True,
+                env=env_python_subprocess_env(),
             )
         if result.returncode != 0:
             error_msg = (
@@ -703,6 +727,7 @@ def start_inference_process(job_id, config_path, env_python_path):
             stderr=stderr_target,
             text=True,
             cwd=os.path.dirname(os.path.abspath(__file__)),
+            env=env_python_subprocess_env(),
         )
 
         # Store log file handle with process if we opened one
@@ -904,6 +929,7 @@ def start_training_process(job_id, config_path, env_python_path):
             stderr=stderr_target,
             text=True,
             cwd=os.path.dirname(os.path.abspath(__file__)),
+            env=env_python_subprocess_env(),
         )
 
         # Store log file handle with process if we opened one
@@ -992,6 +1018,7 @@ def start_extraction_process(job_id, config_path, env_python_path):
             stderr=stderr_target,
             text=True,
             cwd=os.path.dirname(os.path.abspath(__file__)),
+            env=env_python_subprocess_env(),
         )
 
         # Store log file handle with process if we opened one
@@ -3576,6 +3603,7 @@ print(json.dumps(result))
             capture_output=True,
             text=True,
             timeout=600,
+            env=env_python_subprocess_env(),
         )
         if proc.returncode != 0:
             stderr = proc.stderr[-2000:] if proc.stderr else ""
@@ -3622,7 +3650,7 @@ print(json.dumps(result))
                 f"dipper_songspace_{key.replace('/', '_')[-40:]}.log",
             )
             log_fh = open(log_path, "w")
-            env = os.environ.copy()
+            env = env_python_subprocess_env()
             env["PYTHONUNBUFFERED"] = "1"  # disable Python stdout buffering
             env["TF_CPP_MIN_LOG_LEVEL"] = "3"  # suppress TF C++ logs to stdout
             proc = subprocess.Popen(
