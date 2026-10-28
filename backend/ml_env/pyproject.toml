@@ -1,0 +1,34 @@
+# Experimental: uv-managed ML environment, replacing dipper_ml_env.yml + conda-pack.
+# Mirrors the `pip:` section of backend/dipper_ml_env.yml.
+[project]
+name = "dipper-ml-env"
+version = "0.0.0"
+requires-python = "==3.12.*"
+dependencies = [
+    # General app and IO framework
+    "pyyaml>=6.0",
+    "h5py>=3.0.0",
+    "psutil>=5.8.0",
+    # v82 removed pkg_resources required by tf
+    # see https://github.com/pypa/setuptools/issues/5174
+    "setuptools<82.0.0",
+
+    # HTTP and networking
+    "aiohttp>=3.8.0",
+    "aiohttp-cors>=0.7.0",
+
+    # Bioacoustics libraries
+    "opensoundscape==0.13.2",
+    "bioacoustics-model-zoo==0.13.2",
+
+    # BMZ dependencies for extended model support
+    "timm>=1.0.0",          # HawkEars
+    "opencv-python",        # HawkEars
+    "ai-edge-litert",       # BirdNET (.tflite)
+    "transformers",         # BirdSET
+    "tensorflow>=2.20.0",   # Perch and Perch v2
+    "kagglehub",            # Perch and Perch v2
+]
+
+[tool.uv]
+package = false

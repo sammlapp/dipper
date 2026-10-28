@@ -1,0 +1,67 @@
+name: Test uv ML Environment
+
+on:
+  push:
+    branches: [uv-ml-env-test]
+    paths:
+      - 'backend/ml_env/**'
+      - '.github/workflows/test-uv-ml-env.yml'
+  workflow_dispatch:
+
+jobs:
+  test-uv-env:
+    name: uv sync - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-22.04]
+    defaults:
+      run:
+        shell: bash
+        working-directory: backend/ml_env
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # No setup-python: uv downloads its own managed Python, as the app would.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Check lockfile is up to date
+        run: uv lock --check
+
+      - name: Install environment from lockfile
+        run: |
+          start=$(date +%s)
+          uv sync --frozen --python 3.12 --managed-python
+          echo "uv sync took $(( $(date +%s) - start ))s"
+
+      - name: Environment size
+        run: du -sh .venv
+
+      # PYTHONHOME/PYTHONPATH set to a nonexistent dir mimic packaged launchers
+      # (see the Linux AppImage conda-unpack failure); python must be launched
+      # by path from a cleaned environment as the backend does.
+      - name: Import check
+        run: |
+          if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=.venv/Scripts/python.exe; fi
+          "$PY" --version
+          env -u PYTHONHOME -u PYTHONPATH "$PY" - <<'PYEOF'
+          import importlib
+          mods = ["torch", "tensorflow", "opensoundscape", "bioacoustics_model_zoo",
+                  "timm", "cv2", "ai_edge_litert", "transformers", "kagglehub",
+                  "h5py", "yaml", "psutil", "aiohttp", "aiohttp_cors", "pkg_resources"]
+          failed = []
+          for m in mods:
+              try:
+                  mod = importlib.import_module(m)
+                  print("OK:", m, getattr(mod, "__version__", ""))
+              except Exception as e:
+                  print("FAIL:", m, repr(e))
+                  failed.append(m)
+          import torch
+          print("torch cuda available:", torch.cuda.is_available())
+          raise SystemExit(1 if failed else 0)
+          PYEOF
