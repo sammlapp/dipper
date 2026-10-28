@@ -81,10 +81,11 @@ jobs:
           echo "[OK] PyInstaller build script exists"
           test -f backend/build_pyinstaller.py
 
-      - name: Test conda-pack build script
+      - name: Test ML environment lockfile exists
         run: |
-          echo "[OK] Conda-pack build script exists"
-          test -f backend/build_conda_pack.py
+          echo "[OK] ML environment definition exists"
+          test -f backend/ml_env/pyproject.toml
+          test -f backend/ml_env/uv.lock
 
   quick-build-test:
     name: Quick Build Test - PyInstaller

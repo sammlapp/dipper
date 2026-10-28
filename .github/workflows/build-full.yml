@@ -62,19 +62,19 @@ jobs:
           retention-days: 7
 
   test-built-backend:
-    name: Test built backend env install - ${{ matrix.os }}
+    name: Test built backend env install - ${{ matrix.os }} - ${{ matrix.variant }}
     needs: build-pyinstaller
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        # CI runners have no GPU: cuda checks that the CUDA build installs.
         include:
-          - os: macos-latest
-            artifact_name: dipper-backend-macos-arm64
-          - os: windows-latest
-            artifact_name: dipper-backend-windows-x64
-          - os: ubuntu-22.04
-            artifact_name: dipper-backend-linux-x64
+          - {os: macos-latest, variant: cpu, artifact_name: dipper-backend-macos-arm64}
+          - {os: windows-latest, variant: cpu, artifact_name: dipper-backend-windows-x64}
+          - {os: windows-latest, variant: cuda, artifact_name: dipper-backend-windows-x64}
+          - {os: ubuntu-22.04, variant: cpu, artifact_name: dipper-backend-linux-x64}
+          - {os: ubuntu-22.04, variant: cuda, artifact_name: dipper-backend-linux-x64}
 
     steps:
       - name: Checkout code
@@ -97,7 +97,7 @@ jobs:
         run: |
           EXE=$(ls built-backend/dipper-backend*)
           chmod +x "$EXE"
-          python backend/tests/test_built_backend.py "$PWD/$EXE"
+          python backend/tests/test_built_backend.py "$PWD/$EXE" ${{ matrix.variant }}
 
   build-tauri-full:
     name: Build Tauri Full App - ${{ matrix.platform }}
@@ -306,7 +306,7 @@ jobs:
 
             ### ML Environment
 
-            The conda-pack ML environment (~700MB) is built separately and will be downloaded automatically by the app when needed.
+            The ML environment (PyTorch, TensorFlow, etc.) is installed automatically by the app on first use, from a lockfile bundled with the app. The GPU (CUDA) build is selected automatically when a compatible NVIDIA driver is found.
 
             ### What's New
             - See CHANGELOG.md for details

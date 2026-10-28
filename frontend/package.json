@@ -10,7 +10,6 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "build:backend": "python ../backend/build_pyinstaller.py",
-    "build:conda-pack": "python ../backend/build_conda_pack.py",
     "build:all": "npm run build && npm run build:backend",
     "build:review-all": "npm run build:review && npm run build:backend",
     "start:server": "./python-dist/dipper-backend --port 8000",

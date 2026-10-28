@@ -6,7 +6,7 @@ the environment ready. The backend is started with PYTHONHOME/PYTHONPATH pointin
 at a nonexistent directory to mimic packaged launchers (e.g. Linux AppImage), and
 without the test runner's Python on PATH.
 
-Usage:  python tests/test_built_backend.py <path-to-dipper-backend>
+Usage:  python tests/test_built_backend.py <path-to-dipper-backend> <cpu|cuda>
 Installs into the real per-user Dipper cache directory and downloads the full
 archive for the current platform (several GB).
 """
@@ -66,7 +66,7 @@ def wait_for(predicate, timeout, description):
     raise TimeoutError(f"Timed out waiting for {description}")
 
 
-def main(executable):
+def main(executable, torch_variant):
     port = free_port()
     with tempfile.TemporaryDirectory() as poison_dir:
         proc = subprocess.Popen(
@@ -81,7 +81,7 @@ def main(executable):
 
             wait_for(healthy, STARTUP_TIMEOUT_S, "backend /health")
 
-            started = request(port, "POST", "/env/install")
+            started = request(port, "POST", "/env/install", {"torch_variant": torch_variant})
             assert started["status"] in ("started", "already_ready", "already_running"), started
 
             def finished():
@@ -94,6 +94,7 @@ def main(executable):
 
             check = request(port, "POST", "/env/check")
             assert check["status"] == "ready", f"/env/check not ready: {check}"
+            assert check["torch_variant"] == torch_variant, f"wrong torch build: {check}"
             print(f"OK: environment ready ({check.get('version')})")
         finally:
             proc.terminate()
@@ -104,6 +105,6 @@ def main(executable):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 3 or sys.argv[2] not in ("cpu", "cuda"):
         sys.exit(__doc__)
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2])

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 No dumb hard-coded fallbacks! These make things harder rather than easier to maintain, debug, and refactor. 
 
-Do NOT confuse the "backend", which builds a pyinstaller executable for app.py, with the python ml environment, which is built as conda-pack enviornment and used by python scripts for background machine learning processes.
+Do NOT confuse the "backend", which builds a pyinstaller executable for app.py, with the python ml environment, which is a uv-managed environment (defined by `backend/ml_env/pyproject.toml` + `uv.lock`) used by python scripts for background machine learning processes.
 
 ## Project Overview
 
@@ -98,7 +98,7 @@ All ML scripts are in `backend/scripts/`:
 1. User interacts with React UI (InferenceTab, TrainingTab, etc.)
 2. Frontend TaskManager.js sends HTTP POST/GET to localhost:8000
 3. Backend app.py receives request
-4. Backend spawns subprocess running ML script in conda environment
+4. Backend spawns subprocess running ML script in the uv-managed ML environment
 5. Frontend polls status endpoint every 2 seconds
 6. Subprocess writes `.status` file with progress updates
 7. Backend reads .status and returns to frontend
@@ -163,9 +163,13 @@ Focus mode loads a configurable amount of audio before and after each annotation
 
 ### Environment Management
 - **Backend env**: PyInstaller executable (bundled with app, ~50MB)
-- **Heavy env**: Conda environment with PyTorch (auto-downloaded on first use, ~700MB)
-- **Download**: From GitHub/HuggingFace to system cache (`appdirs.user_cache_dir("Dipper")`)
-- **Location**: `~/Library/Caches/Dipper/envs/dipper_ml_env` (macOS)
+- **Heavy env**: uv-managed venv with PyTorch, TensorFlow, opensoundscape etc., installed on first use (3-9 GB depending on the torch build)
+- **Definition**: `backend/ml_env/pyproject.toml` + `uv.lock` (bundled into the PyInstaller backend together with the `uv` executable). The lockfile pins every package, so no resolution happens on user machines. After changing dependencies: `cd backend/ml_env && uv lock`, commit both files.
+- **Install**: `install_environment()` in `app.py` runs `uv sync --frozen --extra <cpu|cuda>`; uv downloads its own managed Python 3.12, so nothing is needed on the system
+- **Torch build**: `cpu` or `cuda` extra. `detect_torch_variant()` picks `cuda` on Windows/Linux when `nvidia-smi` reports a driver >= `CUDA_MIN_DRIVER` (CUDA 12.6 wheels), else `cpu`; macOS always uses the standard PyPI build (MPS). The user can override in Settings. Always pass an extra — a plain `uv sync` on Linux/Windows would give the PyPI default torch.
+- **Import order**: TensorFlow bundles its own LLVM and clashes with numba/llvmlite on Linux if imported *before* opensoundscape (`LLVM ERROR: ... registered more than once`). Import opensoundscape/bioacoustics_model_zoo first.
+- **Location**: `~/Library/Caches/Dipper/envs/ml_env` (macOS); uv's package cache and managed Python are in `uv-cache/` and `python/` in the same cache dir. Install state is in `ml_env.install_status` / `ml_env.torch_variant` next to the env dir.
+- **Subprocess env**: processes that run the env's Python use `env_python_subprocess_env()`, which strips `PYTHONHOME`/`PYTHONPATH` (set by some packaged launchers such as the Linux AppImage).
 
 ## Development Modes
 
@@ -218,7 +222,7 @@ Builds include:
 - React app (built static files)
 - Tauri framework (Rust-based)
 - PyInstaller backend executable
-- Does NOT include conda environment (downloaded on-demand)
+- Does NOT include the ML environment (installed on first use by the bundled uv)
 
 ### Review-Only Desktop Application
 ```bash
@@ -284,12 +288,12 @@ Managed through Settings tab, saved/loaded via HTTP endpoints.
 ## Important Notes
 
 1. **HTTP-based communication**: Frontend communicates with backend via HTTP REST API, not Tauri commands
-2. **Two Python environments**: PyInstaller for backend, conda for ML tasks
+2. **Two Python environments**: PyInstaller for backend, uv-managed venv for ML tasks
 3. **Status polling**: Frontend polls every 2 seconds for job updates
 4. **Subprocess isolation**: Each job runs in separate Python process
 5. **Review-only build**: Conditional rendering based on REACT_APP_REVIEW_ONLY
 6. **Desktop vs Server mode**: Desktop uses Tauri wrapper, server mode runs React + backend without Tauri
-7. **Python version must match**: PyInstaller backend and conda-pack ML env must both use **Python 3.12**. A mismatch (e.g. PyInstaller built with 3.11, conda env on 3.12) causes `python311.dll conflicts` when multiprocessing spawns DataLoader workers on Windows. CI workflow (`build-full.yml`) must use `python-version: '3.12'`.
+7. **Python version must match**: PyInstaller backend and the ML env must both use **Python 3.12**. A mismatch (e.g. PyInstaller built with 3.11, ML env on 3.12) causes `python311.dll conflicts` when multiprocessing spawns DataLoader workers on Windows. CI workflow (`build-full.yml`) must use `python-version: '3.12'`.
 8. **Class name CSVs must be git-tracked**: `backend/data/class_names/*.csv` are required for classifier label lookup (geomodel filtering etc.). The `*.csv` gitignore pattern must not apply to this directory.
 9. **Testing PyInstaller backend standalone is insufficient for Windows DLL issues**: Some multiprocessing/DLL conflicts only manifest in the full built app, not when running `dipper-backend.exe` directly.
 10. **num_workers defaults to 0**: DataLoader `num_workers > 0` spawns subprocesses on Windows which is fragile. Default is 0 (main-process loading).
@@ -304,7 +308,7 @@ Managed through Settings tab, saved/loaded via HTTP endpoints.
 - Python 3.12, aiohttp, PyTorch, OpenSoundscape, SoundFile, pandas
 
 **Build:**
-- Tauri CLI, PyInstaller, conda-pack
+- Tauri CLI, PyInstaller, uv
 
 ## Version Management
 
@@ -350,7 +354,7 @@ See `scripts/README.md` for more details.
 **Fix**: Check if dipper-backend is running on port 8000: `curl http://localhost:8000/health`
 
 **Issue**: ML tasks fail
-**Fix**: Check if conda environment downloaded: `~/Library/Caches/Dipper/envs/`
+**Fix**: Check if the ML environment is installed: `~/Library/Caches/Dipper/envs/` (and `[uv]` lines in the backend log)
 
 **Issue**: PyInstaller changes not reflected in desktop build
 **Fix**: Rebuild and copy: `cd backend && python build_pyinstaller.py && cp dist/dipper-backend ../frontend/python-dist/`

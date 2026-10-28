@@ -77,7 +77,7 @@ GitHub Actions workflows in `.github/workflows/` automate builds:
 - `build-full.yml` — full Dipper app for all platforms
 - `build-review.yml` — review-only app
 
-CI uses Python 3.12 for the PyInstaller backend. **The backend Python version must match the conda-pack ML environment Python version** (also 3.12) to avoid DLL conflicts on Windows when multiprocessing spawns DataLoader workers.
+CI uses Python 3.12 for the PyInstaller backend. **The backend Python version must match the ML environment Python version** (`ML_PYTHON_VERSION` in `backend/app.py` and `requires-python` in `backend/ml_env/pyproject.toml`; also 3.12) to avoid DLL conflicts on Windows when multiprocessing spawns DataLoader workers.
 
 ## Development Builds
 
@@ -94,7 +94,7 @@ npm run tauri:dev
 ## Python Backend
 
 The PyInstaller backend bundles Python 3.12 + lightweight dependencies (no PyTorch).
-Heavy ML dependencies live in the separately downloaded conda-pack environment.
+The PyInstaller build also bundles the `uv` executable and `backend/ml_env/{pyproject.toml,uv.lock}`. Heavy ML dependencies live in a uv-managed environment that the app installs on first use from that lockfile.
 
 To rebuild after backend changes:
 ```bash
@@ -117,6 +117,6 @@ The spec file (`http_server.spec`) bundles:
 
 **PyInstaller changes not reflected**: Rebuild and copy the backend executable (see above).
 
-**Windows multiprocessing DLL conflict**: PyInstaller backend Python version must match the conda ML env Python version (both 3.12). Check `build-full.yml` uses `python-version: '3.12'`.
+**Windows multiprocessing DLL conflict**: PyInstaller backend Python version must match the ML env Python version (both 3.12). Check `build-full.yml` uses `python-version: '3.12'`.
 
 **Class name tables missing in built app**: Ensure `backend/data/class_names/*.csv` files are git-tracked (not gitignored). They must be present at PyInstaller build time to be bundled.

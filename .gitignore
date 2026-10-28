@@ -94,3 +94,4 @@ frontend/src-tauri/bin
 server_config.yml
 frontend/public/server-launch-config.json
 frontend/build/server-launch-config.json
+backend/ml_env/.venv/

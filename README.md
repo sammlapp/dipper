@@ -160,7 +160,7 @@ The application integrates with the [bioacoustics model zoo](https://github.com/
 - Python 3.12, aiohttp, PyTorch, OpenSoundscape, SoundFile, pandas
 
 **Build:**
-- Tauri CLI, PyInstaller, conda-pack
+- Tauri CLI, PyInstaller (bundles uv)
 
 ## Contributing
 

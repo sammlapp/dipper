@@ -11,13 +11,19 @@ import {
   Button,
   Alert,
   Divider,
-  Switch
+  MenuItem,
+  Switch,
+  Tooltip,
+  CircularProgress
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import RestoreIcon from '@mui/icons-material/Restore';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DownloadIcon from '@mui/icons-material/Download';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useBackendUrl } from '../hooks/useBackendUrl';
 
@@ -29,11 +35,26 @@ function SettingsTab({ onEnvReady }) {
   const backendUrl = useBackendUrl();
 
   // ML environment state
-  // envStatus: 'checking' | 'ready' | 'missing' | 'broken' | 'extracting' | 'downloading' | 'error'
+  // envStatus: 'checking' | 'ready' | 'missing' | 'broken' | 'installing' | 'error'
   const [envStatus, setEnvStatus] = useState('checking');
   const [envMessage, setEnvMessage] = useState('');
+  // torchVariant: which PyTorch build to install: 'auto' (use the GPU if a compatible NVIDIA driver is found) | 'cpu' | 'cuda'
+  const [torchVariant, setTorchVariant] = useState('auto');
   const envPollRef = React.useRef(null);
+  // gpuStatus: null while loading, else { level: 'ok' | 'info' | 'warning', summary, detail } from GET /env/gpu
+  const [gpuStatus, setGpuStatus] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const checkGpu = () => {
+    if (!backendUrl) return;
+    setGpuStatus(null);
+    fetch(`${backendUrl}/env/gpu`)
+      .then(r => r.json())
+      .then(result => setGpuStatus(result.error
+        ? { level: 'warning', summary: 'Could not check GPU', detail: result.error }
+        : result))
+      .catch(e => setGpuStatus({ level: 'warning', summary: 'Could not check GPU', detail: String(e) }));
+  };
 
   const checkEnv = () => {
     if (!backendUrl) return;
@@ -41,8 +62,9 @@ function SettingsTab({ onEnvReady }) {
       .then(r => r.json())
       .then(result => {
         setEnvStatus(result.status);
-        setEnvMessage(result.version ? `Python ${result.version}` : result.error || '');
+        setEnvMessage(result.version ? `${result.version}${result.torch_variant ? ` (${result.torch_variant === 'cuda' ? 'GPU / CUDA' : 'CPU'} build)` : ''}` : result.error || '');
         if (onEnvReady) onEnvReady(result.status === 'ready');
+        checkGpu();
       })
       .catch(() => setEnvStatus('missing'));
   };
@@ -53,9 +75,9 @@ function SettingsTab({ onEnvReady }) {
 
   const startEnvInstall = () => {
     if (!backendUrl) return;
-    setEnvStatus('downloading');
-    setEnvMessage('Starting download...');
-    fetch(`${backendUrl}/env/install`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    setEnvStatus('installing');
+    setEnvMessage('Starting install...');
+    fetch(`${backendUrl}/env/install`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ torch_variant: torchVariant }) })
       .catch(() => { });
     envPollRef.current = setInterval(() => {
       fetch(`${backendUrl}/env/install/status`)
@@ -76,14 +98,14 @@ function SettingsTab({ onEnvReady }) {
     if (!backendUrl) return;
     fetch(`${backendUrl}/env/remove`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
       .then(r => r.json())
-      .then(() => { setEnvStatus('missing'); setEnvMessage(''); setConfirmRemove(false); if (onEnvReady) onEnvReady(false); })
+      .then(() => { setEnvStatus('missing'); setEnvMessage(''); setConfirmRemove(false); if (onEnvReady) onEnvReady(false); checkGpu(); })
       .catch(() => { });
   };
 
   const envStatusColor = { ready: 'success', missing: 'warning', broken: 'error', error: 'error', checking: 'info' }[envStatus] || 'info';
   const envStatusLabel = {
     ready: 'Installed', missing: 'Not installed', broken: 'Broken',
-    downloading: 'Downloading...', extracting: 'Installing...', error: 'Error', checking: 'Checking...',
+    installing: 'Installing...', error: 'Error', checking: 'Checking...',
   }[envStatus] || envStatus;
 
   // Load settings from localStorage on mount
@@ -254,7 +276,7 @@ function SettingsTab({ onEnvReady }) {
             ML Environment
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            The conda-pack ML environment is required for inference, training, and extraction tasks (~700 MB on macOS/Windows, ~5 GB on Linux with CUDA).
+            The ML environment is required for inference, training, and extraction tasks. It is downloaded on first install (about 3 GB for the CPU build, 6-9 GB for the GPU build on Windows/Linux).
           </Typography>
           <Divider sx={{ my: 2 }} />
 
@@ -263,20 +285,53 @@ function SettingsTab({ onEnvReady }) {
             {envMessage ? ` — ${envMessage}` : ''}
           </Alert>
 
-          {(envStatus === 'downloading' || envStatus === 'extracting') && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            {gpuStatus === null ? (
+              <>
+                <CircularProgress size={18} />
+                <Typography variant="body2" color="text.secondary">Checking GPU...</Typography>
+              </>
+            ) : (
+              <Tooltip title={gpuStatus.detail} arrow>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'help' }}>
+                  {gpuStatus.level === 'ok' && <CheckCircleOutlineIcon color="success" fontSize="small" />}
+                  {gpuStatus.level === 'warning' && <WarningAmberIcon color="warning" fontSize="small" />}
+                  {gpuStatus.level === 'info' && <InfoOutlinedIcon color="action" fontSize="small" />}
+                  <Typography variant="body2">{gpuStatus.summary}</Typography>
+                </Box>
+              </Tooltip>
+            )}
+          </Box>
+
+          {envStatus === 'installing' && (
             <Alert severity="info" sx={{ mb: 2 }}>
-              {envStatus === 'downloading' ? 'Downloading ML environment. This may take several minutes...' : 'Extracting environment. This may take a few minutes...'}
+              Downloading and installing the ML environment. This may take several minutes...
             </Alert>
           )}
 
+          <TextField
+            select
+            size="small"
+            label="PyTorch build"
+            value={torchVariant}
+            onChange={(e) => setTorchVariant(e.target.value)}
+            disabled={envStatus === 'installing'}
+            helperText="Applies when installing. Auto uses the GPU if a compatible NVIDIA driver is found (Windows/Linux)."
+            sx={{ mb: 2, minWidth: 260 }}
+          >
+            <MenuItem value="auto">Auto-detect GPU</MenuItem>
+            <MenuItem value="cpu">CPU only</MenuItem>
+            <MenuItem value="cuda">GPU (NVIDIA CUDA)</MenuItem>
+          </TextField>
+
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <Button variant="outlined" onClick={checkEnv} disabled={envStatus === 'downloading' || envStatus === 'extracting'}>
+            <Button variant="outlined" onClick={checkEnv} disabled={envStatus === 'installing'}>
               Check
             </Button>
             <Button
               variant="contained"
               onClick={startEnvInstall}
-              disabled={envStatus === 'ready' || envStatus === 'downloading' || envStatus === 'extracting'}
+              disabled={envStatus === 'ready' || envStatus === 'installing'}
             >
               {envStatus === 'missing' || envStatus === 'unknown' ? 'Download and Install' : 'Re-install'}
             </Button>
