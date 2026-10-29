@@ -1,12 +1,18 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code ([claude.ai/code](http://claude.ai/code)) when working with code in this repository.
 
-**Note:** When making significant changes to the project (new features, architecture changes, setup requirements), also update [README.md](README.md) (user-facing: features, installation, help) and [DEVELOPMENT.md](DEVELOPMENT.md) (developer setup, practices, builds, tests) to keep the documentation current. Setup/build/test details belong in DEVELOPMENT.md, not README.md.
+When starting fresh: Take a look at [README.md](http://readme.md) [CLAUDE.md](http://claude.md) and [DEVELOPMENT.md](./DEVELOPMENT.md). We're going to work from [plan.md](http://plan.md) but first I want you to have a good sense for how the code base works and what is currently implemented. If needed, carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, [app.py](http://app.py), scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
 
-No dumb hard-coded fallbacks! These make things harder rather than easier to maintain, debug, and refactor. 
+**Note:** When making significant changes to the project (new features, architecture changes, setup requirements), also update [README.md](http://readme.md) [CLAUDE.md](http://claude.md) and [DEVELOPMENT.md](./DEVELOPMENT.md) to keep them from getting stale.
 
-Do NOT confuse the "backend", which builds a pyinstaller executable for app.py, with the python ml environment, which is a uv-managed environment (defined by `backend/ml_env/pyproject.toml` + `uv.lock`) used by python scripts for background machine learning processes.
+Guidance:
+
+No dumb hard-coded fallbacks! These make things harder rather than easier to maintain, debug, and refactor. For instance: don't use `params.get(min_f, 500)` which makes a hard-coded assumption of a fallback for a value that should not be missing from the provided parameters.
+
+Do NOT confuse the "backend", which builds a pyinstaller executable for [app.py](http://app.py), with the python ml environment, which is a uv-managed environment (defined by `backend/ml_env/pyproject.toml` + `uv.lock`) used by python scripts for background machine learning processes.
+
+No hacky workarounds. This is a production-level codebase built for stability, easy of maintenance, and a modular design for future improvements and extensions.
 
 ## Project Overview
 
