@@ -273,7 +273,7 @@ To rebuild only the backend executable:
 
 ```bash
 cd backend
-uv run --frozen python build_pyinstaller.py     # installs the locked build environment, builds, outputs to frontend/python-dist/ and src-tauri/bin/
+uv run --isolated --no-project python build_pyinstaller.py     # installs the locked build environment, builds, outputs to frontend/python-dist/ and src-tauri/bin/
 ```
 
 The PyInstaller build bundles the `uv` executable and `backend/ml_env/{pyproject.toml,uv.lock}` (see `backend/http_server.spec`). The ML environment itself is not part of the installer. Because it is not bundled, testing a built app requires installing the environment from Settings on first launch.
@@ -302,7 +302,7 @@ Then update `Cargo.lock` (`cd frontend/src-tauri && cargo check`), commit, and t
 | ML tasks fail with "ML environment is not installed" or "out of date" | Install or update the environment from the Settings tab |
 | Install fails with a TLS, 403 or DNS message | The network blocks or intercepts the downloads. The error lists the hosts needed; use Settings > ML Environment > advanced network settings for a proxy or mirror |
 | Status messages do not show in the UI | Check that the `.status` file exists in the job folder |
-| Backend changes not reflected in a built app | Rebuild the PyInstaller executable: `cd backend && uv run --frozen python build_pyinstaller.py` |
+| Backend changes not reflected in a built app | Rebuild the PyInstaller executable: `cd backend && uv run --isolated --no-project python build_pyinstaller.py` |
 | `npm start` tries to build the Tauri app in server mode | Use `./scripts/launch-server-dev.sh` instead |
 | Class-name tables missing in a built app | Ensure `backend/data/class_names/*.csv` is git-tracked |
 

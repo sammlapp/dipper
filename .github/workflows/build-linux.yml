@@ -32,7 +32,7 @@ jobs:
         run: |
           cd backend
           printf 'XC_API_KEY = "%s"\n' "$XC_DIPPER_API_KEY" > _secrets.py
-          uv run --frozen python build_pyinstaller.py
+          uv run --isolated --no-project python build_pyinstaller.py
         env:
           PYTHONIOENCODING: utf-8
           XC_DIPPER_API_KEY: ${{ secrets.XC_DIPPER_API_KEY }}

@@ -49,6 +49,15 @@ def sync_build_environment():
     uv downloads the Python version pinned in pyproject.toml, so no particular
     Python needs to be installed. Returns the PyInstaller command prefix.
     """
+    # This script must not run from inside backend/.venv: on Windows, uv cannot
+    # replace files of an environment whose python.exe / uv.exe are running.
+    if Path(sys.prefix).resolve() == (BACKEND_DIR / ".venv").resolve():
+        print(
+            "[ERROR] Run this script outside the project environment:\n"
+            "        uv run --isolated --no-project python build_pyinstaller.py"
+        )
+        sys.exit(1)
+
     uv = shutil.which("uv")
     if uv is None:
         print("[ERROR] uv not found. Install it from https://docs.astral.sh/uv/")

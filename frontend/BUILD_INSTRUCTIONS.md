@@ -42,7 +42,7 @@ Smaller build with only the ReviewTab. Uses `REACT_APP_REVIEW_ONLY=true`.
 ```bash
 # 1. Build PyInstaller backend
 cd backend
-uv run --frozen python build_pyinstaller.py   # also copies the executable to frontend/python-dist/
+uv run --isolated --no-project python build_pyinstaller.py   # also copies the executable to frontend/python-dist/
 
 # 2. Build React app
 cd ../frontend
@@ -98,7 +98,7 @@ The PyInstaller build also bundles the `uv` executable and `backend/ml_env/{pypr
 To rebuild after backend changes:
 ```bash
 cd backend
-uv run --frozen python build_pyinstaller.py   # also copies the executable to frontend/python-dist/
+uv run --isolated --no-project python build_pyinstaller.py   # also copies the executable to frontend/python-dist/
 ```
 
 The spec file (`http_server.spec`) bundles:

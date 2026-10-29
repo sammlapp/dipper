@@ -85,7 +85,7 @@ echo -e "${BLUE}[2/4] Building Python backend executable...${NC}"
 cd "$PROJECT_ROOT/backend"
 
 echo "  Running PyInstaller (this may take a few minutes)..."
-uv run --frozen python build_pyinstaller.py
+uv run --isolated --no-project python build_pyinstaller.py
 
 if [ ! -f "$PROJECT_ROOT/frontend/python-dist/dipper-backend" ]; then
     echo -e "${RED}✗ PyInstaller build failed — dipper-backend not found${NC}"

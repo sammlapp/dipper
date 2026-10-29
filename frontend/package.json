@@ -9,7 +9,7 @@
     "build:review": "cross-env REACT_APP_REVIEW_ONLY=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "build:backend": "uv run --project ../backend --frozen python ../backend/build_pyinstaller.py",
+    "build:backend": "uv run --isolated --no-project python ../backend/build_pyinstaller.py",
     "build:all": "npm run build && npm run build:backend",
     "build:review-all": "npm run build:review && npm run build:backend",
     "start:server": "./python-dist/dipper-backend --port 8000",
