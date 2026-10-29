@@ -68,7 +68,7 @@ Both build workflows create a **draft GitHub Release** with assets attached when
 - `Dipper-X.Y.Z-arm64.dmg` — macOS Apple Silicon
 - `Dipper-X.Y.Z-x64-setup.exe` — Windows x64
 - `Dipper-X.Y.Z-x64.AppImage` — Linux x64
-- Size: ~100–200 MB app + ~700 MB ML environment (downloaded on first use)
+- Size: ~100–200 MB app. The ML environment (about 3–4 GB for CPU, 6–10 GB with GPU support) is installed by the app on first use
 
 ---
 

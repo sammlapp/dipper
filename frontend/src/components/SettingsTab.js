@@ -54,6 +54,7 @@ function SettingsTab({ onEnvReady }) {
   });
   const [showNetworkSettings, setShowNetworkSettings] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const loadInstallPlan = () => {
     if (!backendUrl) return;
@@ -152,10 +153,12 @@ function SettingsTab({ onEnvReady }) {
 
   const removeEnv = () => {
     if (!backendUrl) return;
+    setRemoving(true);
     fetch(`${backendUrl}/env/remove`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
       .then(r => r.json())
       .then(() => { setEnvStatus('missing'); setEnvMessage(''); setConfirmRemove(false); if (onEnvReady) onEnvReady(false); checkGpu(); })
-      .catch(() => { });
+      .catch(() => { })
+      .finally(() => setRemoving(false));
   };
 
   const envStatusColor = { ready: 'success', outdated: 'warning', missing: 'warning', broken: 'error', error: 'error', checking: 'info' }[envStatus] || 'info';
@@ -423,7 +426,11 @@ function SettingsTab({ onEnvReady }) {
             >
               {envStatus === 'missing' || envStatus === 'unknown' ? 'Download and Install' : envStatus === 'outdated' ? 'Update' : 'Re-install'}
             </Button>
-            {confirmRemove ? (
+            {removing ? (
+              <Button variant="outlined" color="error" disabled>
+                Removing...
+              </Button>
+            ) : confirmRemove ? (
               <>
                 <Button variant="contained" color="error" onClick={removeEnv}>
                   Confirm Remove

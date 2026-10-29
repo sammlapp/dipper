@@ -53,15 +53,18 @@ jobs:
         run: |
           if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=.venv/Scripts/python.exe; fi
           VARIANT="${{ matrix.variant }}" "$PY" - <<'PYEOF'
-          import os, sys, torch
+          import os, sys, tomllib, torch
           variant = os.environ["VARIANT"]
-          print("torch", torch.__version__, "| torch.version.cuda =", torch.version.cuda)
+          # the expected CUDA build comes from [tool.dipper.cuda] in pyproject.toml
+          with open("pyproject.toml", "rb") as f:
+              cuda_version = tomllib.load(f)["tool"]["dipper"]["cuda"]["version"]
+          print("torch", torch.__version__, "| torch.version.cuda =", torch.version.cuda, "| expected CUDA", cuda_version)
           if sys.platform == "darwin":
               ok = "+" not in torch.__version__ and torch.version.cuda is None
           elif variant == "cpu":
               ok = torch.__version__.endswith("+cpu") and torch.version.cuda is None
           else:
-              ok = torch.__version__.endswith("+cu128") and torch.version.cuda.startswith("12.8")
+              ok = torch.__version__.endswith("+cu" + cuda_version.replace(".", "")) and torch.version.cuda == cuda_version
           raise SystemExit(0 if ok else f"unexpected torch build for variant {variant}")
           PYEOF
 

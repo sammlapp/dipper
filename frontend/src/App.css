@@ -1015,6 +1015,16 @@ select {
   transition: all 0.2s ease;
 }
 
+/* MUI Select renders a hidden native input; keep the global input styling off it */
+.MuiSelect-nativeInput {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  transition: none !important;
+  opacity: 0 !important;
+}
+
 input:focus,
 select:focus {
   outline: none;
