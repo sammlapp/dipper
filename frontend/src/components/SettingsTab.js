@@ -11,7 +11,9 @@ import {
   Button,
   Alert,
   Divider,
+  FormControl,
   MenuItem,
+  Select,
   Switch,
   Tooltip,
   CircularProgress
@@ -314,20 +316,19 @@ function SettingsTab({ onEnvReady }) {
             </Alert>
           )}
 
-          <TextField
-            select
-            size="small"
-            label="PyTorch build"
-            value={torchVariant}
-            onChange={(e) => setTorchVariant(e.target.value)}
-            disabled={envStatus === 'installing'}
-            helperText="Applies when installing. Auto uses the GPU if a compatible NVIDIA driver is found (Windows/Linux)."
-            sx={{ mb: 2, minWidth: 260 }}
-          >
-            <MenuItem value="auto">Auto-detect GPU</MenuItem>
-            <MenuItem value="cpu">CPU only</MenuItem>
-            <MenuItem value="cuda">GPU (NVIDIA CUDA)</MenuItem>
-          </TextField>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>PyTorch build</Typography>
+            <FormControl size="small" sx={{ minWidth: 260 }} disabled={envStatus === 'installing'}>
+              <Select value={torchVariant} onChange={(e) => setTorchVariant(e.target.value)}>
+                <MenuItem value="auto">Auto-detect GPU</MenuItem>
+                <MenuItem value="cpu">CPU only</MenuItem>
+                <MenuItem value="cuda">GPU (NVIDIA CUDA)</MenuItem>
+              </Select>
+            </FormControl>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Applies when installing. Auto uses the GPU if a compatible NVIDIA driver is found (Windows/Linux).
+            </Typography>
+          </Box>
 
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <Button variant="outlined" onClick={checkEnv} disabled={envStatus === 'installing'}>
