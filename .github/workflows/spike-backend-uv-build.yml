@@ -1,0 +1,54 @@
+name: Spike - Backend Build with uv
+
+# Throwaway experiment: does the PyInstaller backend build and work on a uv-managed
+# Python (no setup-python) on every platform? Uses the existing requirements-backend.txt
+# and http_server.spec. Delete this workflow after the decision.
+on:
+  push:
+    branches: [uv-ml-env-test]
+    paths:
+      - '.github/workflows/spike-backend-uv-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Backend via uv - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-22.04]
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # No setup-python: uv downloads its own Python.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Create build environment with uv-managed Python
+        working-directory: backend
+        run: |
+          uv venv --python 3.13 --managed-python build-venv
+          if [ -x build-venv/bin/python ]; then PY=build-venv/bin/python; else PY=build-venv/Scripts/python.exe; fi
+          uv pip install --python "$PY" -r requirements-backend.txt
+          "$PY" -c "import sys; print(sys.version); print('base_prefix:', sys.base_prefix)"
+
+      - name: Build backend with PyInstaller
+        working-directory: backend
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          if [ -x build-venv/bin/python ]; then PY=build-venv/bin/python; else PY=build-venv/Scripts/python.exe; fi
+          "$PY" -m PyInstaller --clean --noconfirm http_server.spec
+          ls -lh dist/
+
+      # Installs the ML environment (CPU build) through the freshly built executable.
+      - name: Test built backend
+        run: |
+          EXE=$(ls backend/dist/dipper-backend*)
+          uv run --no-project --python 3.13 python backend/tests/test_built_backend.py "$PWD/$EXE" cpu
