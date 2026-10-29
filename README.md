@@ -54,7 +54,7 @@ Running models needs PyTorch and related software, which is too large to include
 Things to know:
 
 - **Internet access is required for this step**, to download the software. The install needs to reach pypi.org, files.pythonhosted.org, download.pytorch.org, and github.com. If your network uses a proxy or blocks these sites, see the advanced network settings in Settings, or ask your IT administrator.
-- **Disk space:** about 3-4 GB for the CPU build, and roughly 6-10 GB for the GPU build on Windows and Linux. Dipper shows the expected size and your free space before installing.
+- **Disk space:** about 2.5-4 GB for the CPU build, and roughly 6.5-9.5 GB for the GPU build on Windows and Linux. Dipper shows the expected size and your free space before installing.
 - **GPU support:** On Windows and Linux with an NVIDIA graphics card and a recent driver (version 570 or newer), Auto-detect installs the GPU build, which runs models much faster. On Apple Silicon Macs, the GPU is used automatically. Settings shows whether Dipper found a GPU and can use it, and explains why if it can't (hover over the warning icon for details). You can choose CPU only or GPU manually.
 - **After updating Dipper**, Settings may show "Update required" if the new version needs different packages. Click **Update**; it only downloads what changed.
 

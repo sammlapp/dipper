@@ -282,11 +282,11 @@ TORCH_VARIANTS = ("cpu", "cuda")
 # in CI (`du -sh .venv` in test-uv-ml-env.yml). Used to show the expected size
 # up front and to check free disk space. Re-measure when the lock changes.
 ENV_SIZE_GB = {
-    ("Darwin", "cpu"): 2.5,
+    ("Darwin", "cpu"): 2.4,
     ("Windows", "cpu"): 2.8,
-    ("Linux", "cpu"): 3.8,
-    ("Windows", "cuda"): 6.3,
-    ("Linux", "cuda"): 9.2,
+    ("Linux", "cpu"): 3.7,
+    ("Windows", "cuda"): 6.5,
+    ("Linux", "cuda"): 9.5,
 }
 # A fresh install needs this multiple of the environment size free (downloaded
 # wheels are cached while they are installed).
