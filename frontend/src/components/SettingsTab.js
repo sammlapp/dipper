@@ -45,7 +45,35 @@ function SettingsTab({ onEnvReady }) {
   const envPollRef = React.useRef(null);
   // gpuStatus: null while loading, else { level: 'ok' | 'info' | 'warning', summary, detail } from GET /env/gpu
   const [gpuStatus, setGpuStatus] = useState(null);
+  // installPlan: what installing would do, from GET /env/plan:
+  // { variant, reason, mode: 'install' | 'update' | 'up_to_date', estimated_size_gb, required_free_gb, free_gb, enough_space }
+  const [installPlan, setInstallPlan] = useState(null);
+  // installerEnvText: advanced network settings for locked-down networks, one NAME=value per line (proxy, mirrors)
+  const [installerEnvText, setInstallerEnvText] = useState(() => {
+    try { return localStorage.getItem('dipper_installer_env') || ''; } catch (e) { return ''; }
+  });
+  const [showNetworkSettings, setShowNetworkSettings] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const loadInstallPlan = () => {
+    if (!backendUrl) return;
+    fetch(`${backendUrl}/env/plan?torch_variant=${torchVariant}`)
+      .then(r => r.json())
+      .then(plan => setInstallPlan(plan.error ? null : plan))
+      .catch(() => setInstallPlan(null));
+  };
+
+  // "NAME=value" lines -> object; blank lines and # comments are ignored
+  const parseInstallerEnv = () => {
+    const env = {};
+    installerEnvText.split('\n').forEach(line => {
+      const text = line.trim();
+      if (!text || text.startsWith('#')) return;
+      const i = text.indexOf('=');
+      if (i > 0) env[text.slice(0, i).trim()] = text.slice(i + 1).trim();
+    });
+    return env;
+  };
 
   const checkGpu = () => {
     if (!backendUrl) return;
@@ -64,7 +92,7 @@ function SettingsTab({ onEnvReady }) {
       .then(r => r.json())
       .then(result => {
         setEnvStatus(result.status);
-        setEnvMessage(result.version ? `${result.version}${result.torch_variant ? ` (${result.torch_variant === 'cuda' ? 'GPU / CUDA' : 'CPU'} build)` : ''}` : result.error || '');
+        setEnvMessage(result.status === 'outdated' ? (result.message || '') : result.version ? `${result.version}${result.torch_variant ? ` (${result.torch_variant === 'cuda' ? 'GPU / CUDA' : 'CPU'} build)` : ''}` : result.error || '');
         if (onEnvReady) onEnvReady(result.status === 'ready');
         checkGpu();
       })
@@ -75,30 +103,51 @@ function SettingsTab({ onEnvReady }) {
     checkEnv();
   }, [backendUrl]); // eslint-disable-line
 
+  useEffect(() => {
+    loadInstallPlan();
+  }, [backendUrl, torchVariant, envStatus]); // eslint-disable-line
+
+  useEffect(() => {
+    try { localStorage.setItem('dipper_installer_env', installerEnvText); } catch (e) { /* storage unavailable */ }
+  }, [installerEnvText]);
+
   const startEnvInstall = () => {
     if (!backendUrl) return;
     setEnvStatus('installing');
     setEnvMessage('Starting install...');
-    fetch(`${backendUrl}/env/install`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ torch_variant: torchVariant }) })
-      .catch(() => { });
-    envPollRef.current = setInterval(() => {
-      fetch(`${backendUrl}/env/install/status`)
-        .then(r => r.json())
-        .then(state => {
-          setEnvStatus(state.stage);
-          setEnvMessage(state.message || '');
-          if (state.stage === 'ready') {
-            clearInterval(envPollRef.current);
-            checkEnv();
-          } else if (state.stage === 'error') {
-            // keep the install error visible; checkEnv would replace it with a bare "Not installed"
-            clearInterval(envPollRef.current);
-            setEnvStatus('error');
-            setEnvMessage(state.message || 'Install failed');
-          }
-        })
-        .catch(() => { });
-    }, 2000);
+    fetch(`${backendUrl}/env/install`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ torch_variant: torchVariant, installer_env: parseInstallerEnv() })
+    })
+      .then(r => r.json())
+      .then(result => {
+        if (result.status === 'error') {
+          // rejected before starting (e.g. not enough disk space)
+          setEnvStatus('error');
+          setEnvMessage(result.error);
+          return;
+        }
+        envPollRef.current = setInterval(() => {
+          fetch(`${backendUrl}/env/install/status`)
+            .then(r => r.json())
+            .then(state => {
+              setEnvStatus(state.stage);
+              setEnvMessage(state.message || '');
+              if (state.stage === 'ready') {
+                clearInterval(envPollRef.current);
+                checkEnv();
+              } else if (state.stage === 'error') {
+                // keep the install error visible; checkEnv would replace it with a bare "Not installed"
+                clearInterval(envPollRef.current);
+                setEnvStatus('error');
+                setEnvMessage(state.message || 'Install failed');
+              }
+            })
+            .catch(() => { });
+        }, 2000);
+      })
+      .catch(e => { setEnvStatus('error'); setEnvMessage(String(e)); });
   };
 
   const removeEnv = () => {
@@ -109,9 +158,9 @@ function SettingsTab({ onEnvReady }) {
       .catch(() => { });
   };
 
-  const envStatusColor = { ready: 'success', missing: 'warning', broken: 'error', error: 'error', checking: 'info' }[envStatus] || 'info';
+  const envStatusColor = { ready: 'success', outdated: 'warning', missing: 'warning', broken: 'error', error: 'error', checking: 'info' }[envStatus] || 'info';
   const envStatusLabel = {
-    ready: 'Installed', missing: 'Not installed', broken: 'Broken',
+    ready: 'Installed', outdated: 'Update required', missing: 'Not installed', broken: 'Broken',
     installing: 'Installing...', error: 'Error', checking: 'Checking...',
   }[envStatus] || envStatus;
 
@@ -330,6 +379,39 @@ function SettingsTab({ onEnvReady }) {
             </Typography>
           </Box>
 
+          {installPlan && installPlan.mode !== 'up_to_date' && envStatus !== 'installing' && (
+            <Alert severity={installPlan.enough_space ? 'info' : 'error'} sx={{ mb: 2 }}>
+              {installPlan.mode === 'update' ? 'Update' : 'Install'}: {installPlan.variant === 'cuda' ? 'GPU (NVIDIA CUDA)' : 'CPU'} build
+              {installPlan.mode === 'install' ? `, about ${installPlan.estimated_size_gb} GB of disk space` : ''}
+              {' '}({installPlan.reason}). {installPlan.free_gb} GB free
+              {installPlan.enough_space ? '.' : `, but at least ${installPlan.required_free_gb} GB is needed.`}
+            </Alert>
+          )}
+
+          <Box sx={{ mb: 2 }}>
+            <Button size="small" onClick={() => setShowNetworkSettings(v => !v)}>
+              {showNetworkSettings ? 'Hide' : 'Show'} advanced network settings
+            </Button>
+            {showNetworkSettings && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                  For networks that need a proxy or mirror. One NAME=value per line. Allowed: HTTPS_PROXY, HTTP_PROXY, ALL_PROXY, NO_PROXY,
+                  SSL_CERT_FILE, SSL_CERT_DIR, UV_DEFAULT_INDEX, UV_INDEX, UV_PYTHON_INSTALL_MIRROR, UV_HTTP_TIMEOUT.
+                </Typography>
+                <TextField
+                  multiline
+                  minRows={3}
+                  fullWidth
+                  size="small"
+                  value={installerEnvText}
+                  onChange={(e) => setInstallerEnvText(e.target.value)}
+                  placeholder={'HTTPS_PROXY=http://proxy.example.edu:8080'}
+                  disabled={envStatus === 'installing'}
+                />
+              </Box>
+            )}
+          </Box>
+
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <Button variant="outlined" onClick={checkEnv} disabled={envStatus === 'installing'}>
               Check
@@ -337,9 +419,9 @@ function SettingsTab({ onEnvReady }) {
             <Button
               variant="contained"
               onClick={startEnvInstall}
-              disabled={envStatus === 'ready' || envStatus === 'installing'}
+              disabled={envStatus === 'ready' || envStatus === 'installing' || (installPlan !== null && !installPlan.enough_space)}
             >
-              {envStatus === 'missing' || envStatus === 'unknown' ? 'Download and Install' : 'Re-install'}
+              {envStatus === 'missing' || envStatus === 'unknown' ? 'Download and Install' : envStatus === 'outdated' ? 'Update' : 'Re-install'}
             </Button>
             {confirmRemove ? (
               <>

@@ -19,6 +19,9 @@ import base64
 import subprocess
 import threading
 import shutil
+import functools
+import hashlib
+import tomllib
 import glob
 import platform
 import ssl
@@ -275,10 +278,44 @@ ML_PYTHON_VERSION = "3.13"
 # in ml_env/pyproject.toml.
 TORCH_VARIANTS = ("cpu", "cuda")
 
-# Minimum NVIDIA driver (major, minor) for the CUDA 12.x PyTorch build (cu126
-# in ml_env/pyproject.toml), which relies on CUDA minor-version compatibility.
-# Update together with the CUDA index in pyproject.toml.
-CUDA_MIN_DRIVER = {"Linux": (525, 60), "Windows": (528, 33)}
+# On-disk size (GB) of the installed environment per (OS, torch variant), measured
+# in CI (`du -sh .venv` in test-uv-ml-env.yml). Used to show the expected size
+# up front and to check free disk space. Re-measure when the lock changes.
+ENV_SIZE_GB = {
+    ("Darwin", "cpu"): 2.5,
+    ("Windows", "cpu"): 2.8,
+    ("Linux", "cpu"): 3.8,
+    ("Windows", "cuda"): 6.3,
+    ("Linux", "cuda"): 9.2,
+}
+# A fresh install needs this multiple of the environment size free (downloaded
+# wheels are cached while they are installed).
+INSTALL_DISK_MARGIN = 1.25
+# Free space needed to update an existing environment in place (incremental).
+UPDATE_MIN_FREE_GB = 2.0
+
+# Hosts the installer downloads from, listed in connection error messages.
+REQUIRED_HOSTS = (
+    "pypi.org and files.pythonhosted.org (Python packages)",
+    "download.pytorch.org (PyTorch)",
+    "github.com and objects.githubusercontent.com (the Python download)",
+)
+
+# Environment variables users may set for the installer (proxy, mirrors,
+# certificates), e.g. from Settings on locked-down networks. Everything else
+# starting with UV_ is removed so a user's own uv setup can't change the install.
+INSTALLER_ENV_ALLOWED = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "UV_DEFAULT_INDEX",
+    "UV_INDEX",
+    "UV_PYTHON_INSTALL_MIRROR",
+    "UV_HTTP_TIMEOUT",
+)
 
 
 def get_default_env_cache_dir():
@@ -362,18 +399,48 @@ def query_nvidia_gpus():
     return [row[0] for row in rows], rows[0][1], None
 
 
-def _driver_meets_minimum(driver):
-    """Whether an NVIDIA driver version string supports the bundled CUDA build."""
-    driver_version = tuple(int(p) for p in driver.split(".")[:2])
-    return driver_version >= CUDA_MIN_DRIVER[platform.system()]
+def _parse_driver(version):
+    """(major, minor) from an NVIDIA driver version string such as '570.26' or '560.35.03'."""
+    parts = version.strip().split(".")
+    if len(parts) < 2:
+        raise ValueError(f"unrecognized driver version {version!r}")
+    return int(parts[0]), int(parts[1])
 
 
-def _driver_too_old_message(driver):
-    min_driver = ".".join(map(str, CUDA_MIN_DRIVER[platform.system()]))
-    return (
-        f"NVIDIA driver {driver} is older than the minimum {min_driver} required "
-        "for the CUDA build; update the driver to enable GPU support"
-    )
+@functools.lru_cache(maxsize=1)
+def get_cuda_requirements():
+    """(CUDA version, {OS: minimum driver (major, minor)}) for the bundled CUDA build.
+
+    Read from [tool.dipper.cuda] in ml_env/pyproject.toml, which keeps them next to
+    the torch pin and CUDA index they must match.
+    """
+    with open(os.path.join(get_ml_project_dir(), "pyproject.toml"), "rb") as f:
+        cuda = tomllib.load(f)["tool"]["dipper"]["cuda"]
+    min_driver = {
+        "Linux": _parse_driver(cuda["min_driver"]["linux"]),
+        "Windows": _parse_driver(cuda["min_driver"]["windows"]),
+    }
+    return cuda["version"], min_driver
+
+
+def _check_driver(driver):
+    """Whether an NVIDIA driver version supports the bundled CUDA build.
+
+    Returns (usable, problem); `problem` explains why not.
+    """
+    cuda_version, min_driver = get_cuda_requirements()
+    try:
+        version = _parse_driver(driver)
+    except ValueError:
+        return False, f"could not read the NVIDIA driver version ({driver!r})"
+    minimum = min_driver[platform.system()]
+    if version < minimum:
+        return False, (
+            f"NVIDIA driver {driver} is older than the minimum "
+            f"{'.'.join(map(str, minimum))} required for the CUDA {cuda_version} "
+            "build; update the driver to enable GPU support"
+        )
+    return True, None
 
 
 def detect_torch_variant():
@@ -386,20 +453,31 @@ def detect_torch_variant():
     system = platform.system()
     if system == "Darwin":
         return "cpu", "macOS uses the standard PyTorch build (CPU and Apple MPS)"
-    if system not in CUDA_MIN_DRIVER:
+    if system not in get_cuda_requirements()[1]:
         raise RuntimeError(f"Unsupported operating system: {system}")
 
     gpus, driver, problem = query_nvidia_gpus()
     if problem:
         return "cpu", problem
-    if not _driver_meets_minimum(driver):
-        return "cpu", _driver_too_old_message(driver)
+    usable, driver_problem = _check_driver(driver)
+    if not usable:
+        return "cpu", driver_problem
     return "cuda", f"NVIDIA driver {driver} supports the CUDA build"
 
 
-def resolve_torch_variant(requested):
-    """Resolve 'auto' / 'cpu' / 'cuda' to a concrete variant. Returns (variant, reason)."""
+def resolve_torch_variant(requested, env_check=None):
+    """Resolve 'auto' / 'cpu' / 'cuda' to a concrete variant. Returns (variant, reason).
+
+    When updating an installed environment, 'auto' keeps the installed build instead
+    of re-detecting, so an update never silently switches between CPU and GPU.
+    """
     if requested == "auto":
+        if (
+            env_check is not None
+            and env_check["status"] == "outdated"
+            and env_check.get("torch_variant")
+        ):
+            return env_check["torch_variant"], "keeping the installed build"
         return detect_torch_variant()
     if requested not in TORCH_VARIANTS:
         raise ValueError(
@@ -410,11 +488,24 @@ def resolve_torch_variant(requested):
 
 TORCH_PROBE_SCRIPT = """
 import json, torch
+available = torch.cuda.is_available()
+arch_list = torch.cuda.get_arch_list() if available else []
+devices = []
+for i in range(torch.cuda.device_count() if available else 0):
+    major, minor = torch.cuda.get_device_capability(i)
+    arch = f"sm_{major}{minor}"
+    devices.append({
+        "name": torch.cuda.get_device_name(i),
+        "arch": arch,
+        # the build must contain kernels for this GPU's architecture
+        "arch_supported": arch in arch_list,
+    })
 print(json.dumps({
     "torch_version": torch.__version__,
     "cuda_build": torch.version.cuda,
-    "cuda_available": torch.cuda.is_available(),
-    "cuda_devices": [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())],
+    "cuda_available": available,
+    "cuda_arch_list": arch_list,
+    "cuda_devices": devices,
     "mps_available": torch.backends.mps.is_available(),
 }))
 """
@@ -482,17 +573,15 @@ def get_gpu_status():
             "Silicon and a recent macOS). Tasks will run on the CPU.",
         )
 
-    if system not in CUDA_MIN_DRIVER:
+    if system not in get_cuda_requirements()[1]:
         raise RuntimeError(f"Unsupported operating system: {system}")
     gpus, driver, problem = query_nvidia_gpus()
     gpu_names = ", ".join(gpus)
     hardware = {"gpus": gpus, "driver": driver}
     if problem:
         gpu_usable, hardware_problem = False, problem
-    elif not _driver_meets_minimum(driver):
-        gpu_usable, hardware_problem = False, _driver_too_old_message(driver)
     else:
-        gpu_usable, hardware_problem = True, None
+        gpu_usable, hardware_problem = _check_driver(driver)
 
     if probe is None:
         if gpu_usable:
@@ -504,8 +593,12 @@ def get_gpu_status():
                 **hardware,
             )
         if gpus:
-            return status("warning", "NVIDIA GPU found, but its driver is too old",
-                          hardware_problem, **hardware)  # fmt: skip
+            return status(
+                "warning",
+                "NVIDIA GPU found, but its driver can't be used",
+                hardware_problem,
+                **hardware,
+            )
         return status(
             "info",
             "No NVIDIA GPU detected",
@@ -514,11 +607,31 @@ def get_gpu_status():
         )
 
     if probe["cuda_available"]:
+        supported = [d for d in probe["cuda_devices"] if d["arch_supported"]]
+        unsupported = [d for d in probe["cuda_devices"] if not d["arch_supported"]]
+        if not supported:
+            names = ", ".join(f"{d['name']} ({d['arch']})" for d in unsupported)
+            return status(
+                "warning",
+                f"GPU not supported by the installed PyTorch build: {names}",
+                f"PyTorch {probe['torch_version']} (CUDA {probe['cuda_build']}) was "
+                f"built for GPU architectures {', '.join(probe['cuda_arch_list'])}, which "
+                "does not include this GPU's architecture, so GPU tasks would fail. "
+                "Tasks should be run on the CPU build.",
+                **hardware,
+            )
+        note = (
+            ""
+            if not unsupported
+            else " Not usable: "
+            + ", ".join(f"{d['name']} ({d['arch']})" for d in unsupported)
+            + "."
+        )
         return status(
             "ok",
-            f"GPU acceleration available: {', '.join(probe['cuda_devices'])}",
+            f"GPU acceleration available: {', '.join(d['name'] for d in supported)}",
             f"PyTorch {probe['torch_version']} (CUDA {probe['cuda_build']}) can use "
-            f"the GPU. NVIDIA driver {driver}.",
+            f"the GPU. NVIDIA driver {driver}.{note}",
             **hardware,
         )
     if installed_variant == "cpu" and gpu_usable:
@@ -570,6 +683,16 @@ def _torch_variant_path(env_path):
     return env_path + ".torch_variant"
 
 
+def _lock_hash_path(env_path):
+    return env_path + ".lock_hash"
+
+
+def _lock_hash():
+    """Hash of the bundled uv.lock: identifies which packages this Dipper expects."""
+    with open(os.path.join(get_ml_project_dir(), "uv.lock"), "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
 def _read_text(path):
     try:
         with open(path, "r") as f:
@@ -617,7 +740,9 @@ def _env_python_path(env_path):
 def check_environment(env_path):
     """Check whether a Python environment exists and is usable.
 
-    The managed environment (the default path) must also have completed installation.
+    The managed environment (the default path) must also have completed installation
+    and match the bundled uv.lock. Statuses: ready, outdated (usable, but the lockfile
+    changed since it was installed), installing, missing, broken, error.
     """
     try:
         managed = os.path.abspath(env_path) == os.path.abspath(get_default_env_path())
@@ -655,16 +780,28 @@ def check_environment(env_path):
         }
         if managed:
             info["torch_variant"] = _read_text(_torch_variant_path(env_path))
+            # A new Dipper release may ship a different uv.lock; the installed
+            # packages are then out of date even though the install completed.
+            if _read_text(_lock_hash_path(env_path)) != _lock_hash():
+                info["status"] = "outdated"
+                info["message"] = (
+                    "This version of Dipper needs different packages than the "
+                    "installed ML environment. Update it from Settings."
+                )
         return info
 
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
 
-def _uv_subprocess_env(env_dir):
+def _uv_subprocess_env(env_dir, installer_env=None):
     """Environment for running uv: isolated from the user's own uv/venv settings,
     with uv's Python installs and package cache kept in Dipper's cache directory
-    (on the same filesystem as the environment so installs can use hard links)."""
+    (on the same filesystem as the environment so installs can use hard links).
+
+    installer_env: user-supplied overrides (proxy, mirrors, certificates), limited to
+    INSTALLER_ENV_ALLOWED.
+    """
     env = env_python_subprocess_env()
     for key in list(env):
         if key.startswith("UV_") or key == "VIRTUAL_ENV":
@@ -673,16 +810,157 @@ def _uv_subprocess_env(env_dir):
     env["UV_PROJECT_ENVIRONMENT"] = env_dir
     env["UV_CACHE_DIR"] = os.path.join(cache_dir, "uv-cache")
     env["UV_PYTHON_INSTALL_DIR"] = os.path.join(cache_dir, "python")
+    env.update(installer_env or {})
     return env
 
 
-def install_environment(env_dir, torch_variant, on_progress=None):
+def validate_installer_env(installer_env):
+    """Check user-supplied installer environment variables; returns them as a dict."""
+    if not isinstance(installer_env, dict):
+        raise ValueError("installer_env must be an object of NAME: value pairs")
+    unknown = sorted(set(installer_env) - set(INSTALLER_ENV_ALLOWED))
+    if unknown:
+        raise ValueError(
+            f"Not allowed as installer settings: {', '.join(unknown)}. "
+            f"Allowed: {', '.join(INSTALLER_ENV_ALLOWED)}"
+        )
+    return {k: str(v) for k, v in installer_env.items()}
+
+
+# (phrases in uv's output, explanation, whether it is a network/access problem)
+_INSTALL_ERROR_PATTERNS = (
+    (
+        (
+            "dns error",
+            "failed to lookup address",
+            "name or service not known",
+            "no such host",
+            "nodename nor servname",
+        ),
+        "Could not look up a download server's address (DNS error). Check your internet connection.",
+        True,
+    ),
+    (
+        (
+            "invalid peer certificate",
+            "unknownissuer",
+            "certificate verify failed",
+            "self-signed",
+            "invalid certificate",
+            "tls handshake",
+        ),
+        "A secure (TLS) connection could not be verified. This usually means a network "
+        "proxy or firewall is intercepting HTTPS traffic with its own certificate.",
+        True,
+    ),
+    (
+        ("403 forbidden", "status code 403", "407 proxy", "proxy authentication"),
+        "A download server refused the request (HTTP 403 or proxy authentication). "
+        "This is usually a firewall or proxy restriction.",
+        True,
+    ),
+    (
+        ("404 not found", "status code 404"),
+        "A package file is no longer available at its download address (HTTP 404). "
+        "This version of Dipper may need an update.",
+        False,
+    ),
+    (
+        ("timed out", "timeout"),
+        "A download timed out. Check your connection and try again.",
+        True,
+    ),
+    (
+        (
+            "connection refused",
+            "connection reset",
+            "connection closed",
+            "error sending request",
+        ),
+        "The connection to a download server failed.",
+        True,
+    ),
+    (
+        ("no space left on device", "os error 28", "not enough space", "disk full"),
+        "The disk is full. Free some space and try again.",
+        False,
+    ),
+    (
+        ("permission denied", "access is denied"),
+        "Permission was denied while writing files. Check that Dipper's cache "
+        "directory is writable and not blocked by security software.",
+        False,
+    ),
+)
+
+
+def explain_install_error(output_lines, returncode):
+    """Turn the tail of uv's output into a message a user can act on."""
+    text = "\n".join(output_lines).lower()
+    details = "\n".join(output_lines[-10:])
+    for phrases, explanation, is_network in _INSTALL_ERROR_PATTERNS:
+        if any(p in text for p in phrases):
+            message = explanation
+            if is_network:
+                hosts = "\n".join(f"  - {h}" for h in REQUIRED_HOSTS)
+                message += (
+                    f"\n\nThe installer needs to reach:\n{hosts}\n"
+                    "If your network blocks these or needs a proxy or mirror, ask your IT "
+                    "administrator, or enter proxy/mirror settings under Settings > "
+                    "ML Environment > Advanced network settings."
+                )
+            return f"{message}\n\nDetails:\n{details}"
+    return f"uv sync exited with code {returncode}:\n{details}"
+
+
+def _free_disk_gb(path):
+    """Free space (GB) on the filesystem that will hold `path`."""
+    probe = path
+    while not os.path.exists(probe):
+        probe = os.path.dirname(probe)
+    return shutil.disk_usage(probe).free / 1e9
+
+
+def plan_install(requested="auto"):
+    """What installing the ML environment would do, for showing before it starts.
+
+    Returns the torch variant, whether this is a fresh install, an update, or
+    nothing to do, the expected disk size, and whether enough disk space is free.
+    """
+    env_dir = get_default_env_path()
+    env_check = check_environment(env_dir)
+    variant, reason = resolve_torch_variant(requested, env_check)
+
+    if env_check["status"] == "ready" and env_check.get("torch_variant") == variant:
+        mode = "up_to_date"
+    elif env_check["status"] == "outdated" and env_check.get("torch_variant") == variant:
+        mode = "update"
+    else:
+        mode = "install"
+
+    size_gb = ENV_SIZE_GB[(platform.system(), variant)]
+    required_gb = UPDATE_MIN_FREE_GB if mode == "update" else size_gb * INSTALL_DISK_MARGIN
+    free_gb = _free_disk_gb(env_dir)
+    return {
+        "variant": variant,
+        "reason": reason,
+        "mode": mode,
+        "estimated_size_gb": size_gb,
+        "required_free_gb": round(required_gb, 1),
+        "free_gb": round(free_gb, 1),
+        "enough_space": mode == "up_to_date" or free_gb >= required_gb,
+        "env_path": env_dir,
+    }
+
+
+def install_environment(env_dir, torch_variant, on_progress=None, installer_env=None):
     """Create or update the ML environment at env_dir from the bundled lockfile.
 
     Args:
         env_dir: environment directory (managed by uv)
         torch_variant: 'cpu' or 'cuda' (a concrete variant, see resolve_torch_variant)
         on_progress: optional callable receiving each line of uv's output
+        installer_env: optional validated environment overrides for uv (proxy, mirror)
     """
     try:
         if torch_variant not in TORCH_VARIANTS:
@@ -696,8 +974,10 @@ def install_environment(env_dir, torch_variant, on_progress=None):
 
         # --frozen: install exactly what uv.lock pins, with no resolution.
         # --no-config: ignore any uv configuration files on the user's machine.
+        # --system-certs: trust the operating system's certificate store, so networks
+        #   that intercept HTTPS with a corporate or university certificate work.
         cmd = [
-            uv, "--no-config", "--color", "never",
+            uv, "--no-config", "--system-certs", "--color", "never",
             "sync", "--frozen", "--no-progress",
             "--project", project_dir,
             "--python", ML_PYTHON_VERSION, "--managed-python",
@@ -708,7 +988,7 @@ def install_environment(env_dir, torch_variant, on_progress=None):
         output_tail = []
         with subprocess.Popen(
             cmd,
-            env=_uv_subprocess_env(env_dir),
+            env=_uv_subprocess_env(env_dir, installer_env),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -726,13 +1006,12 @@ def install_environment(env_dir, torch_variant, on_progress=None):
         returncode = process.returncode
         if returncode != 0:
             _write_text(_install_status_path(env_dir), "failed")
-            error_msg = f"uv sync exited with code {returncode}:\n" + "\n".join(
-                output_tail
-            )
+            error_msg = explain_install_error(output_tail, returncode)
             logger.error(error_msg)
             return {"status": "error", "error": error_msg}
 
         _write_text(_torch_variant_path(env_dir), torch_variant)
+        _write_text(_lock_hash_path(env_dir), _lock_hash())
         _write_text(_install_status_path(env_dir), "complete")
 
         env_check = check_environment(env_dir)
@@ -764,6 +1043,13 @@ def resolve_path(path_str, base_dir=None):
             return os.path.join(base_dir, path_str)
         else:
             return os.path.abspath(path_str)
+
+
+def env_not_ready_message(env_result):
+    """Message for a task request when the ML environment can't be used."""
+    if env_result["status"] == "outdated":
+        return "The ML environment is out of date for this version of Dipper. Please update it from the Settings tab."
+    return "ML environment is not installed. Please install it from the Settings tab."
 
 
 def setup_environment(env_dir=None, torch_variant="auto"):
@@ -808,7 +1094,7 @@ def setup_environment(env_dir=None, torch_variant="auto"):
                 "message": "Environment already ready",
             }
 
-        variant, reason = resolve_torch_variant(torch_variant)
+        variant, reason = resolve_torch_variant(torch_variant, env_check)
         logger.info(f"Installing ML environment: torch variant {variant} ({reason})")
         install_result = install_environment(env_dir, variant)
         if install_result["status"] != "success":
@@ -1704,6 +1990,7 @@ class DipperServer:
         self.app.router.add_get("/env/install/status", self.install_env_status)
         self.app.router.add_post("/env/remove", self.remove_env)
         self.app.router.add_get("/env/gpu", self.env_gpu)
+        self.app.router.add_get("/env/plan", self.env_plan)
         self.app.router.add_post("/inference/run", self.run_inference)
         self.app.router.add_get("/inference/status/{job_id}", self.get_inference_status)
         self.app.router.add_post("/inference/cancel/{job_id}", self.cancel_inference)
@@ -2447,10 +2734,12 @@ class DipperServer:
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def install_env(self, request):
-        """Start a background install of the ML environment.
+        """Start a background install (or update) of the ML environment.
 
-        Body (optional): {"torch_variant": "auto" | "cpu" | "cuda"}; "auto" (default)
-        picks CUDA if a new enough NVIDIA driver is present.
+        Body (all optional): {"torch_variant": "auto" | "cpu" | "cuda",
+        "installer_env": {"HTTPS_PROXY": "...", ...}}. "auto" (default) picks CUDA if
+        a new enough NVIDIA driver is present, or keeps the installed build when
+        updating. installer_env is limited to INSTALLER_ENV_ALLOWED.
 
         Non-blocking: returns immediately with {"status": "started"} or
         {"status": "already_running"} if an install is already in progress.
@@ -2462,14 +2751,13 @@ class DipperServer:
 
         data = await request.json()
         try:
-            variant, reason = resolve_torch_variant(data.get("torch_variant", "auto"))
+            installer_env = validate_installer_env(data.get("installer_env", {}))
+            plan = plan_install(data.get("torch_variant", "auto"))
         except ValueError as e:
             return web.json_response({"status": "error", "error": str(e)}, status=400)
+        variant, reason, env_dir = plan["variant"], plan["reason"], plan["env_path"]
 
-        # Already ready with the requested build?
-        env_dir = get_default_env_path()
-        env_check = check_environment(env_dir)
-        if env_check["status"] == "ready" and env_check["torch_variant"] == variant:
+        if plan["mode"] == "up_to_date":
             self._env_install_state = {
                 "stage": "ready",
                 "message": "Environment already ready",
@@ -2477,6 +2765,16 @@ class DipperServer:
             }
             return web.json_response(
                 {"status": "already_ready", "state": self._env_install_state}
+            )
+        if not plan["enough_space"]:
+            return web.json_response(
+                {
+                    "status": "error",
+                    "error": f"Not enough free disk space: the {variant} build needs about "
+                    f"{plan['required_free_gb']} GB free in {env_dir}, but only "
+                    f"{plan['free_gb']} GB is available.",
+                },
+                status=400,
             )
 
         def _set_progress(line):
@@ -2488,8 +2786,12 @@ class DipperServer:
 
         def _run():
             try:
-                logger.info(f"Starting background environment install: {variant} ({reason})")
-                result = install_environment(env_dir, variant, on_progress=_set_progress)
+                logger.info(
+                    f"Starting background environment {plan['mode']}: {variant} ({reason})"
+                )
+                result = install_environment(
+                    env_dir, variant, on_progress=_set_progress, installer_env=installer_env
+                )
                 if result["status"] == "success":
                     self._env_install_state = {
                         "stage": "ready",
@@ -2513,13 +2815,24 @@ class DipperServer:
 
         self._env_install_state = {
             "stage": "installing",
-            "message": f"Starting install ({variant}: {reason})...",
+            "message": f"Starting {plan['mode']} ({variant}: {reason})...",
             "error": None,
         }
         threading.Thread(target=_run, daemon=True).start()
         return web.json_response(
-            {"status": "started", "state": self._env_install_state}
+            {"status": "started", "state": self._env_install_state, "plan": plan}
         )
+
+    async def env_plan(self, request):
+        """What installing would do (variant, expected size, free disk space)."""
+        try:
+            plan = plan_install(request.query.get("torch_variant", "auto"))
+            return web.json_response(plan)
+        except ValueError as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=400)
+        except Exception as e:
+            logger.error(f"Error planning environment install: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def install_env_status(self, request):
         """Return current state of background env install."""
@@ -2577,7 +2890,7 @@ class DipperServer:
                 return web.json_response(
                     {
                         "status": "error",
-                        "error": "ML environment is not installed. Please install it from the Settings tab.",
+                        "error": env_not_ready_message(env_result),
                         "env_status": env_result["status"],
                     },
                     status=503,
@@ -2831,7 +3144,7 @@ class DipperServer:
                 return web.json_response(
                     {
                         "status": "error",
-                        "error": "ML environment is not installed. Please install it from the Settings tab.",
+                        "error": env_not_ready_message(env_result),
                         "env_status": env_result["status"],
                     },
                     status=503,
@@ -3035,7 +3348,7 @@ class DipperServer:
                 return web.json_response(
                     {
                         "status": "error",
-                        "error": "ML environment is not installed. Please install it from the Settings tab.",
+                        "error": env_not_ready_message(env_result),
                         "env_status": env_result["status"],
                     },
                     status=503,

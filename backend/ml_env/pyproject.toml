@@ -30,32 +30,43 @@ dependencies = [
     "kagglehub",            # Perch and Perch v2
 ]
 
+# ---------------------------------------------------------------------------
+# PyTorch / CUDA configuration. Update these together (see DEVELOPMENT.md):
+#   1. the torch/torchvision/torchaudio pins in `constraint-dependencies` (must exist on BOTH the cpu index
+#      and the CUDA index below, for every platform: check with
+#      `curl https://download.pytorch.org/whl/<index>/torch/`)
+#   2. the CUDA index name (`pytorch-cuXXX`, in [tool.uv.sources] and [[tool.uv.index]])
+#   3. [tool.dipper.cuda]: the CUDA version and the minimum NVIDIA driver for it
+#      (read by backend/app.py)
+#
 # The torch variant is chosen at install time:  uv sync --frozen --extra cpu|cuda
-# Both are locked. PyPI's default torch is CPU-only on Windows and CUDA 13.2 on
+# Both are locked. PyPI's default torch is CPU-only on Windows and CUDA 13 on
 # Linux, so the PyTorch index is used explicitly for both variants. macOS always
 # uses PyPI (CPU + MPS) and ignores the extras.
+# ---------------------------------------------------------------------------
 [project.optional-dependencies]
 cpu = ["torch", "torchvision", "torchaudio"]
 cuda = ["torch", "torchvision", "torchaudio"]
 
 [tool.uv]
 package = false
-# 2.14.1 is the newest torch published on both the cpu and cu126 indexes.
-constraint-dependencies = ["torch==2.14.1"]
+# torch 2.11.0 is the newest on both the cpu and cu128 indexes. torchvision and
+# torchaudio must match torch's release (their metadata does not pin torch).
+constraint-dependencies = ["torch==2.11.0", "torchvision==0.26.0", "torchaudio==2.11.0"]
 conflicts = [[{ extra = "cpu" }, { extra = "cuda" }]]
 
 [tool.uv.sources]
 torch = [
     { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
-    { index = "pytorch-cu126", extra = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", extra = "cuda", marker = "sys_platform != 'darwin'" },
 ]
 torchvision = [
     { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
-    { index = "pytorch-cu126", extra = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", extra = "cuda", marker = "sys_platform != 'darwin'" },
 ]
 torchaudio = [
     { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
-    { index = "pytorch-cu126", extra = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", extra = "cuda", marker = "sys_platform != 'darwin'" },
 ]
 
 [[tool.uv.index]]
@@ -64,6 +75,16 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [[tool.uv.index]]
-name = "pytorch-cu126"
-url = "https://download.pytorch.org/whl/cu126"
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
+
+# Minimum NVIDIA driver for the CUDA build above: the "CUDA 12.8 GA" row of
+# "CUDA Toolkit and Corresponding Driver Versions" in the CUDA Toolkit release notes
+# (https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/). CUDA 12.x minor-version
+# compatibility would allow older drivers (branch >= 525), but that is untested here.
+[tool.dipper.cuda]
+version = "12.8"
+[tool.dipper.cuda.min_driver]
+linux = "570.26"
+windows = "570.65"

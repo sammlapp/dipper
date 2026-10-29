@@ -1,0 +1,33 @@
+name: Check ML Environment Lock
+
+# Runs weekly to catch upstream problems (yanked or removed wheels) before users hit
+# them. Failed scheduled runs notify the person who last edited this schedule.
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Mondays 08:00 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'backend/ml_env/**'
+      - '.github/workflows/check-ml-env-lock.yml'
+
+jobs:
+  check-lock:
+    name: uv.lock is current and its files are available
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: backend/ml_env
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      # pyproject.toml and uv.lock must agree (re-resolves against the live indexes)
+      - name: Check lockfile is up to date
+        run: uv lock --check
+
+      - name: Check pinned files are still downloadable
+        run: uv run --no-project --python 3.13 python check_locked_urls.py uv.lock

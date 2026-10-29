@@ -61,7 +61,7 @@ jobs:
           elif variant == "cpu":
               ok = torch.__version__.endswith("+cpu") and torch.version.cuda is None
           else:
-              ok = torch.__version__.endswith("+cu126") and torch.version.cuda.startswith("12.6")
+              ok = torch.__version__.endswith("+cu128") and torch.version.cuda.startswith("12.8")
           raise SystemExit(0 if ok else f"unexpected torch build for variant {variant}")
           PYEOF
 
