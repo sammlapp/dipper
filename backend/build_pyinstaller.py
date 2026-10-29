@@ -56,7 +56,7 @@ def create_virtual_env():
 
     # Create new venv
     run_command(
-        "python -m venv pyinstaller-venv-light",
+        f'"{sys.executable}" -m venv pyinstaller-venv-light',
         description="Creating virtual environment",
     )
 
@@ -179,15 +179,7 @@ def main():
         print(f"Backend directory: {BACKEND_DIR}")
         print(f"Frontend directory: {FRONTEND_DIR}")
 
-        # Check if Python is available
-        try:
-            result = subprocess.run(
-                ["python", "--version"], capture_output=True, text=True
-            )
-            print(f"[OK] Python found: {result.stdout.strip()}")
-        except FileNotFoundError:
-            print("[ERROR] Python not found. Please install Python 3.8 or higher.")
-            sys.exit(1)
+        print(f"[OK] Using Python {sys.version.split()[0]} ({sys.executable})")
 
         # Create virtual environment and install dependencies
         python_exe, pip_exe, pyinstaller_exe, venv_path = create_virtual_env()

@@ -33,17 +33,29 @@ echo ""
 # Check for required commands
 echo -e "${BLUE}Checking prerequisites...${NC}"
 
-# Check Python
-if ! command -v python3 &> /dev/null && ! command -v python &> /dev/null; then
-    echo -e "${RED}✗ Python not found${NC}"
-    echo "  Please install Python 3.8 or later"
-    echo "  Visit: https://www.python.org/downloads/"
+# Check Python (the backend must use the same Python minor version as the ML environment)
+REQUIRED_PYTHON="3.13"
+if [ -n "$PYTHON" ]; then
+    PYTHON_CMD="$PYTHON"
+else
+    PYTHON_CMD=$(command -v "python$REQUIRED_PYTHON" || command -v python3 || command -v python || true)
+fi
+if [ -z "$PYTHON_CMD" ] || ! PYTHON_VERSION=$("$PYTHON_CMD" -c 'import sys; print("%d.%d.%d" % sys.version_info[:3])' 2>/dev/null); then
+    echo -e "${RED}✗ Python $REQUIRED_PYTHON not found${NC}"
+    PYTHON_VERSION=""
+fi
+if [ -n "$PYTHON_VERSION" ] && [ "${PYTHON_VERSION%.*}" != "$REQUIRED_PYTHON" ]; then
+    echo -e "${RED}✗ Python $REQUIRED_PYTHON required, but $PYTHON_CMD is Python $PYTHON_VERSION${NC}"
+    PYTHON_VERSION=""
+fi
+if [ -z "$PYTHON_VERSION" ]; then
+    echo "  Install Python $REQUIRED_PYTHON, e.g. with uv (https://docs.astral.sh/uv/):"
+    echo "    uv python install $REQUIRED_PYTHON"
+    echo "  or conda: conda create -n dipper python=$REQUIRED_PYTHON"
+    echo "  then put python$REQUIRED_PYTHON on PATH or re-run with PYTHON=/path/to/python$REQUIRED_PYTHON"
     exit 1
 fi
-
-PYTHON_CMD=$(command -v python3 || command -v python)
-PYTHON_VERSION=$($PYTHON_CMD --version 2>&1 | awk '{print $2}')
-echo -e "${GREEN}✓ Python: $PYTHON_VERSION${NC}"
+echo -e "${GREEN}✓ Python: $PYTHON_VERSION ($PYTHON_CMD)${NC}"
 
 # Check Node.js
 if ! command -v node &> /dev/null; then
@@ -77,14 +89,14 @@ if [ ! -f "requirements-backend.txt" ]; then
 fi
 
 echo "  Creating Python virtual environment..."
-$PYTHON_CMD -m venv venv
+"$PYTHON_CMD" -m venv --clear venv
 
 echo "  Activating virtual environment..."
 source venv/bin/activate
 
 echo "  Installing packages from requirements-backend.txt..."
-pip install --upgrade pip
-pip install -r requirements-backend.txt
+python -m pip install --upgrade pip
+python -m pip install -r requirements-backend.txt
 
 echo -e "${GREEN}  ✓ Python dependencies installed${NC}"
 echo ""
@@ -93,14 +105,8 @@ echo ""
 echo -e "${BLUE}[2/4] Building Python backend executable...${NC}"
 cd "$PROJECT_ROOT/backend"
 
-# Check for PyInstaller
-if ! $PYTHON_CMD -m PyInstaller --version &> /dev/null; then
-    echo "  Installing PyInstaller..."
-    pip install pyinstaller
-fi
-
 echo "  Running PyInstaller (this may take a few minutes)..."
-$PYTHON_CMD build_pyinstaller.py
+python build_pyinstaller.py
 
 if [ ! -f "$PROJECT_ROOT/frontend/python-dist/dipper-backend" ]; then
     echo -e "${RED}✗ PyInstaller build failed — dipper-backend not found${NC}"

@@ -4,6 +4,16 @@ Run Dipper on a remote server and access it from your laptop's browser.
 
 ## Installation (5 minutes)
 
+### Prerequisites
+
+- **Python 3.13** exactly. The backend must use the same Python version as the ML environment, and older versions can't install its dependencies (for example pandas 3 needs Python 3.11 or newer). If you don't have it, install it with [uv](https://docs.astral.sh/uv/) or conda:
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  uv python install 3.13
+  # or: conda create -n dipper python=3.13
+  ```
+- **Node.js 16+** and npm
+
 ### On the remote server:
 
 ```bash
@@ -11,14 +21,21 @@ Run Dipper on a remote server and access it from your laptop's browser.
 git clone https://github.com/sammlapp/dipper.git
 cd dipper
 
-# 2. Run installer (installs Python + Node.js dependencies) with admin privelages
+# 2. Run installer (installs Python + Node.js dependencies) with admin privileges
 # enter password if prompted
 sudo ./scripts/install-server.sh
 ```
 
+The installer uses `python3.13` if it is on PATH, otherwise `python3`, and stops if that isn't Python 3.13. To use a specific interpreter (for example one installed by uv or conda), pass it with `PYTHON`. Put it after `sudo`, because sudo drops your environment variables:
+
+```bash
+sudo PYTHON=$(uv python find 3.13) ./scripts/install-server.sh
+# or: sudo PYTHON=/path/to/envs/dipper/bin/python ./scripts/install-server.sh
+```
+
 The installer will:
-- ✓ Check Python 3.8+ and Node.js 16+ are installed
-- ✓ Create Python virtual environment
+- ✓ Check Python 3.13 and Node.js 16+ are installed
+- ✓ Create the Python virtual environment `backend/venv` (an existing one is recreated)
 - ✓ Install Python packages (aiohttp, librosa, etc.)
 - ✓ Install Node.js packages
 - ✓ Build React app for server mode
@@ -158,8 +175,13 @@ REACT_APP_MODE=server npm run build
 ```bash
 cd backend
 source venv/bin/activate
+python --version   # must be 3.13; if not, re-run the installer with PYTHON=/path/to/python3.13
 pip install -r requirements-backend.txt
 ```
+
+### `No matching distribution found for pandas>=3.0.0` (or similar)
+
+The installer or venv is using a Python older than 3.13. Install Python 3.13 (see [Prerequisites](#prerequisites)) and re-run the installer, passing it with `PYTHON=...` if it isn't on PATH as `python3.13`.
 
 ### Can't access from laptop
 
