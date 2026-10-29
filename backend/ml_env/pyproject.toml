@@ -1,5 +1,6 @@
-# Experimental: uv-managed ML environment, replacing dipper_ml_env.yml + conda-pack.
-# Mirrors the `pip:` section of backend/dipper_ml_env.yml.
+# The ML environment: heavy dependencies (PyTorch, TensorFlow, OpenSoundscape) used by the
+# scripts in backend/scripts. Installed by the app on first use with `uv sync --frozen`.
+# This is separate from the backend (../pyproject.toml), which runs app.py.
 [project]
 name = "dipper-ml-env"
 version = "0.0.0"

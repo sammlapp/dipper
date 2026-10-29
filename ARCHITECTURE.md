@@ -18,7 +18,7 @@ Key points:
 1. Backend: The python executable (app.py) serves as the backend, providing the API to the frontend via aiohttp.
 2. Frontend: ReactJS front end is run either via Tauri (desktop mode) or launched with npx (server mode)
 3. File system operations: implemented via Tauri (desktop mode, see main.rs) or directly in app.py (server mode)
-4. Background Tasks: The backend launches background ml tasks by running python scripts with a dedicated conda-pack environment. Task management is handled by TaskManager.js in the React app.
+4. Background Tasks: The backend launches background ml tasks by running python scripts in a dedicated uv-managed Python environment (the "ML environment"), installed on first use from a bundled lockfile. Task management is handled by TaskManager.js in the React app.
 
 
 ### Desktop Mode
@@ -53,7 +53,7 @@ Key points:
        │   - inference.py                     │
        │   - train_model.py                   │
        │   - clip_extraction.py               │
-       │   (Run in conda environment)         │
+       │   (Run in the ML environment)           │
        └──────────────────────────────────────┘
 ```
 
@@ -92,7 +92,7 @@ Key points:
 2. **React → Frontend Task Manager** → TaskManager.js manages tasks
 3. **Frontend → Backend** → `fetch('http://localhost:PORT/...')` HTTP POST/GET
 4. **Backend Server** → Receives HTTP request, validates, starts subprocess
-5. **Subprocess** → Runs ML script in separate conda environment
+5. **Subprocess** → Runs ML script in the separate uv-managed ML environment
 6. **Status Updates** → Frontend polls HTTP endpoint every 2 seconds
 7. **Results** → Subprocess writes to files, frontend fetches via HTTP
 
@@ -146,7 +146,11 @@ logging:
 ### Environment Management
 
 - `POST /env/check` - Check Python environment availability
-- `POST /env/setup` - Setup/download conda environment
+- `POST /env/setup` - Install the ML environment if needed (same installer as below)
+- `GET /env/plan` - What an install would do: torch build, expected size, free disk space
+- `POST /env/install` - Start a background install or update (`torch_variant`: `auto`/`cpu`/`cuda`; optional `installer_env` for proxy/mirror settings); poll `GET /env/install/status`
+- `GET /env/gpu` - GPU detection and whether the installed environment can use it
+- `POST /env/remove` - Delete the installed ML environment
 
 ### ML Tasks - Inference
 
@@ -215,21 +219,21 @@ The `/clip` endpoint supports arbitrary `start_time`/`end_time` ranges. Focus mo
 
 **Dependencies:**
 - aiohttp, pandas, numpy, librosa, soundfile, Pillow, scipy
-- gdown (for environment downloads)
-- appdirs (for cache directories)
+- uv (installs the ML environment; its executable is bundled)
+- platformdirs (for cache and log directories)
 - PyYAML (for config file parsing)
 
-### Heavy Environment (Conda)
+### Heavy Environment (uv)
 
-**Purpose:** ML model training and inference (PyTorch, OpenSoundscape)
-**Build:** conda-pack creates portable conda environment
-**Download/Install:** Via Settings panel, downloads .tar.gz from HF, runs conda-unpack to set up
-**Location:** System cache directory via `appdirs.user_cache_dir("Dipper")`
-- macOS: `~/Library/Caches/Dipper/envs/dipper_ml_env`
-- Linux: `~/.cache/Dipper/envs/dipper_ml_env`
-- Windows: `C:\Users\<user>\AppData\Local\Dipper\Dipper\Cache\envs\dipper_ml_env`
+**Purpose:** ML model inference and extraction (PyTorch, TensorFlow, OpenSoundscape)
+**Definition:** `backend/ml_env/pyproject.toml` + `uv.lock`, bundled into the PyInstaller backend together with the `uv` executable. The lockfile pins every package for both torch builds (`cpu`, `cuda`), so nothing is resolved on user machines.
+**Install:** Via the Settings panel (`POST /env/install`): `uv sync --frozen --extra cpu|cuda`. uv downloads its own managed Python, so nothing needs to be installed on the system. The torch build is chosen from the NVIDIA driver version (`detect_torch_variant()`), or by the user. A hash of `uv.lock` is stored with the install, so a newer Dipper with a different lockfile reports the environment as `outdated` and updates it in place.
+**Location:** System cache directory via `platformdirs.user_cache_dir("Dipper", "Dipper")`; uv's package cache and managed Python are beside it (`uv-cache/`, `python/`)
+- macOS: `~/Library/Caches/Dipper/envs/ml_env`
+- Linux: `~/.cache/Dipper/envs/ml_env`
+- Windows: `C:\Users\<user>\AppData\Local\Dipper\Dipper\Cache\envs\ml_env`
 
-**Size:** ~700MB compressed, ~2GB extracted
+**Size:** about 2.4-3.7 GB for the CPU build and 6.5-9.5 GB for the CUDA build (measured in CI; shown to the user before installing)
 
 **Dependencies:**
 - PyTorch, torchaudio, timm, lightning
@@ -339,7 +343,7 @@ npm run tauri:build:review
 - React app (built, static HTML/CSS/JS)
 - Tauri framework (Rust-based)
 - PyInstaller Python server executable
-- NOT bundled: Heavy conda environment (downloaded on-demand)
+- NOT bundled: the heavy ML environment (installed on-demand by the bundled uv)
 
 ### Server Mode Build
 
@@ -485,12 +489,12 @@ npm run tauri:dev
 - PyYAML (config files)
 - onnxruntime (geomodel inference)
 - huggingface_hub (model downloads)
-- appdirs (system paths)
+- platformdirs (system paths)
 
 **Build Tools:**
 - Tauri CLI 2.x
 - PyInstaller
-- conda-pack
+- uv (backend and ML environment dependency management)
 - concurrently, wait-on (dev orchestration)
 
 ## Server Mode Features
