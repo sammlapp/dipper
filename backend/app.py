@@ -534,14 +534,10 @@ def get_gpu_status():
     """
     system = platform.system()
     env_check = check_environment(get_default_env_path())
-    installed_variant = (
-        env_check.get("torch_variant") if env_check["status"] == "ready" else None
-    )
-    probe = (
-        probe_torch_runtime(env_check["python_path"])
-        if env_check["status"] == "ready"
-        else None
-    )
+    # an outdated environment is still installed and usable
+    installed = env_check["status"] in ("ready", "outdated")
+    installed_variant = env_check.get("torch_variant") if installed else None
+    probe = probe_torch_runtime(env_check["python_path"]) if installed else None
 
     def status(level, summary, detail, **extra):
         return {
@@ -1043,6 +1039,11 @@ def resolve_path(path_str, base_dir=None):
             return os.path.join(base_dir, path_str)
         else:
             return os.path.abspath(path_str)
+
+
+async def optional_json_body(request):
+    """JSON body of a request, or {} if it has none (e.g. a bare `curl -X POST`)."""
+    return await request.json() if request.can_read_body else {}
 
 
 def env_not_ready_message(env_result):
@@ -2696,7 +2697,7 @@ class DipperServer:
         If env_path not provided or None, uses default system cache directory
         """
         try:
-            data = await request.json()
+            data = await optional_json_body(request)
             env_path = data.get("env_path")  # Could be None for default
 
             # Use default cache directory if not provided
@@ -2749,7 +2750,7 @@ class DipperServer:
         if state["stage"] == "installing":
             return web.json_response({"status": "already_running", "state": state})
 
-        data = await request.json()
+        data = await optional_json_body(request)
         try:
             installer_env = validate_installer_env(data.get("installer_env", {}))
             plan = plan_install(data.get("torch_variant", "auto"))

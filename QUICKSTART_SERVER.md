@@ -68,6 +68,41 @@ Open in browser: http://localhost:3000
 Press Ctrl+C to stop
 ```
 
+## Install the ML Environment (once)
+
+Running models needs the ML environment (PyTorch and related packages). It is installed by the same code as the desktop app, using `uv`, into the cache directory of the user who runs the server (`~/.cache/Dipper`). It needs internet access to pypi.org, files.pythonhosted.org, download.pytorch.org, and github.com, and about 3-4 GB of disk space (6.5-9.5 GB with GPU support).
+
+You can install it from the **Settings** tab in the browser, or entirely from the command line over SSH. With the server running (use your `server.port`; default 8000):
+
+```bash
+# 1. Is the backend up, and what is the environment's state?
+curl -s localhost:8000/health
+curl -s -X POST localhost:8000/env/check          # "status": "ready" | "outdated" | "missing" | ...
+
+# 2. Does the server have a usable GPU? What would be installed, and how big is it?
+curl -s localhost:8000/env/gpu
+curl -s "localhost:8000/env/plan?torch_variant=auto"
+
+# 3. Install (or update). torch_variant: "auto" (GPU build if a compatible NVIDIA driver is found), "cpu", or "cuda"
+curl -s -X POST localhost:8000/env/install -H 'Content-Type: application/json' -d '{"torch_variant": "auto"}'
+
+# 4. Watch progress until "stage" is "ready" (or "error", with the reason in "message")
+watch -n 5 'curl -s localhost:8000/env/install/status'
+```
+
+`/env/check` reports `outdated` after updating Dipper if the new version needs different packages; run step 3 again to update (only what changed is downloaded).
+
+Without a running server, you can call the same functions from the `backend/` directory, as the user that will run the server:
+
+```bash
+cd backend
+./venv/bin/python -c "import app, json; print(json.dumps(app.check_environment(app.get_default_env_path()), indent=2))"
+./venv/bin/python -c "import app, json; print(json.dumps(app.get_gpu_status(), indent=2))"
+./venv/bin/python -c "import app; print(app.setup_environment(None, 'auto'))"   # install or update
+```
+
+Installer output is logged as `[uv]` lines in `~/.local/state/Dipper/log/dipper-backend.log`. If your network needs a proxy, set `HTTPS_PROXY` in the server's environment before starting it, or pass `"installer_env": {"HTTPS_PROXY": "http://proxy:8080"}` in step 3.
+
 ## Access from Your Laptop
 
 ### Option 1: SSH Tunnel (Recommended)
