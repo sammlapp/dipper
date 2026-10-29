@@ -6,11 +6,9 @@ Run Dipper on a remote server and access it from your laptop's browser.
 
 ### Prerequisites
 
-- **Python 3.13** exactly. The backend must use the same Python version as the ML environment, and older versions can't install its dependencies (for example pandas 3 needs Python 3.11 or newer). If you don't have it, install it with [uv](https://docs.astral.sh/uv/) or conda:
+- **[uv](https://docs.astral.sh/uv/getting-started/installation/)**, which manages the backend's Python environment. It downloads the exact Python version the project needs (currently 3.13), so no particular Python has to be installed on the server:
   ```bash
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-  uv python install 3.13
-  # or: conda create -n dipper python=3.13
+  curl -LsSf https://astral.sh/uv/install.sh | sh     # then open a new shell so `uv` is on PATH
   ```
 - **Node.js 16+** and npm
 
@@ -21,25 +19,19 @@ Run Dipper on a remote server and access it from your laptop's browser.
 git clone https://github.com/sammlapp/dipper.git
 cd dipper
 
-# 2. Run installer (installs Python + Node.js dependencies) with admin privileges
-# enter password if prompted
-sudo ./scripts/install-server.sh
-```
-
-The installer uses `python3.13` if it is on PATH, otherwise `python3`, and stops if that isn't Python 3.13. To use a specific interpreter (for example one installed by uv or conda), pass it with `PYTHON`. Put it after `sudo`, because sudo drops your environment variables:
-
-```bash
-sudo PYTHON=$(uv python find 3.13) ./scripts/install-server.sh
-# or: sudo PYTHON=/path/to/envs/dipper/bin/python ./scripts/install-server.sh
+# 2. Run the installer as your normal user (it does not need sudo)
+./scripts/install-server.sh
 ```
 
 The installer will:
-- ✓ Check Python 3.13 and Node.js 16+ are installed
-- ✓ Create the Python virtual environment `backend/venv` (an existing one is recreated)
-- ✓ Install Python packages (aiohttp, librosa, etc.)
+- ✓ Check that uv and Node.js 16+ are installed
+- ✓ Install the backend's Python packages from the lockfile into `backend/.venv` (uv downloads Python 3.13 if needed)
+- ✓ Build the backend executable
 - ✓ Install Node.js packages
 - ✓ Build React app for server mode
 - ✓ Create default `server_config.yml`
+
+The heavy machine learning environment (PyTorch etc.) is installed separately, once, after the server is running; see [Install the ML Environment](#install-the-ml-environment-once).
 
 ## Configuration (2 minutes)
 
@@ -113,9 +105,9 @@ Without a running server, you can call the same functions from the `backend/` di
 
 ```bash
 cd backend
-./venv/bin/python -c "import app, json; print(json.dumps(app.check_environment(app.get_default_env_path()), indent=2))"
-./venv/bin/python -c "import app, json; print(json.dumps(app.get_gpu_status(), indent=2))"
-./venv/bin/python -c "import app; print(app.setup_environment(None, 'auto'))"   # install or update
+uv run --frozen python -c "import app, json; print(json.dumps(app.check_environment(app.get_default_env_path()), indent=2))"
+uv run --frozen python -c "import app, json; print(json.dumps(app.get_gpu_status(), indent=2))"
+uv run --frozen python -c "import app; print(app.setup_environment(None, 'auto'))"   # install or update
 ```
 
 Installer output is logged as `[uv]` lines in `~/.local/state/Dipper/log/dipper-backend.log`. If your network needs a proxy, set `HTTPS_PROXY` in the server's environment before starting it, or pass `"installer_env": {"HTTPS_PROXY": "http://proxy:8080"}` in step 3.
@@ -174,14 +166,13 @@ REACT_APP_MODE=server npm run build
 
 ```bash
 cd backend
-source venv/bin/activate
-python --version   # must be 3.13; if not, re-run the installer with PYTHON=/path/to/python3.13
-pip install -r requirements-backend.txt
+uv sync --frozen --group build     # re-installs the locked packages into backend/.venv
+uv run --frozen python --version   # 3.13.x
 ```
 
-### `No matching distribution found for pandas>=3.0.0` (or similar)
+### `uv: command not found`
 
-The installer or venv is using a Python older than 3.13. Install Python 3.13 (see [Prerequisites](#prerequisites)) and re-run the installer, passing it with `PYTHON=...` if it isn't on PATH as `python3.13`.
+Install uv (see [Prerequisites](#prerequisites)) and open a new shell so it is on `PATH`. If you installed it as another user or ran the installer with `sudo`, run the installer again as your normal user.
 
 ### Can't access from laptop
 

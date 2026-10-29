@@ -29,11 +29,6 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -86,6 +81,8 @@ jobs:
           echo "[OK] ML environment definition exists"
           test -f backend/ml_env/pyproject.toml
           test -f backend/ml_env/uv.lock
+          test -f backend/pyproject.toml
+          test -f backend/uv.lock
 
   quick-build-test:
     name: Quick Build Test - PyInstaller
@@ -95,15 +92,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
 
       - name: Test PyInstaller build
         run: |
           cd backend
-          python build_pyinstaller.py
+          uv run --frozen python build_pyinstaller.py
         env:
           PYTHONIOENCODING: utf-8
 

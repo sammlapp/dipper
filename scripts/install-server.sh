@@ -2,7 +2,8 @@
 #
 # Dipper Server Mode Installer
 #
-# Installs all dependencies needed to run Dipper in server mode
+# Installs all dependencies needed to run Dipper in server mode.
+# Requires uv (https://docs.astral.sh/uv/) and Node.js.
 #
 
 set -e
@@ -33,29 +34,15 @@ echo ""
 # Check for required commands
 echo -e "${BLUE}Checking prerequisites...${NC}"
 
-# Check Python (the backend must use the same Python minor version as the ML environment)
-REQUIRED_PYTHON="3.13"
-if [ -n "$PYTHON" ]; then
-    PYTHON_CMD="$PYTHON"
-else
-    PYTHON_CMD=$(command -v "python$REQUIRED_PYTHON" || command -v python3 || command -v python || true)
-fi
-if [ -z "$PYTHON_CMD" ] || ! PYTHON_VERSION=$("$PYTHON_CMD" -c 'import sys; print("%d.%d.%d" % sys.version_info[:3])' 2>/dev/null); then
-    echo -e "${RED}✗ Python $REQUIRED_PYTHON not found${NC}"
-    PYTHON_VERSION=""
-fi
-if [ -n "$PYTHON_VERSION" ] && [ "${PYTHON_VERSION%.*}" != "$REQUIRED_PYTHON" ]; then
-    echo -e "${RED}✗ Python $REQUIRED_PYTHON required, but $PYTHON_CMD is Python $PYTHON_VERSION${NC}"
-    PYTHON_VERSION=""
-fi
-if [ -z "$PYTHON_VERSION" ]; then
-    echo "  Install Python $REQUIRED_PYTHON, e.g. with uv (https://docs.astral.sh/uv/):"
-    echo "    uv python install $REQUIRED_PYTHON"
-    echo "  or conda: conda create -n dipper python=$REQUIRED_PYTHON"
-    echo "  then put python$REQUIRED_PYTHON on PATH or re-run with PYTHON=/path/to/python$REQUIRED_PYTHON"
+# Check uv. It manages the backend's Python environment (and downloads the pinned
+# Python version, so no particular Python needs to be installed on this machine).
+if ! command -v uv &> /dev/null; then
+    echo -e "${RED}✗ uv not found${NC}"
+    echo "  Install uv: https://docs.astral.sh/uv/getting-started/installation/"
+    echo "  then make sure it is on PATH (open a new shell) and re-run this script."
     exit 1
 fi
-echo -e "${GREEN}✓ Python: $PYTHON_VERSION ($PYTHON_CMD)${NC}"
+echo -e "${GREEN}✓ uv: $(uv --version)${NC}"
 
 # Check Node.js
 if ! command -v node &> /dev/null; then
@@ -79,24 +66,16 @@ NPM_VERSION=$(npm --version)
 echo -e "${GREEN}✓ npm: $NPM_VERSION${NC}"
 echo ""
 
-# Install Python dependencies
-echo -e "${BLUE}[1/3] Installing Python dependencies...${NC}"
+# Install Python dependencies (locked versions from backend/uv.lock)
+echo -e "${BLUE}[1/4] Installing Python dependencies...${NC}"
 cd "$PROJECT_ROOT/backend"
 
-if [ ! -f "requirements-backend.txt" ]; then
-    echo -e "${RED}✗ requirements-backend.txt not found${NC}"
+if [ ! -f "uv.lock" ]; then
+    echo -e "${RED}✗ backend/uv.lock not found${NC}"
     exit 1
 fi
 
-echo "  Creating Python virtual environment..."
-"$PYTHON_CMD" -m venv --clear venv
-
-echo "  Activating virtual environment..."
-source venv/bin/activate
-
-echo "  Installing packages from requirements-backend.txt..."
-python -m pip install --upgrade pip
-python -m pip install -r requirements-backend.txt
+uv sync --frozen --group build --managed-python
 
 echo -e "${GREEN}  ✓ Python dependencies installed${NC}"
 echo ""
@@ -106,7 +85,7 @@ echo -e "${BLUE}[2/4] Building Python backend executable...${NC}"
 cd "$PROJECT_ROOT/backend"
 
 echo "  Running PyInstaller (this may take a few minutes)..."
-python build_pyinstaller.py
+uv run --frozen python build_pyinstaller.py
 
 if [ ! -f "$PROJECT_ROOT/frontend/python-dist/dipper-backend" ]; then
     echo -e "${RED}✗ PyInstaller build failed — dipper-backend not found${NC}"
@@ -127,10 +106,6 @@ fi
 
 echo "  Installing npm packages..."
 npm install
-
-# Install serve globally for static file serving
-echo "  Installing serve (static file server)..."
-npm install -g serve
 
 echo -e "${GREEN}  ✓ Node.js dependencies installed${NC}"
 echo ""

@@ -51,7 +51,7 @@ function testPyInstallerBuild() {
     console.log('-----------------------------');
 
     // Check if PyInstaller environment exists
-    const pyinstallerVenv = path.join(BACKEND_DIR, 'pyinstaller-venv-light');
+    const pyinstallerVenv = path.join(BACKEND_DIR, '.venv');
     if (!checkFileExists(pyinstallerVenv, 'PyInstaller virtual environment')) {
         console.log('Creating PyInstaller environment...');
         const result = runCommand('npm run build:backend', FRONTEND_DIR);

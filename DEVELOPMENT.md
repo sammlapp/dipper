@@ -33,7 +33,7 @@ There are **two different Python environments**; do not confuse them:
 |---|---|---|
 | Runs | `backend/app.py` (HTTP API, light data processing) | Heavy tasks in `backend/scripts/` (PyTorch, TensorFlow, OpenSoundscape) |
 | In releases | PyInstaller executable bundled with the app | Installed by the user on first use, from a bundled lockfile |
-| Defined by | `backend/requirements-backend.txt` (and `backend/pixi.toml` for development) | `backend/ml_env/pyproject.toml` + `backend/ml_env/uv.lock` |
+| Defined by | `backend/pyproject.toml` + `backend/uv.lock` (environment: `backend/.venv`) | `backend/ml_env/pyproject.toml` + `backend/ml_env/uv.lock` (installed into the user's cache directory) |
 
 Jobs communicate progress by writing a `.status` JSON file in the job folder; the backend reads it and the frontend polls every 2 seconds. See [CLAUDE.md](CLAUDE.md) for the job folder layout and status format.
 
@@ -53,7 +53,8 @@ dipper/
 │   ├── data/class_names/  Classifier label tables (must be git-tracked)
 │   ├── tests/             Environment install tests
 │   ├── http_server.spec   PyInstaller spec
-│   └── pixi.toml          Development environment for the backend
+│   ├── pyproject.toml     Backend dependencies (uv); uv.lock pins them
+│   └── .venv/             Backend environment created by uv (git-ignored)
 ├── scripts/               Server-mode launchers, version bump
 ├── docs/                  GitHub Pages download site
 └── .github/workflows/     CI/CD
@@ -61,7 +62,7 @@ dipper/
 
 ## Prerequisites
 
-All platforms: Git, Node.js 18+, Python 3.13, Rust (with Cargo).
+All platforms: Git, Node.js 18+, Rust (with Cargo), and [uv](https://docs.astral.sh/uv/getting-started/installation/). uv installs the backend's Python (3.13) and packages itself, so no particular Python needs to be installed.
 
 - **macOS:** `xcode-select --install`, then install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 - **Windows:** Visual Studio Build Tools with the "Desktop development with C++" workload, then Rust via [rustup-init.exe](https://www.rust-lang.org/tools/install). Restart the terminal afterwards.
@@ -71,17 +72,15 @@ All platforms: Git, Node.js 18+, Python 3.13, Rust (with Cargo).
   ```
   then install Rust as on macOS.
 
-[pixi](https://pixi.sh) is the recommended way to manage the backend's development environment.
-
 ## Setting up
 
 ```bash
 git clone <repository-url>
 cd dipper
 
-# 1. Backend environment (includes uv, which installs the ML environment)
+# 1. Backend environment: creates backend/.venv from the lockfile (downloads Python 3.13 if needed)
 cd backend
-pixi install            # or: python -m venv venv && source venv/bin/activate && pip install -r requirements-backend.txt
+uv sync
 
 # 2. Frontend dependencies
 cd ../frontend
@@ -105,8 +104,7 @@ chmod +x src-tauri/bin/dipper-backend-aarch64-apple-darwin
 ```bash
 # Terminal 1: backend. Wait for it to report that it is ready.
 cd backend
-pixi shell
-python app.py --port 8000
+uv run python app.py --port 8000
 
 # Terminal 2: frontend (React hot reload + Tauri window)
 cd frontend
@@ -119,7 +117,7 @@ Backend changes need a restart of the backend only; no PyInstaller rebuild is ne
 
 | Command | What it does |
 |---------|--------------|
-| `npm run tauri:dev:full` | Starts the backend (`python ../backend/app.py`, so run it from a shell where the backend environment is active), waits for `/health`, then launches Tauri |
+| `npm run tauri:dev:full` | Starts the backend (`uv run --project ../backend python ../backend/app.py`), waits for `/health`, then launches Tauri |
 | `npm run tauri:dev` | Frontend only; HTTP calls fail without a backend |
 | `npm run tauri:dev:review` / `tauri:dev:review:full` | Same, for the review-only app (`REACT_APP_REVIEW_ONLY=true`) |
 | `npm start` | React dev server in a browser, no Tauri |
@@ -130,7 +128,7 @@ Server mode (React in a browser, backend on a remote machine) has its own launch
 
 The ML environment is created on first use by the bundled `uv` from `backend/ml_env/uv.lock`. The lockfile pins every package, so nothing is resolved on user machines, and uv downloads its own Python, so nothing needs to be installed on the system.
 
-In development, install it from the app's **Settings** tab (or `POST /env/install`). From a source checkout, the backend finds `uv` through the `uv` Python package, so it must be in your backend environment (it is in `requirements-backend.txt` and `pixi.toml`).
+In development, install it from the app's **Settings** tab (or `POST /env/install`). From a source checkout, the backend finds `uv` through the `uv` Python package, which is a dependency in `backend/pyproject.toml`, so `uv sync` in `backend/` provides it.
 
 How it works (`backend/app.py`):
 
@@ -179,7 +177,7 @@ and finish with:
 - Test on a real NVIDIA machine on Windows and Linux. CI has no GPU, so it can only prove that the CUDA wheels install and import.
 - `test-uv-ml-env.yml` derives the expected CUDA build from `[tool.dipper.cuda]`, so it needs no edit.
 
-**Bumping Python.** Check that the heavy dependencies resolve and import on the new version first (`uv lock` in a scratch copy with the new `requires-python`; TensorFlow is the usual blocker, and a resolution that needs a release candidate means it isn't ready). Then change together: `requires-python` in `ml_env/pyproject.toml`, `ML_PYTHON_VERSION` in `app.py`, `python-version` in the workflows, and the docs.
+**Bumping Python.** Check that the heavy dependencies resolve and import on the new version first (`uv lock` in a scratch copy with the new `requires-python`; TensorFlow is the usual blocker, and a resolution that needs a release candidate means it isn't ready). Then change together: `requires-python` in `ml_env/pyproject.toml` **and** `backend/pyproject.toml`, `ML_PYTHON_VERSION` in `app.py`, and the docs, and re-run `uv lock` in both directories. The workflows need no edit: they use uv, which installs the version the project asks for.
 
 **Upstream drift.** `check-ml-env-lock.yml` runs weekly (and on changes to `backend/ml_env`). It checks that `uv.lock` still matches `pyproject.toml` and that every pinned file for the supported platforms can still be downloaded, so a yanked or removed wheel is reported before users hit it. If it fails, re-lock and test, or pin around the problem.
 
@@ -187,7 +185,7 @@ and finish with:
 
 - **Always pass an extra** (`--extra cpu` or `--extra cuda`) on Linux/Windows. A plain `uv sync` there gives the PyPI default torch, which is a CUDA 13 build on Linux and CPU-only on Windows.
 - **Import order matters for TensorFlow.** TensorFlow bundles its own LLVM and aborts on Linux with `LLVM ERROR: ... registered more than once` if it is imported before opensoundscape (numba/llvmlite). Import opensoundscape and `bioacoustics_model_zoo` first, as the scripts do.
-- **Python version:** `requires-python` in `pyproject.toml` and `ML_PYTHON_VERSION` in `app.py` must agree, and should match the Python used to build the PyInstaller backend (see [Python version](#python-version)).
+- **Python version:** `requires-python` in `ml_env/pyproject.toml` and `ML_PYTHON_VERSION` in `app.py` must agree, and should match the backend's `requires-python` in `backend/pyproject.toml` (see [Python version](#python-version)).
 
 ### Where things live
 
@@ -199,6 +197,17 @@ and finish with:
 The environment is `envs/ml_env` in the cache directory; uv's package cache and managed Python are in `uv-cache/` and `python/` beside it. uv's output appears in the backend log as `[uv]` lines. To start over, use **Remove** in Settings, or delete the `envs/ml_env*` entries.
 
 ## Common tasks
+
+### Change the backend's dependencies
+
+Edit `backend/pyproject.toml` (runtime packages under `dependencies`, developer tools under the `dev` group, build tools under the `build` group), then:
+
+```bash
+cd backend
+uv lock                       # commit pyproject.toml and uv.lock
+```
+
+The lockfile is what gets built into releases, so every release uses exactly the versions you tested. This is separate from the ML environment (`backend/ml_env`), whose dependencies are locked independently.
 
 ### Add or change a backend endpoint
 
@@ -227,7 +236,7 @@ Create the component in `frontend/src/components/`, import it in `App.js`, and a
 
 ### Python version
 
-The PyInstaller backend and the ML environment should use the **same Python minor version** (currently 3.13). A mismatch has caused DLL conflicts on Windows (`python3xx.dll conflicts`) when multiprocessing spawns DataLoader workers. CI workflows (`build-full.yml` and others) set `python-version`; change them together with `ML_PYTHON_VERSION` and `requires-python`.
+The PyInstaller backend and the ML environment should use the **same Python minor version** (currently 3.13). A mismatch has caused DLL conflicts on Windows (`python3xx.dll conflicts`) when multiprocessing spawns DataLoader workers. The version is set in three places that must agree: `requires-python` in `backend/pyproject.toml` and in `backend/ml_env/pyproject.toml`, and `ML_PYTHON_VERSION` in `backend/app.py`. CI uses uv, which installs whichever version the project asks for, so the workflows do not pin one.
 
 ## Testing
 
@@ -236,8 +245,8 @@ There is no single test command. The checks are:
 | Check | How | Notes |
 |-------|-----|-------|
 | Backend health | `curl http://localhost:8000/health` | Quick sanity check |
-| ML environment install | `cd backend && TORCH_VARIANT=cpu python -m unittest tests.test_env_install -v` | Installs the full environment (several GB) into a temporary directory, with a bogus `PYTHONHOME` set. `TORCH_VARIANT` is `cpu` or `cuda`; on a machine without a GPU, `cuda` checks the wheels install and import, not that CUDA works |
-| Built backend | `python backend/tests/test_built_backend.py <path-to-dipper-backend> <cpu\|cuda>` | Launches a built executable, installs the environment through its HTTP API, and checks `/env/check`. **Installs into your real Dipper cache directory**, replacing an existing environment, so prefer running it in CI |
+| ML environment install | `cd backend && TORCH_VARIANT=cpu uv run python -m unittest tests.test_env_install -v` | Installs the full environment (several GB) into a temporary directory, with a bogus `PYTHONHOME` set. `TORCH_VARIANT` is `cpu` or `cuda`; on a machine without a GPU, `cuda` checks the wheels install and import, not that CUDA works |
+| Built backend | `uv run --project backend python backend/tests/test_built_backend.py <path-to-dipper-backend> <cpu\|cuda>` | Launches a built executable, installs the environment through its HTTP API, and checks `/env/check`. **Installs into your real Dipper cache directory**, replacing an existing environment, so prefer running it in CI |
 | UI | Run the app and exercise it | Frontend unit tests (`npm test`) exist only as `react-scripts` defaults |
 
 CI ([.github/workflows/README.md](.github/workflows/README.md) has details):
@@ -264,7 +273,7 @@ To rebuild only the backend executable:
 
 ```bash
 cd backend
-python build_pyinstaller.py     # outputs to frontend/python-dist/
+uv run --frozen python build_pyinstaller.py     # installs the locked build environment, builds, outputs to frontend/python-dist/ and src-tauri/bin/
 ```
 
 The PyInstaller build bundles the `uv` executable and `backend/ml_env/{pyproject.toml,uv.lock}` (see `backend/http_server.spec`). The ML environment itself is not part of the installer. Because it is not bundled, testing a built app requires installing the environment from Settings on first launch.
@@ -289,11 +298,11 @@ Then update `Cargo.lock` (`cd frontend/src-tauri && cargo check`), commit, and t
 | `npm run tauri:dev` fails with "cargo metadata" or "program not found" | Rust/Cargo is not installed or not on `PATH`. On Windows, install the Visual Studio Build Tools and restart the terminal |
 | Tauri window is blank | The backend is not running on port 8000. Use `npm run tauri:dev:full`, or start the backend first |
 | Backend does not respond | `curl http://localhost:8000/health`; check the backend log |
-| "Install" in Settings returns to "Not installed" | Read the error shown in Settings and the `[uv]` lines in the backend log. In development, the most common cause is `uv` missing from the backend environment (`pip install -r backend/requirements-backend.txt`, or `pixi install`) |
+| "Install" in Settings returns to "Not installed" | Read the error shown in Settings and the `[uv]` lines in the backend log. In development, the most common cause is `uv` missing from the backend environment (run `uv sync` in `backend/`) |
 | ML tasks fail with "ML environment is not installed" or "out of date" | Install or update the environment from the Settings tab |
 | Install fails with a TLS, 403 or DNS message | The network blocks or intercepts the downloads. The error lists the hosts needed; use Settings > ML Environment > advanced network settings for a proxy or mirror |
 | Status messages do not show in the UI | Check that the `.status` file exists in the job folder |
-| Backend changes not reflected in a built app | Rebuild the PyInstaller executable: `cd backend && python build_pyinstaller.py` |
+| Backend changes not reflected in a built app | Rebuild the PyInstaller executable: `cd backend && uv run --frozen python build_pyinstaller.py` |
 | `npm start` tries to build the Tauri app in server mode | Use `./scripts/launch-server-dev.sh` instead |
 | Class-name tables missing in a built app | Ensure `backend/data/class_names/*.csv` is git-tracked |
 

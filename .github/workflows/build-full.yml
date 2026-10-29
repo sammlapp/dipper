@@ -28,17 +28,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
 
       - name: Build PyInstaller executable
         shell: bash
         run: |
           cd backend
           printf 'XC_API_KEY = "%s"\n' "$XC_DIPPER_API_KEY" > _secrets.py
-          python build_pyinstaller.py
+          uv run --frozen python build_pyinstaller.py
         env:
           PYTHONIOENCODING: utf-8
           XC_DIPPER_API_KEY: ${{ secrets.XC_DIPPER_API_KEY }}
@@ -80,11 +78,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Runs the test script only; it removes this Python from the backend's PATH.
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
+      # uv provides the Python that runs the test script; the test removes it from the backend's PATH.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
 
       - name: Download PyInstaller artifact
         uses: actions/download-artifact@v4
@@ -97,7 +93,7 @@ jobs:
         run: |
           EXE=$(ls built-backend/dipper-backend*)
           chmod +x "$EXE"
-          python backend/tests/test_built_backend.py "$PWD/$EXE" ${{ matrix.variant }}
+          uv run --project backend --frozen python backend/tests/test_built_backend.py "$PWD/$EXE" ${{ matrix.variant }}
 
   build-tauri-full:
     name: Build Tauri Full App - ${{ matrix.platform }}

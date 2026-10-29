@@ -272,13 +272,7 @@ Currently, workflows use ad-hoc signing for development builds.
 
 ### Change Python Version
 
-Edit all workflow files:
-```yaml
-- name: Setup Python
-  uses: actions/setup-python@v5
-  with:
-    python-version: '3.11'  # Change this
-```
+The workflows use [uv](https://docs.astral.sh/uv/) (`astral-sh/setup-uv`), which installs the Python version the project asks for, so there is no `python-version` to edit in the workflows. Change `requires-python` in `backend/pyproject.toml` and `backend/ml_env/pyproject.toml` (and `ML_PYTHON_VERSION` in `backend/app.py`), then re-run `uv lock` in both directories. See DEVELOPMENT.md.
 
 ### Change Node Version
 

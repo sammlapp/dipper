@@ -5,7 +5,7 @@ This document describes how to build Dipper for different platforms using Tauri.
 ## Prerequisites
 
 1. **Node.js** (v18+)
-2. **Python 3.13** with PyInstaller dependencies (`backend/requirements-backend.txt`)
+2. **[uv](https://docs.astral.sh/uv/)** — manages the backend's Python 3.13 and its locked dependencies (`backend/pyproject.toml` + `backend/uv.lock`); no separate Python install is needed
 3. **Rust/Cargo** — required by Tauri
    - macOS/Linux: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
    - Windows: install via [rustup-init.exe](https://www.rust-lang.org/tools/install)
@@ -42,8 +42,7 @@ Smaller build with only the ReviewTab. Uses `REACT_APP_REVIEW_ONLY=true`.
 ```bash
 # 1. Build PyInstaller backend
 cd backend
-python build_pyinstaller.py
-cp dist/dipper-backend ../frontend/python-dist/dipper-backend
+uv run --frozen python build_pyinstaller.py   # also copies the executable to frontend/python-dist/
 
 # 2. Build React app
 cd ../frontend
@@ -99,8 +98,7 @@ The PyInstaller build also bundles the `uv` executable and `backend/ml_env/{pypr
 To rebuild after backend changes:
 ```bash
 cd backend
-python build_pyinstaller.py
-cp dist/dipper-backend ../frontend/python-dist/dipper-backend
+uv run --frozen python build_pyinstaller.py   # also copies the executable to frontend/python-dist/
 ```
 
 The spec file (`http_server.spec`) bundles:

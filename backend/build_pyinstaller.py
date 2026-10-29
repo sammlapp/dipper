@@ -43,43 +43,24 @@ def run_command(command, cwd=None, description=None):
         sys.exit(1)
 
 
-def create_virtual_env():
-    """Create virtual environment for PyInstaller"""
-    print("[INFO] Creating virtual environment for PyInstaller...")
+def sync_build_environment():
+    """Install the locked build environment (backend/.venv) with uv.
 
-    venv_path = BACKEND_DIR / "pyinstaller-venv-light"
+    uv downloads the Python version pinned in pyproject.toml, so no particular
+    Python needs to be installed. Returns the PyInstaller command prefix.
+    """
+    uv = shutil.which("uv")
+    if uv is None:
+        print("[ERROR] uv not found. Install it from https://docs.astral.sh/uv/")
+        sys.exit(1)
 
-    # Clean up existing venv
-    if venv_path.exists():
-        print("Removing existing virtual environment...")
-        shutil.rmtree(venv_path)
-
-    # Create new venv
+    print("[INFO] Installing locked build environment with uv...")
+    # --frozen: install exactly what uv.lock pins (never re-resolve while building)
     run_command(
-        f'"{sys.executable}" -m venv pyinstaller-venv-light',
-        description="Creating virtual environment",
+        f'"{uv}" sync --frozen --group build --managed-python',
+        description="Installing backend dependencies (uv sync)",
     )
-
-    # Determine paths based on OS
-    if os.name == "nt":  # Windows
-        python_exe = venv_path / "Scripts" / "python.exe"
-        pip_exe = venv_path / "Scripts" / "pip.exe"
-        pyinstaller_exe = venv_path / "Scripts" / "pyinstaller.exe"
-    else:  # Unix-like
-        python_exe = venv_path / "bin" / "python"
-        pip_exe = venv_path / "bin" / "pip"
-        pyinstaller_exe = venv_path / "bin" / "pyinstaller"
-
-    # Install requirements
-    print("[INFO] Installing requirements...")
-    # Use python -m pip to avoid Windows file locking issues when upgrading pip
-    run_command(f'"{python_exe}" -m pip install --upgrade pip setuptools wheel')
-
-    # Install requirements from file if it exists
-    requirements_file = BACKEND_DIR / "requirements-backend.txt"
-    run_command(f'"{python_exe}" -m pip install -r {requirements_file}')
-
-    return python_exe, pip_exe, pyinstaller_exe, venv_path
+    return f'"{uv}" run --frozen --group build --managed-python pyinstaller'
 
 
 def get_tauri_platform_name():
@@ -103,7 +84,7 @@ def get_tauri_platform_name():
         return None
 
 
-def build_with_pyinstaller(pyinstaller_exe, venv_path):
+def build_with_pyinstaller(pyinstaller_cmd):
     """Build executable with PyInstaller"""
     print("[INFO] Building executable with PyInstaller...")
 
@@ -123,7 +104,7 @@ def build_with_pyinstaller(pyinstaller_exe, venv_path):
         sys.exit(1)
 
     run_command(
-        f'"{pyinstaller_exe}" --clean --noconfirm http_server.spec',
+        f"{pyinstaller_cmd} --clean --noconfirm http_server.spec",
         description="Building with PyInstaller",
     )
 
@@ -179,13 +160,11 @@ def main():
         print(f"Backend directory: {BACKEND_DIR}")
         print(f"Frontend directory: {FRONTEND_DIR}")
 
-        print(f"[OK] Using Python {sys.version.split()[0]} ({sys.executable})")
-
-        # Create virtual environment and install dependencies
-        python_exe, pip_exe, pyinstaller_exe, venv_path = create_virtual_env()
+        # Install the locked build environment
+        pyinstaller_cmd = sync_build_environment()
 
         # Build with PyInstaller
-        build_with_pyinstaller(pyinstaller_exe, venv_path)
+        build_with_pyinstaller(pyinstaller_cmd)
 
         print("\n[OK] Python backend built successfully with PyInstaller!")
         print(f"Executable locations:")

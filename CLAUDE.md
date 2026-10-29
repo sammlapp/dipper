@@ -57,11 +57,9 @@ npm install
 # Verify Rust/Cargo is available
 cargo --version
 
-# (Optional) Backend Python setup for running backend from source
+# Backend Python setup for running the backend from source (uv installs Python 3.13 itself)
 cd ../backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements-backend.txt
+uv sync                   # creates backend/.venv from backend/uv.lock; run with: uv run python app.py
 ```
 
 ## Quick Start Commands
@@ -79,8 +77,7 @@ npm run tauri:build:all                    # Build desktop app with PyInstaller 
 ### Backend Development
 ```bash
 cd backend
-./pyinstaller-venv-light/bin/pyinstaller --clean --noconfirm http_server.spec
-cp dist/dipper-backend ../frontend/python-dist/dipper-backend
+uv run --frozen python build_pyinstaller.py   # uv sync --frozen --group build, then PyInstaller; copies to frontend/python-dist and src-tauri/bin
 ```
 
 ### Python Scripts Location
@@ -162,7 +159,7 @@ Backend reads these files and returns via status endpoints. Frontend displays in
 Focus mode loads a configurable amount of audio before and after each annotation clip (default ±4 s, set via "Focus mode: context (seconds)" in ReviewSettings). `loadFocusClipSpectrogram` in ReviewTab expands `start_time`/`end_time` and passes the original clip bounds as `clip_start_time`/`clip_end_time`. `FocusView` uses these to draw a highlight overlay on the spectrogram, position the playback cursor at the annotation clip start, and display original clip times in the info row. No backend changes are needed — `/clip` already accepts arbitrary time windows.
 
 ### Environment Management
-- **Backend env**: PyInstaller executable (bundled with app, ~50MB)
+- **Backend env**: PyInstaller executable (bundled with app). Its dependencies are a uv project in `backend/` (`pyproject.toml` + `uv.lock`): `uv sync` then `uv run python app.py` to develop; `uv run --frozen python build_pyinstaller.py` to build (it runs `uv sync --frozen --group build`). Change dependencies with `uv lock` and commit both files. No system Python is needed; uv installs Python 3.13.
 - **Heavy env**: uv-managed venv with PyTorch, TensorFlow, opensoundscape etc., installed on first use (3-9 GB depending on the torch build)
 - **Definition**: `backend/ml_env/pyproject.toml` + `uv.lock` (bundled into the PyInstaller backend together with the `uv` executable). The lockfile pins every package, so no resolution happens on user machines. After changing dependencies: `cd backend/ml_env && uv lock`, commit both files.
 - **Install**: `install_environment()` in `app.py` runs `uv sync --frozen --system-certs --extra <cpu|cuda>`; uv downloads its own managed Python 3.13, so nothing is needed on the system
@@ -236,7 +233,7 @@ Smaller app with only ReviewTab functionality. Uses `REACT_APP_REVIEW_ONLY=true`
 
 ### Modifying Backend API
 1. Edit `backend/app.py`
-2. Rebuild PyInstaller: `cd backend && python build_pyinstaller.py`
+2. Rebuild PyInstaller: `cd backend && uv run --frozen python build_pyinstaller.py`
 3. Copy to frontend: `cp dist/dipper-backend ../frontend/python-dist/`
 4. Restart dev server
 
@@ -268,7 +265,7 @@ cd frontend && npm start
 cd frontend && npm run tauri:dev:full
 
 # Test Python backend standalone
-cd backend && python app.py --port 8000
+cd backend && uv run python app.py --port 8000
 ```
 
 ### Backend Health Check
@@ -358,7 +355,7 @@ See `scripts/README.md` for more details.
 **Fix**: Check if the ML environment is installed: `~/Library/Caches/Dipper/envs/` (and `[uv]` lines in the backend log)
 
 **Issue**: PyInstaller changes not reflected in desktop build
-**Fix**: Rebuild and copy: `cd backend && python build_pyinstaller.py && cp dist/dipper-backend ../frontend/python-dist/`
+**Fix**: Rebuild: `cd backend && uv run --frozen python build_pyinstaller.py` (copies the executable to `frontend/python-dist/` and `src-tauri/bin/`)
 
 **Issue**: Status messages not showing in UI
 **Fix**: Check `.status` file exists in job folder and backend logs show file reads

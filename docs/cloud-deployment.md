@@ -43,7 +43,7 @@ No domain name, TLS certificate, or separate static file server is required for 
 
 ### Setup script (`scripts/install-server.sh`) — already exists
 
-- [x] Creates Python venv and installs `requirements-backend.txt`
+- [x] Installs the locked backend dependencies with uv (`backend/uv.lock`)
 - [x] Runs `npm install` and builds the React frontend with `REACT_APP_MODE=server`
 - [x] Creates `server_config.yml` from example if not present
 - [ ] Once backend serves the frontend, remove the `npm install -g serve` step (no longer needed)

@@ -122,7 +122,7 @@ To rebuild without creating a new tag:
 
 **PyInstaller build fails**
 ```bash
-cd backend && python build_pyinstaller.py   # reproduce locally, fix, commit, retag
+cd backend && uv run --frozen python build_pyinstaller.py   # reproduce locally, fix, commit, retag
 ```
 
 **Tauri build fails**

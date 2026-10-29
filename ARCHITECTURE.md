@@ -352,7 +352,7 @@ npm run build:server
 **Build PyInstaller backend:**
 ```bash
 cd backend
-python build_pyinstaller.py
+uv run --frozen python build_pyinstaller.py
 cp dist/dipper-backend ../frontend/python-dist/
 ```
 

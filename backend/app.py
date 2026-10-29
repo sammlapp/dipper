@@ -348,7 +348,7 @@ def get_uv_executable():
         except ImportError as e:
             raise RuntimeError(
                 "The 'uv' package is not installed in the backend's Python environment. "
-                "Run: pip install -r backend/requirements-backend.txt"
+                "Run: cd backend && uv sync"
             ) from e
 
         uv_path = find_uv_bin()
@@ -2636,7 +2636,7 @@ class DipperServer:
             )
         except ImportError:
             return web.json_response(
-                {"error": "psutil not installed; run: pip install psutil"}, status=501
+                {"error": "psutil not installed; run: cd backend && uv sync"}, status=501
             )
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)

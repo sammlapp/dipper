@@ -1,0 +1,74 @@
+# The backend: app.py, the HTTP API server that Dipper ships as a PyInstaller
+# executable. This is NOT the ML environment (heavy dependencies such as PyTorch);
+# that is defined separately in ml_env/pyproject.toml and installed by the app.
+#
+#   uv sync                      run/develop:   uv run python app.py
+#   uv sync --group build        build the executable (see build_pyinstaller.py)
+#   uv lock                      after changing dependencies; commit pyproject.toml + uv.lock
+[project]
+name = "dipper-backend"
+version = "0.0.0"
+description = "Dipper backend HTTP API server (packaged with PyInstaller)"
+# Must match the ML environment's Python (ml_env/pyproject.toml) and ML_PYTHON_VERSION in app.py.
+requires-python = "==3.13.*"
+dependencies = [
+    # Installs the ML environment on first use. The executable is bundled into the
+    # PyInstaller build (see http_server.spec), so the locked version is what ships.
+    "uv>=0.12.5",
+
+    # Data processing
+    "numpy>=1.21.0",
+    "pandas>=3.0.0",
+    "scipy>=1.7.0",
+
+    # Audio processing (without heavy ML deps)
+    "soundfile>=0.10.0",
+    "resampy>=0.3.0",
+    "aru_metadata_parser>=1.0.0",
+
+    # Taxonomy
+    "birdnames>=0.1.3",
+
+    # GeoModel species occurrence
+    "huggingface_hub",
+    "onnxruntime",
+
+    # Image processing
+    "Pillow>=8.0.0",
+
+    # Visualization
+    "matplotlib>=3.5.0",
+    "seaborn>=0.11.0",
+
+    # Data formats
+    "h5py>=3.0.0",
+    "pyyaml>=6.0",
+
+    # System utilities
+    "psutil>=5.8.0",
+    "tqdm>=4.60.0",
+    "pathlib2>=2.3.0",
+    "platformdirs>=3.0.0",
+    "python-dotenv>=1.0.0",
+
+    # HTTP server
+    "aiohttp>=3.8.0",
+    "aiohttp-cors>=0.7.0",
+    "certifi>=2024.0.0",
+
+    # Configuration and validation
+    "pydantic>=1.8.0",
+
+    # Standard library enhancements
+    "click>=8.0.0",
+    "python-dateutil>=2.8.0",
+]
+
+[dependency-groups]
+dev = ["black"]
+# Only needed to build the executable
+build = ["pyinstaller>=6.14.2"]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
