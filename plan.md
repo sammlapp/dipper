@@ -1,5 +1,9 @@
 This project will create a cross-platform desktop app that runs pytorch machine learning models and allows users to train models in an active learning loop. 
 
+## claude start up prompt
+
+take a close look at this codebase, especially documentation markdowns such as [readme.md](http://readme.md) [claude.md](http://claude.md) [build.md](http://build.md). We're going to work from [plan.md](http://plan.md) but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, [app.py](http://app.py), scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
+
 ## Projects
 
 We're going to introduce a new conceptual layer to the user experience: projects.
@@ -10,14 +14,11 @@ A project is mechanically just a folder on the user's disk. The project will wra
 - when a project is open:
 1. the project folder because the default location to save inference and extraction job outputs: project/classifier_predictions/ and project/review_tasks. User can over-ride, but the field is no longer required and defaults to the project-specific output directory. 
 2. The classifier and model config default to project config
-3. A summary of the classifier predictions (project/classifier_predictions) and of the review tasks (project/review_tasks) is visible in the Project tab. User can click on one of the project's review tasks to open it in the Review Tab. 
+3. A summary of the classifier predictions (project/classifier_predictions) and of the review tasks (project/review_tasks) is visible in the Project tab. User can click on one of the project's review tasks to open it in the Review Tab.
 
+## 1.0.0 release items
 
-## 1.0.0 release items:
-- show dipper version number in settings panel
-
-## claude start up prompt
-take a close look at this codebase, especially documentation markdowns such as readme.md claude.md build.md. We're going to work from plan.md but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, app.py, scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
+##
 
 # Build and release
 - backend python executable for GUI back-end is built with pyinstaller
@@ -32,38 +33,67 @@ take a close look at this codebase, especially documentation markdowns such as r
 
 # Bugs
 
-Task queue tab: after restarting a task, current task duration is correct in the top section "Currently Running" but in "All Tasks", the Duration is negative. Must be comparing an outdated end vs start time from the original task run. 
+Task queue tab: after restarting a task, current task duration is correct in the top section "Currently Running" but in "All Tasks", the Duration is negative. Must be comparing an outdated end vs start time from the original task run.
 
 # Incomplete items / TODO /feature request
-test download and use of ML env from HF/GitHub release 
 
-allow 'file' for stratification
-allow 'week' for stratification
+## Model Additions
+
+BirdCODE
+
+HawkEars V2.x
+
+Google MultiSpeciesWhale
+
+HumpbackWhale
+
+BatDetect2
+
+these are in the most recent bioacoustics model zoo v0.13.5
+
+## Background Task Management
+
+Need to overhaul the management of background tasks. Keep a lightweight database for queued/active/completed tasks, including their working dir and pid for running tasks. The running background tasks should be able to send messages with their status to the db (or some other way that is not as hacky as the current approach of writing the message to a .status file in the output dir). The task manager can cancel and poll tasks using the db.
+
+Once this is done, we should add a good progress bar for actively running inference tasks, including fraction of completed items. May require slightly modifying the inference script to provide useful progress statistics.
+
+## Inference
+
+when multiple GPUs are available, the Advanced Settings panel in the inference tab should allow the user to select which device to use. This should be reflected in the inference script's device selection. Settings -> Task Execution should have a checkbox for 'count concurrent tasks per device'
+
+keep a persistent background python task so that ML processes can launch quickly?
+
+## Clip extraction
+
+allow 'file' for stratification in annotation task creation form  
+allow 'week' for stratification in annotation task creation form
+
+Once added to hoplite, migrate to storing and retrieving scores from the parquet-scores backend
+
 allow csv metadata: categories based on mapping of file or folder name to any column value
 
-Switch annotation saving format to always "long" - no multi-class rows, just one row per annotation (like a database entry in HopLite) indexed by F,S,E,class
+## Annotation
+
+Import/open detections from other apps, including BirdNET and (others?)
+
+Switch annotation saving format to always "long" - no multi-class rows, no column-per-clsas, just one row per annotation (like a database entry in HopLite) with file,start time, end time , class, yes/no/uncertain label, provenance (user/model)
+
 - dropdown/type to select for current class (eg species) viewed
 - display annotations of other classes on the same clip as bubble
 - allow user to add/remove annotation of other class (switch to multi-class annotation view?)
 - labels can be yes/no/uncertain, and contain f,s,e,class,provenance
 - binary annotation and multi-class have the same save format: long table / df
 - binary annotation just means selecting one class you are currently annotating; multi-class remains the same
-- annotation box = 1 per annotation, corresponds to a specific class, works well
+- annotation box = 1 per annotation, corresponds to a specific class
 - store as sqlite on disk, pd.DF in python backend
-
 - add "load config" button on task panels in task queue (opens new task creation panel in the relevant tab with config settings from the job)
+- allow easy export to csv
 
-keep a persistent background python task so that ML processes can launch quickly?
+## Other
 
 "collections": create and browse clip collections (folders of clips that can be browsed as a group) from Collections tab. When creating new collection, choose where to store it (default is in app cache dir, but can be a folder anywhere) and whether to copy audio clips or just store references. Creates a folder and csv of file path, start/end time, notes. Right click on a clip in review or explore tab to add it to a collection.
 
-custom classifiers during inference
-
-create look-up table for default batch size and num_workers arguments based on system specs and model
-
 embedding to hoplite as an option during inference
-
-test the various permutations of training
 
 During model training, create an html page (live updates) with progress bar + run time & eta, some example labels,  loss vs training step, and performance metrics on training and validation sets
 The html page is stored in the job folder. A button on the task panel in the task queue renders this html in a pop-up window. 
@@ -72,37 +102,18 @@ The html page is stored in the job folder. A button on the task panel in the tas
 
 - when pasting a path to navigate to in server mode file browser and hitting Enter/Return: if its a file path instead of a folder, navigate to the folder and activate that file as the 'selected' file
 
-If create task or create and run task buttons are disabled, hovering over them should inform the user which required fields have not been filled in. 
+If create task or create and run task buttons are disabled, hovering over them should inform the user which required fields have not been filled in.
 
-WandB integration: need to allow user to provide API key and configure group name and project name for a run. Run name should match the dipper run name. 
-
-- made a working env on Windows: needed to make edits to the windows env yml, then uninstall soundfile and force-reinstall with pip
-- used dipper env to run conda-pack, creating dipper_ml_env.tar.gz file
-
-test downloading/using default conda-pack env on linux! (updated conda pack env; need to rerun github runner and re-upload to onedrive)
-
-
-[requested] Task manager status message updates:
-When downloading/extracting the python environment, this should be the message in the task's message field (currently just has generic message)
-for training tasks: similar to inference tasks, status updates during training should be posted to .status file in the job output folder and read by the task manager to show the user a useful message about the current status/progress of training. Currently always just says "training task is still running"
-
-[requested, implemented but somewhat buggy] Task status updates: "toast" notifications appear regardless of which tab you are viewing; disappear after a few seconds, or user can dismiss 
-https://mui.com/material-ui/react-snackbar/
+Task status updates: "toast" notifications appear regardless of which tab you are viewing; disappear after a few seconds, or user can dismiss  
+[https://mui.com/material-ui/react-snackbar/](https://mui.com/material-ui/react-snackbar/)  
 Colors match coloring of tasks in task pane for running (started)/queued/canceled/failed/pending/completed
-- [task name] started (<task type>) (blue)
+
+- [task name] started (&lt;task type>) (blue)
 - [task name] queued (task type) (purple)
 - [task name] created (Waiting on user to start) (neutral?)
 - [task name] completed  (task type) (green)
 - [task name] failed (task type) (red)
 - [task name] canceled (task type) (yellow)
-
-
-Regional/date bird species list filtering using ebird meta-model. 
-
-Settings panel, implement buttons for: 
-"check ML backend environment health"
-"remove and re-install python environment"
-
 
 ### User feature requests
 Extraction (binary): creating separate files per species should be optional. If not checked, creates the 'class' column as in Multi-class extraction and concatenates the annotation csvs into one. 
@@ -125,7 +136,6 @@ Easy version: link to Macaulay / XC pages
 https://search.macaulaylibrary.org/catalog?taxonCode=towhee&behaviors=s&mediaType=a
 Xeno Canto species page?
 
-
 XC API call: 
 - provide paged audio-spectrogram grid, e.g. 5 examples with next page to see more
 - default filter to high quality
@@ -138,12 +148,13 @@ also see how Chirpity pulls example clips
 #### Training
 1. Collect audio:
 Training data:
-- Use BriteKit to pull clips for species from XC, iNat
+
+- pull clips for species from XC, iNat
 - user provided positives
 - user provided negatives!
 - user provided unlabeled data (can be used as weak negatives, strong negative, or as a set to annotate)
 - diverse random negatives set with noise, biotic sounds
-- annotate as needed
+- annotate as needed  
 (default: annotate first 20 seconds of each XC/iNat file)
 
 2. Create eval set
@@ -163,15 +174,17 @@ random sample of field data; or targeted random sample of subset for rare sp or 
 - document sound class trained
 - optionally share the classifier! and labeled clips! (or just the Perch2 embedding + label) to CommonPAM
 - carefully document which classes are annotated for which clips
-- ebird labels for consistent taxonomy? 
+- ebird labels for consistent taxonomy?
 
 Empirical q: does flipping the sign or zeroing of spatial embedding values outside bandpass range improve TL classification?
 
 #### User feature requests
 
 Jeff Larkin: 
+
 - ecological inference, basics like map, modelled occupancy in two treatment groups 
 - creating a report
+- better progress bar during inference
 
 JT Larkin:
 - CGL stopping criterion for number of negative clips in bin
@@ -249,13 +262,12 @@ Manual server mode port specification turned out to be a hassle. The frontend an
 
 ## Training mode in progress updates
 HopLite: update to v1.0 api, OpenSoundscape v0.13.0 API, and corresponding BMZ, before working on the hoplite integration further. 
- 
+
 can we simplify and make the training configuration workflow (save, load, submit task) more robust by avoiding the need to hard code every argument? 
 
 in progress: 
 In @backend/scripts/train_model.py I implemented two different training modes, train_on_audio and train_on_embeddings. Training configuration panel should allow user to pick between these two modes as an additional option. If train_on_embeddings is selected, there is an additional checkbox for "Use existing Hoplite Embedding Database" and when checked, there is a folder selection button "Select existing HopLite DB (folder) to set the config variable "hoplite_db_path". This variable is used within the train_model.py script to load an existing embedding database. If not checked, a different button is shown for "New HopLite DB Folder", this looks like a file save dialogue but the returned value is still set as "hoplite_db_path" in the config and no new files are created yet. The train_model.py script will create a hoplite database folder at the specified folder. 
-- UI is implemented, need similar for inference tab; but need to update backend scripts for HopLite 1.0 and OPSO 0.13.0, and haven't quite finished merging these changes into opso dev/main yet! 
-
+- UI is implemented, need similar for inference tab; but need to update backend scripts for HopLite 1.0 and OPSO 0.13.0, and haven't quite finished merging these changes into opso dev/main yet!
 
 ## Intuitive workflows from task manager pane
 Completed tasks in task manager should have a button for the next step in the workflow:
@@ -264,7 +276,6 @@ Completed tasks in task manager should have a button for the next step in the wo
 
 ## next steps:
 debug/fix building conda-pack environment for Linux and Windows
-
 
 test inference with custom/local models
 
@@ -283,7 +294,8 @@ In train/inference, add an option to specify device name for the ML model (typic
 ## general feature request list 
 
 get xeno-canto / other public recordings for a species to supplement training data?!
-- this functionality is now provided in Jan's package
+
+- this functionality is now provided in Jan's package Britekit
 - also possible via scripting on BirdSet, though snapshot is early 2024
 
 implement stratification by arbitrary columns in metadata for clip extraction:
@@ -294,7 +306,6 @@ denoising and/or bandpassing for audio playback / review
 wandb integration with training & inference for logging progress and model evaluation: login on global settings page, specify user/project/run name/notes in configuration panel; if used, provide link to wandb page in task panels
 
 for clip review from query/explore mode: "add to cart" button on panel, adds the clip to an annotation "cart" that can be exported as an annotation task
-
 
 review tab "undo" functionality? I think this would require tracking the full-page or single-clip annotations in a history so that we can sequentially undo and redo changes witch ctrl/cmd+z and ctrl/cmd+y
 
@@ -308,7 +319,6 @@ user selects a csv file with `folder` column and other columns
 form populates with multi-select of the other columns
 user selects which other columns to use for stratification
 form displays the number of unique values for each selected stratification column
-
 
 #### For stratify by date window: 
 display a panel with a table of MUI date range pickers. Starts with no rows.
@@ -333,21 +343,14 @@ export default function BasicDateRangePicker() {
 ```
 
 - "status bar" is being covered by the global app status bar in App.js instead of integrating with it. 
-- auto-advance in classifier-guided listening mode: 
+- auto-advance in classifier-guided listening mode:
 
 Something is wrong with the way grid mode is rendering when CGL is enabled. When CGL is off, I can create a grid with 2 columns, but when CGL is on, choosing 2 columns setting creates only 1 column in the displayed grid. 
 
-
 ## rewind
-- throughout the application, when providing click-to-play spectrograms, make it so that clicking on the left 20% of the spectrogram rewinds the clip to the beginning instead of performing the play/pause action. Show a rewind icon when hovering over the left 20% of the spectrogram. 
+- throughout the application, when providing click-to-play spectrograms, make it so that clicking on the left 20% of the spectrogram rewinds the clip to the beginning instead of performing the play/pause action. Show a rewind icon when hovering over the left 20% of the spectrogram.
 
 ## Remote mode
-- install on a remote machine accessed via SSH
-- replace native filesystem / other native system interactions with text fields or other working alternatives
-- avoid system alerts/dialogues, which won't work
-- add Global Settings page with option to switch between remote and desktop versions
-- provide instructions for port forwarding to access the gui on a web browser
-- launch from CLI with argument for HTTP forwarding port
 
 ### Training wishlist
 (see sketch of full data ingestion tooling)
@@ -382,7 +385,6 @@ Review tab: same as review tab for full app.
 
 Query tab: I need to write backend script that embeds the query clips and runs search across db
 
-
 ## conda-pack updates:
 - if on linux or mac, include ai-edge-litert as a dependency and allow BirdNET use in the inference gui
 inference issue: BirdSet model not producing outputs if clips are <5 seconds
@@ -410,7 +412,6 @@ The running task continues when the app quits.
   Potential improvements:
   - Add process ID tracking to reconnect on restart
 
-
 ## Annotation task creation panel Improvements:
 - Review tab binary classification: check box in settings to show f"Score : {row['score']:0.2f}" in the clip display panel (just below audio file display position)
 
@@ -419,35 +420,4 @@ for completed tasks, add a button to create an annotation task
 
 Too many subfolders in job folder: after creating job folder for inference/train with unique name, should be flat file structure with config.json, logs, and any outputs such as inference predictions.csv or saved model objects. 
 
-Add a button for each task in the task manager to "load config" -> loads that task's config to the configuration form, switching to train/inference tab as appropriate. 
-
-
-for completed tasks, add buttons to
-- open results in Explore tab
-- create annotation task (we need to implement a wizard/panel for this)
-Inference:
-- subset classes: can use text file or ebird filter
-
-Inference update:
-- optional sparse outputs: don't save scores below a floor, and save df as a sparse pickle
-I've implemented this in inference.py using config['sparse_save_threshold']. Update the frontend inference config creator to:
-- toggle on/off an option to save only values below a threshold. If off, config['sparse_save_threshold'] is none/null
-- if toggled on, user specifies the numeric threshold for the logit score beneath which scores are discarded, default value -3. config['sparse_save_threshold']
-- output_file of the config should be predictions.csv if sparse_save_threshold is None and sparse_predictions.pkl if the threshold is used
-
-
-- explore tab should support loading sparse predictions (.pkl) as well as csv files (.csv). This will require using python backend to run `sparse_df_loaded = pd.read_pickle("sparse_df.pkl")`. the sparse values are np.nan and should always be treated as non-detections. The unpickled df will be a dataframe with the multi-index 'file','start_time','end_time'.
-
-TODO:
-- allow setting threshold when loading an annotation task in Review mode
-
-# Explore tab updates
-- should have a little button in the panel (gold medal icon: 🥇)  to the right of the title, to return to viewing the highest-scoring clip (eg after clicking on a histogram bin)
-- put the display settings in a side panel/tray, like the settings panel in the review tab. Make sure the settings are properly implemented and are not mixed up with the display settings for the review tab. 
-- images are being cut off at the bottom. Resize them to the height of the 
-
-future items:
-- use Material UI badges and small photos of the class detected for quick overview (use birdnames repo for name translation, find open-source set of images for species headshots or use the global bird svgs dataset)
-
-
-when selecting models in inference or training mode, we should be able to select a local model file instead of 
+Add a button for each task in the task manager to "load config" -> loads that task's config to the configuration form, switching to train/inference tab as appropriate.
