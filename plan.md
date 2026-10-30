@@ -1,9 +1,3 @@
-This project will create a cross-platform desktop app that runs pytorch machine learning models and allows users to train models in an active learning loop. 
-
-## claude start up prompt
-
-take a close look at this codebase, especially documentation markdowns such as [readme.md](http://readme.md) [claude.md](http://claude.md) [build.md](http://build.md). We're going to work from [plan.md](http://plan.md) but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, [app.py](http://app.py), scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
-
 ## Projects
 
 We're going to introduce a new conceptual layer to the user experience: projects.
@@ -26,28 +20,15 @@ Notes on initial implementation:
 - make pop-up New Project panel wider taking up nearly the whole screen, its too narrow for the species selection elements now
 - styling issue in New Project panel: dark mode has black text on dark background for the 1-2-3 step labels (Name & Folder, Classifier, Species Filter)
 
-## 1.0.0 release items:
-- show dipper version number in settings panel
-
-## claude start up prompt
-take a close look at this codebase, especially documentation markdowns such as readme.md claude.md build.md. We're going to work from plan.md but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, app.py, scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
-
-# Build and release
-- backend python executable for GUI back-end is built with pyinstaller
-- heavy dipper ML environment is built with conda-pack (inference, train scripts); app downloads via google drive into a system-specific cache dir and extracts .tar.gz to conda env folder
-- inference, train, extraction scripts run in separate processes and are tracked by task manager
-- these run with the dipper ML conda env (downloaded on demand to application cache dir) unless the user specifies a custom python env to use
-- an annotation-only version of the app is built for each platform (Mac ARM, Win 64, Linux 64)
-- server mode: user clones github repo, runs install script, edits config file, launches server that can be accessed on web browser via port forwarding
-
 ## for songspace release
+
 - persistent background task for the open SongSpace allows rapid query/interaction; need proper IPC
 
 # Bugs
 
 Task queue tab: after restarting a task, current task duration is correct in the top section "Currently Running" but in "All Tasks", the Duration is negative. Must be comparing an outdated end vs start time from the original task run.
 
-# Incomplete items / TODO /feature request
+# New Features
 
 ## Model Additions
 
@@ -65,13 +46,13 @@ these are in the most recent bioacoustics model zoo v0.13.5
 
 ## Background Task Management
 
-Need to overhaul the management of background tasks. Keep a lightweight database for queued/active/completed tasks, including their working dir and pid for running tasks. The running background tasks should be able to send messages with their status to the db (or some other way that is not as hacky as the current approach of writing the message to a .status file in the output dir). The task manager can cancel and poll tasks using the db.
+Need to overhaul the management of background tasks. Keep a lightweight database for queued/active/completed tasks, including their working dir and pid for running tasks. The running background tasks should be able to send messages with their status to the db (or some other way that is not as hacky as the current approach of writing the message to a .status file in the output dir). The task manager can cancel and poll tasks using the db info.
 
 Once this is done, we should add a good progress bar for actively running inference tasks, including fraction of completed items. May require slightly modifying the inference script to provide useful progress statistics.
 
 ## Inference
 
-when multiple GPUs are available, the Advanced Settings panel in the inference tab should allow the user to select which device to use. This should be reflected in the inference script's device selection. Settings -> Task Execution should have a checkbox for 'count concurrent tasks per device'
+> when multiple GPUs are available, the Advanced Settings panel in the inference tab should allow the user to select which device to use. This should be reflected in the inference script's device selection. Settings -> Task Execution should have a checkbox for 'count concurrent tasks per device'
 
 keep a persistent background python task so that ML processes can launch quickly?
 
@@ -103,16 +84,11 @@ Switch annotation saving format to always "long" - no multi-class rows, no colum
 
 ## Other
 
-"collections": create and browse clip collections (folders of clips that can be browsed as a group) from Collections tab. When creating new collection, choose where to store it (default is in app cache dir, but can be a folder anywhere) and whether to copy audio clips or just store references. Creates a folder and csv of file path, start/end time, notes. Right click on a clip in review or explore tab to add it to a collection.
+"collections": (works like a 'tag' on clips). create and browse clip collections (folders of clips that can be browsed as a group) from new Collections tab. Stores the metadata in project database. "Export" feature creates a folder on disk with `audio/` subdir and a csv of clip metadata. Right click on a clip in review tab to add it to a collection.
 
-embedding to hoplite as an option during inference
+support stereo audio
 
-During model training, create an html page (live updates) with progress bar + run time & eta, some example labels,  loss vs training step, and performance metrics on training and validation sets
-The html page is stored in the job folder. A button on the task panel in the task queue renders this html in a pop-up window. 
-
-- support stereo audio
-
-- when pasting a path to navigate to in server mode file browser and hitting Enter/Return: if its a file path instead of a folder, navigate to the folder and activate that file as the 'selected' file
+when pasting a path to navigate to in server mode file browser and hitting Enter/Return: if its a file path instead of a folder, navigate to the folder and activate that file as the 'selected' file
 
 If create task or create and run task buttons are disabled, hovering over them should inform the user which required fields have not been filled in.
 
@@ -127,17 +103,23 @@ Colors match coloring of tasks in task pane for running (started)/queued/cancele
 - [task name] failed (task type) (red)
 - [task name] canceled (task type) (yellow)
 
+During model training, create an html page (live updates) with progress bar + run time & eta, some example labels, loss vs training step, and performance metrics on training and validation sets  
+The html page is stored in the job folder. A button on the task panel in the task queue renders this html in a pop-up window.
+
 ### User feature requests
-Extraction (binary): creating separate files per species should be optional. If not checked, creates the 'class' column as in Multi-class extraction and concatenates the annotation csvs into one. 
+
+Extraction (binary): creating separate files per species should be optional. If not checked, creates the 'class' column as in Multi-class extraction and concatenates the annotation csvs into one. This may be obscelete once we start using a project database for scores and annotations, but could still be relevant for exporting annotation task labels/audio.
 
 add pre/post seconds in review mode
 
 better community review mode:
+
 - if clip has been annotated for another species, show it on the clip panel
 - allow annotating other species even when in "binary" mode
 - unify label formats across binary/multi class annotation
-
 - search/filter for clip by name
+
+An interface more like Birdnet3 and chirpity and birdcode: see an audio soundscape and one row per detected species, with SED labels as colored rectangles on the row. Click the rectangle to scroll to and play a detection. Then can annotate as yes/no/uncertain.
 
 #### Community review mode: 
 
