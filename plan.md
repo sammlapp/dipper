@@ -7,18 +7,30 @@ take a close look at this codebase, especially documentation markdowns such as [
 ## Projects
 
 We're going to introduce a new conceptual layer to the user experience: projects.
-A project is mechanically just a folder on the user's disk. The project will wrap several aspects of the workflow:
+A project is mechanically just a folder on the user's disk containing a .dipper config file with project settings. The project will wrap several aspects of the workflow:
 - when creating a project, the user selects a classifier and defines a class list (same UI currently in Model Config)
-- opening a project is an app-wide operation; we can add a Project Tab where the user opens/creates/configures project settings
+- opening a project has app-wide effects defined below; we can add a Project Tab where the user opens/creates/configures project settings
 - when no project is open, the app behavior matches current behavior
 - when a project is open:
-1. the project folder because the default location to save inference and extraction job outputs: project/classifier_predictions/ and project/review_tasks. User can over-ride, but the field is no longer required and defaults to the project-specific output directory. 
-2. The classifier and model config default to project config
-3. A summary of the classifier predictions (project/classifier_predictions) and of the review tasks (project/review_tasks) is visible in the Project tab. User can click on one of the project's review tasks to open it in the Review Tab.
+1. the project folder becomes the default location to save inference and extraction job outputs: project/classifier_predictions/ and project/review_tasks. User can over-ride, but the field is no longer required and defaults to the project-specific output directory. 
+2. The classifier and model config default to project config. The classifier _cannot_ be modified, while the other settings _can_ be modified. 
+3. A list of the classifier predictions (`project/classifier_predictions/*`) and of the review tasks (`project/review_tasks/*`) is visible in the Project tab. User can click on one of the project's review tasks to open it in the Review Tab. Review tasks are visually marked as 'unstarted', 'in progress', or 'complete' (for now, the user can manually specify the status; eventually we may have an automatic status check). 
 
-## 1.0.0 release items
+The task pane is unaffected: it shows tasks regardless of whether they belong to the currently open project. 
 
-##
+Future directions to keep in mind:
+- we will eventually use a project-wide db of ML predictions and user annotations that aggregates/unifies ml predictions and 
+
+Notes on initial implementation:
+- remove checkbox for "Filter output to species list" in project set up. User always defines the species list (current behavior of checked box). (also remove "species_filter": "enabled": true, in config, just directly specify species list).
+- make pop-up New Project panel wider taking up nearly the whole screen, its too narrow for the species selection elements now
+- styling issue in New Project panel: dark mode has black text on dark background for the 1-2-3 step labels (Name & Folder, Classifier, Species Filter)
+
+## 1.0.0 release items:
+- show dipper version number in settings panel
+
+## claude start up prompt
+take a close look at this codebase, especially documentation markdowns such as readme.md claude.md build.md. We're going to work from plan.md but first I want you to have a good sense for how the code base works and what is currently implemented. Carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, app.py, scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
 
 # Build and release
 - backend python executable for GUI back-end is built with pyinstaller
