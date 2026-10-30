@@ -11,13 +11,21 @@ import {
   Button,
   Alert,
   Divider,
-  Switch
+  FormControl,
+  MenuItem,
+  Select,
+  Switch,
+  Tooltip,
+  CircularProgress
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import RestoreIcon from '@mui/icons-material/Restore';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DownloadIcon from '@mui/icons-material/Download';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useBackendUrl } from '../hooks/useBackendUrl';
 
@@ -29,11 +37,55 @@ function SettingsTab({ onEnvReady }) {
   const backendUrl = useBackendUrl();
 
   // ML environment state
-  // envStatus: 'checking' | 'ready' | 'missing' | 'broken' | 'extracting' | 'downloading' | 'error'
+  // envStatus: 'checking' | 'ready' | 'missing' | 'broken' | 'installing' | 'error'
   const [envStatus, setEnvStatus] = useState('checking');
   const [envMessage, setEnvMessage] = useState('');
+  // torchVariant: which PyTorch build to install: 'auto' (use the GPU if a compatible NVIDIA driver is found) | 'cpu' | 'cuda'
+  const [torchVariant, setTorchVariant] = useState('auto');
   const envPollRef = React.useRef(null);
+  // gpuStatus: null while loading, else { level: 'ok' | 'info' | 'warning', summary, detail } from GET /env/gpu
+  const [gpuStatus, setGpuStatus] = useState(null);
+  // installPlan: what installing would do, from GET /env/plan:
+  // { variant, reason, mode: 'install' | 'update' | 'up_to_date', estimated_size_gb, required_free_gb, free_gb, enough_space }
+  const [installPlan, setInstallPlan] = useState(null);
+  // installerEnvText: advanced network settings for locked-down networks, one NAME=value per line (proxy, mirrors)
+  const [installerEnvText, setInstallerEnvText] = useState(() => {
+    try { return localStorage.getItem('dipper_installer_env') || ''; } catch (e) { return ''; }
+  });
+  const [showNetworkSettings, setShowNetworkSettings] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const loadInstallPlan = () => {
+    if (!backendUrl) return;
+    fetch(`${backendUrl}/env/plan?torch_variant=${torchVariant}`)
+      .then(r => r.json())
+      .then(plan => setInstallPlan(plan.error ? null : plan))
+      .catch(() => setInstallPlan(null));
+  };
+
+  // "NAME=value" lines -> object; blank lines and # comments are ignored
+  const parseInstallerEnv = () => {
+    const env = {};
+    installerEnvText.split('\n').forEach(line => {
+      const text = line.trim();
+      if (!text || text.startsWith('#')) return;
+      const i = text.indexOf('=');
+      if (i > 0) env[text.slice(0, i).trim()] = text.slice(i + 1).trim();
+    });
+    return env;
+  };
+
+  const checkGpu = () => {
+    if (!backendUrl) return;
+    setGpuStatus(null);
+    fetch(`${backendUrl}/env/gpu`)
+      .then(r => r.json())
+      .then(result => setGpuStatus(result.error
+        ? { level: 'warning', summary: 'Could not check GPU', detail: result.error }
+        : result))
+      .catch(e => setGpuStatus({ level: 'warning', summary: 'Could not check GPU', detail: String(e) }));
+  };
 
   const checkEnv = () => {
     if (!backendUrl) return;
@@ -41,8 +93,9 @@ function SettingsTab({ onEnvReady }) {
       .then(r => r.json())
       .then(result => {
         setEnvStatus(result.status);
-        setEnvMessage(result.version ? `Python ${result.version}` : result.error || '');
+        setEnvMessage(result.status === 'outdated' ? (result.message || '') : result.version ? `${result.version}${result.torch_variant ? ` (${result.torch_variant === 'cuda' ? 'GPU / CUDA' : 'CPU'} build)` : ''}` : result.error || '');
         if (onEnvReady) onEnvReady(result.status === 'ready');
+        checkGpu();
       })
       .catch(() => setEnvStatus('missing'));
   };
@@ -51,39 +104,67 @@ function SettingsTab({ onEnvReady }) {
     checkEnv();
   }, [backendUrl]); // eslint-disable-line
 
+  useEffect(() => {
+    loadInstallPlan();
+  }, [backendUrl, torchVariant, envStatus]); // eslint-disable-line
+
+  useEffect(() => {
+    try { localStorage.setItem('dipper_installer_env', installerEnvText); } catch (e) { /* storage unavailable */ }
+  }, [installerEnvText]);
+
   const startEnvInstall = () => {
     if (!backendUrl) return;
-    setEnvStatus('downloading');
-    setEnvMessage('Starting download...');
-    fetch(`${backendUrl}/env/install`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-      .catch(() => { });
-    envPollRef.current = setInterval(() => {
-      fetch(`${backendUrl}/env/install/status`)
-        .then(r => r.json())
-        .then(state => {
-          setEnvStatus(state.stage);
-          setEnvMessage(state.message || '');
-          if (state.stage === 'ready' || state.stage === 'error') {
-            clearInterval(envPollRef.current);
-            checkEnv();
-          }
-        })
-        .catch(() => { });
-    }, 2000);
+    setEnvStatus('installing');
+    setEnvMessage('Starting install...');
+    fetch(`${backendUrl}/env/install`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ torch_variant: torchVariant, installer_env: parseInstallerEnv() })
+    })
+      .then(r => r.json())
+      .then(result => {
+        if (result.status === 'error') {
+          // rejected before starting (e.g. not enough disk space)
+          setEnvStatus('error');
+          setEnvMessage(result.error);
+          return;
+        }
+        envPollRef.current = setInterval(() => {
+          fetch(`${backendUrl}/env/install/status`)
+            .then(r => r.json())
+            .then(state => {
+              setEnvStatus(state.stage);
+              setEnvMessage(state.message || '');
+              if (state.stage === 'ready') {
+                clearInterval(envPollRef.current);
+                checkEnv();
+              } else if (state.stage === 'error') {
+                // keep the install error visible; checkEnv would replace it with a bare "Not installed"
+                clearInterval(envPollRef.current);
+                setEnvStatus('error');
+                setEnvMessage(state.message || 'Install failed');
+              }
+            })
+            .catch(() => { });
+        }, 2000);
+      })
+      .catch(e => { setEnvStatus('error'); setEnvMessage(String(e)); });
   };
 
   const removeEnv = () => {
     if (!backendUrl) return;
+    setRemoving(true);
     fetch(`${backendUrl}/env/remove`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
       .then(r => r.json())
-      .then(() => { setEnvStatus('missing'); setEnvMessage(''); setConfirmRemove(false); if (onEnvReady) onEnvReady(false); })
-      .catch(() => { });
+      .then(() => { setEnvStatus('missing'); setEnvMessage(''); setConfirmRemove(false); if (onEnvReady) onEnvReady(false); checkGpu(); })
+      .catch(() => { })
+      .finally(() => setRemoving(false));
   };
 
-  const envStatusColor = { ready: 'success', missing: 'warning', broken: 'error', error: 'error', checking: 'info' }[envStatus] || 'info';
+  const envStatusColor = { ready: 'success', outdated: 'warning', missing: 'warning', broken: 'error', error: 'error', checking: 'info' }[envStatus] || 'info';
   const envStatusLabel = {
-    ready: 'Installed', missing: 'Not installed', broken: 'Broken',
-    downloading: 'Downloading...', extracting: 'Installing...', error: 'Error', checking: 'Checking...',
+    ready: 'Installed', outdated: 'Update required', missing: 'Not installed', broken: 'Broken',
+    installing: 'Installing...', error: 'Error', checking: 'Checking...',
   }[envStatus] || envStatus;
 
   // Load settings from localStorage on mount
@@ -254,33 +335,102 @@ function SettingsTab({ onEnvReady }) {
             ML Environment
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            The conda-pack ML environment is required for inference, training, and extraction tasks (~700 MB on macOS/Windows, ~5 GB on Linux with CUDA).
+            The ML environment is required for inference, training, and extraction tasks. It is downloaded on first install (about 3 GB for the CPU build, 6-9 GB for the GPU build on Windows/Linux).
           </Typography>
           <Divider sx={{ my: 2 }} />
 
-          <Alert severity={envStatusColor} sx={{ mb: 2 }}>
+          <Alert severity={envStatusColor} sx={{ mb: 2, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
             <strong>Status: {envStatusLabel}</strong>
             {envMessage ? ` — ${envMessage}` : ''}
           </Alert>
 
-          {(envStatus === 'downloading' || envStatus === 'extracting') && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            {gpuStatus === null ? (
+              <>
+                <CircularProgress size={18} />
+                <Typography variant="body2" color="text.secondary">Checking GPU...</Typography>
+              </>
+            ) : (
+              <Tooltip title={gpuStatus.detail} arrow>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'help' }}>
+                  {gpuStatus.level === 'ok' && <CheckCircleOutlineIcon color="success" fontSize="small" />}
+                  {gpuStatus.level === 'warning' && <WarningAmberIcon color="warning" fontSize="small" />}
+                  {gpuStatus.level === 'info' && <InfoOutlinedIcon color="action" fontSize="small" />}
+                  <Typography variant="body2">{gpuStatus.summary}</Typography>
+                </Box>
+              </Tooltip>
+            )}
+          </Box>
+
+          {envStatus === 'installing' && (
             <Alert severity="info" sx={{ mb: 2 }}>
-              {envStatus === 'downloading' ? 'Downloading ML environment. This may take several minutes...' : 'Extracting environment. This may take a few minutes...'}
+              Downloading and installing the ML environment. This may take several minutes...
             </Alert>
           )}
 
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>PyTorch build</Typography>
+            <FormControl size="small" sx={{ minWidth: 260 }} disabled={envStatus === 'installing'}>
+              <Select value={torchVariant} onChange={(e) => setTorchVariant(e.target.value)}>
+                <MenuItem value="auto">Auto-detect GPU</MenuItem>
+                <MenuItem value="cpu">CPU only</MenuItem>
+                <MenuItem value="cuda">GPU (NVIDIA CUDA)</MenuItem>
+              </Select>
+            </FormControl>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Applies when installing. Auto uses the GPU if a compatible NVIDIA driver is found (Windows/Linux).
+            </Typography>
+          </Box>
+
+          {installPlan && installPlan.mode !== 'up_to_date' && envStatus !== 'installing' && (
+            <Alert severity={installPlan.enough_space ? 'info' : 'error'} sx={{ mb: 2 }}>
+              {installPlan.mode === 'update' ? 'Update' : 'Install'}: {installPlan.variant === 'cuda' ? 'GPU (NVIDIA CUDA)' : 'CPU'} build
+              {installPlan.mode === 'install' ? `, about ${installPlan.estimated_size_gb} GB of disk space` : ''}
+              {' '}({installPlan.reason}). {installPlan.free_gb} GB free
+              {installPlan.enough_space ? '.' : `, but at least ${installPlan.required_free_gb} GB is needed.`}
+            </Alert>
+          )}
+
+          <Box sx={{ mb: 2 }}>
+            <Button size="small" onClick={() => setShowNetworkSettings(v => !v)}>
+              {showNetworkSettings ? 'Hide' : 'Show'} advanced network settings
+            </Button>
+            {showNetworkSettings && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                  For networks that need a proxy or mirror. One NAME=value per line. Allowed: HTTPS_PROXY, HTTP_PROXY, ALL_PROXY, NO_PROXY,
+                  SSL_CERT_FILE, SSL_CERT_DIR, UV_DEFAULT_INDEX, UV_INDEX, UV_PYTHON_INSTALL_MIRROR, UV_HTTP_TIMEOUT.
+                </Typography>
+                <TextField
+                  multiline
+                  minRows={3}
+                  fullWidth
+                  size="small"
+                  value={installerEnvText}
+                  onChange={(e) => setInstallerEnvText(e.target.value)}
+                  placeholder={'HTTPS_PROXY=http://proxy.example.edu:8080'}
+                  disabled={envStatus === 'installing'}
+                />
+              </Box>
+            )}
+          </Box>
+
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <Button variant="outlined" onClick={checkEnv} disabled={envStatus === 'downloading' || envStatus === 'extracting'}>
+            <Button variant="outlined" onClick={checkEnv} disabled={envStatus === 'installing'}>
               Check
             </Button>
             <Button
               variant="contained"
               onClick={startEnvInstall}
-              disabled={envStatus === 'ready' || envStatus === 'downloading' || envStatus === 'extracting'}
+              disabled={envStatus === 'ready' || envStatus === 'installing' || (installPlan !== null && !installPlan.enough_space)}
             >
-              {envStatus === 'missing' || envStatus === 'unknown' ? 'Download and Install' : 'Re-install'}
+              {envStatus === 'missing' || envStatus === 'unknown' ? 'Download and Install' : envStatus === 'outdated' ? 'Update' : 'Re-install'}
             </Button>
-            {confirmRemove ? (
+            {removing ? (
+              <Button variant="outlined" color="error" disabled>
+                Removing...
+              </Button>
+            ) : confirmRemove ? (
               <>
                 <Button variant="contained" color="error" onClick={removeEnv}>
                   Confirm Remove

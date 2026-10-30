@@ -90,17 +90,14 @@ if [ ! -f "$PROJECT_ROOT/backend/app.py" ]; then
     exit 1
 fi
 
-# Check for venv created by install-server.sh
-VENV_PATH="$PROJECT_ROOT/backend/venv"
-if [ -d "$VENV_PATH" ] && [ -f "$VENV_PATH/bin/python" ]; then
-    PYTHON_CMD="$VENV_PATH/bin/python"
-    echo -e "${GREEN}✓ Using venv: $VENV_PATH${NC}"
-else
-    # Fall back to system Python
-    PYTHON_CMD=$(command -v python3 || command -v python)
-    echo -e "${YELLOW}⚠ No venv found at $VENV_PATH, using system Python${NC}"
-    echo -e "${YELLOW}  Run ./scripts/install-server.sh to create venv with dependencies${NC}"
+# The backend runs in the uv-managed environment defined by backend/uv.lock
+if ! command -v uv &> /dev/null; then
+    echo -e "${RED}✗ uv not found${NC}"
+    echo "  Install uv: https://docs.astral.sh/uv/getting-started/installation/"
+    exit 1
 fi
+PYTHON_CMD="uv run --frozen python"
+echo -e "${GREEN}✓ Using uv environment: $PROJECT_ROOT/backend/.venv${NC}"
 
 echo -e "${BLUE}Starting development servers...${NC}"
 echo ""

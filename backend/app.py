@@ -4,8 +4,8 @@ The backend is a pyinstaller executable that exposes an API via aiohttp
 
 This version excludes ML dependencies and uses lightweight libraries.
 
-Heavy ML Tasks are run in background processes using a separate conda-pack
-environment that is downloaded and extracted on demand.
+Heavy ML Tasks are run in background processes using a separate uv-managed
+Python environment that is installed on demand from a bundled lockfile.
 """
 
 import sys
@@ -18,7 +18,10 @@ import logging
 import base64
 import subprocess
 import threading
-import tarfile
+import shutil
+import functools
+import hashlib
+import tomllib
 import glob
 import platform
 import ssl
@@ -78,22 +81,9 @@ _root.addHandler(_stream_handler)
 logger = logging.getLogger(__name__)
 logger.info(f"Log file: {LOG_FILE_PATH}")
 
-# GitHub repository for ML environment releases (owner/repo)
-GITHUB_REPO = "sammlapp/dipper"
-
-# Hugging Face dataset repo for large environments that exceed GitHub's 2GB asset limit
-HF_REPO = "sammlapp/dipper-envs"
-
-# Per-platform download config — all platforms hosted on Hugging Face
 # SSL context using certifi's CA bundle — required in PyInstaller builds where
 # the system cert store is not accessible from the bundled Python runtime.
 SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
-
-PYTORCH_ENV_ASSET = {
-    "Darwin": {"source": "hf", "name": "dipper_ml_env-macos-arm64.tar.gz"},
-    "Windows": {"source": "hf", "name": "dipper_ml_env-windows-x64.tar.gz"},
-    "Linux": {"source": "hf", "name": "dipper_ml_env-linux-x64.tar.gz"},
-}
 
 common_to_sci = birdnames.Converter(
     from_type="common_name",
@@ -274,21 +264,58 @@ def validate_audio_files(file_list):
     return results
 
 
-# Environment Management Functions
-def get_default_env_path():
-    """Get the default environment path in system-specific cache directory"""
-    cache_dir = get_default_env_cache_dir()
-    env_path = os.path.join(cache_dir, "envs/dipper_ml_env")
-    return env_path
-    # # Fallback to local directory # No fallback!
-    # return os.path.join(os.path.expanduser("~"), ".dipper", "env")
+# ML environment management
+#
+# The ML environment is a uv-managed virtual environment, created on first use from
+# the bundled ml_env/pyproject.toml and ml_env/uv.lock. The lockfile pins every
+# package (for both torch variants), so no dependency resolution happens on the
+# user's machine, and uv downloads its own managed Python, so nothing needs to be
+# installed on the system.
 
+ML_PYTHON_VERSION = "3.13"
 
-def get_default_env_archive_path():
-    """Get the default environment archive path in system-specific cache directory"""
-    cache_dir = get_default_env_cache_dir()
-    env_path = os.path.join(cache_dir, "archives/dipper_ml_env.tar.gz")
-    return env_path
+# The torch build is chosen at install time and maps to the `cpu` / `cuda` extras
+# in ml_env/pyproject.toml.
+TORCH_VARIANTS = ("cpu", "cuda")
+
+# On-disk size (GB) of the installed environment per (OS, torch variant), measured
+# in CI (`du -sh .venv` in test-uv-ml-env.yml). Used to show the expected size
+# up front and to check free disk space. Re-measure when the lock changes.
+ENV_SIZE_GB = {
+    ("Darwin", "cpu"): 2.4,
+    ("Windows", "cpu"): 2.8,
+    ("Linux", "cpu"): 3.7,
+    ("Windows", "cuda"): 6.5,
+    ("Linux", "cuda"): 9.5,
+}
+# A fresh install needs this multiple of the environment size free (downloaded
+# wheels are cached while they are installed).
+INSTALL_DISK_MARGIN = 1.25
+# Free space needed to update an existing environment in place (incremental).
+UPDATE_MIN_FREE_GB = 2.0
+
+# Hosts the installer downloads from, listed in connection error messages.
+REQUIRED_HOSTS = (
+    "pypi.org and files.pythonhosted.org (Python packages)",
+    "download.pytorch.org (PyTorch)",
+    "github.com and objects.githubusercontent.com (the Python download)",
+)
+
+# Environment variables users may set for the installer (proxy, mirrors,
+# certificates), e.g. from Settings on locked-down networks. Everything else
+# starting with UV_ is removed so a user's own uv setup can't change the install.
+INSTALLER_ENV_ALLOWED = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "UV_DEFAULT_INDEX",
+    "UV_INDEX",
+    "UV_PYTHON_INSTALL_MIRROR",
+    "UV_HTTP_TIMEOUT",
+)
 
 
 def get_default_env_cache_dir():
@@ -296,156 +323,440 @@ def get_default_env_cache_dir():
     return _platformdirs.user_cache_dir("Dipper", "Dipper")
 
 
-def _download_url_to_file(url, archive_path):
-    """Download a URL to archive_path atomically via a .part temp file."""
-    import urllib.request
+def get_default_env_path():
+    """Get the default environment path in system-specific cache directory"""
+    return os.path.join(get_default_env_cache_dir(), "envs", "ml_env")
 
-    tmp_path = archive_path + ".part"
 
-    def _report(block_count, block_size, total_size):
-        if total_size > 0 and block_count % 500 == 0:
-            downloaded = block_count * block_size
-            pct = min(100, downloaded * 100 // total_size)
-            logger.info(
-                f"  Download progress: {pct}% ({downloaded // (1024*1024)} MB / {total_size // (1024*1024)} MB)"
-            )
+def _bundle_dir():
+    """Directory holding bundled resources (PyInstaller bundle or source tree)."""
+    if getattr(sys, "frozen", False):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
 
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Dipper-App"})
-        opener = urllib.request.build_opener(
-            urllib.request.HTTPSHandler(context=SSL_CONTEXT)
+
+def get_uv_executable():
+    """Path to the uv executable: bundled with the PyInstaller build, or from the
+    `uv` package when running from source."""
+    if getattr(sys, "frozen", False):
+        uv_path = os.path.join(
+            _bundle_dir(), "uv", "uv.exe" if os.name == "nt" else "uv"
         )
-        with opener.open(req) as response, open(tmp_path, "wb") as out:
-            block_size = 8192
-            total_size = int(response.headers.get("Content-Length", 0))
-            block_count = 0
-            while True:
-                chunk = response.read(block_size)
-                if not chunk:
-                    break
-                out.write(chunk)
-                block_count += 1
-                _report(block_count, block_size, total_size)
-        os.replace(tmp_path, archive_path)
-    except Exception as e:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        raise
+    else:
+        try:
+            from uv import find_uv_bin
+        except ImportError as e:
+            raise RuntimeError(
+                "The 'uv' package is not installed in the backend's Python environment. "
+                "Run: cd backend && uv sync"
+            ) from e
+
+        uv_path = find_uv_bin()
+    if not os.path.isfile(uv_path):
+        raise RuntimeError(f"uv executable not found at {uv_path}")
+    return uv_path
 
 
-def download_environment():
-    """Download the PyTorch environment archive for this platform.
+def get_ml_project_dir():
+    """Directory holding the ML environment's pyproject.toml and uv.lock."""
+    project_dir = os.path.join(_bundle_dir(), "ml_env")
+    for name in ("pyproject.toml", "uv.lock"):
+        if not os.path.isfile(os.path.join(project_dir, name)):
+            raise RuntimeError(
+                f"ML environment definition missing: {project_dir}/{name}"
+            )
+    return project_dir
 
-    Routing:
-      macOS / Windows → latest conda-env-* GitHub release asset
-      Linux           → Hugging Face dataset repo (no 2GB size limit)
+
+def query_nvidia_gpus():
+    """Query the NVIDIA driver via nvidia-smi.
+
+    Returns (gpu_names, driver_version, problem). `problem` explains why no GPU
+    information is available (and gpu_names is then empty).
     """
-    import json as _json
-    import urllib.request
+    nvidia_smi = shutil.which("nvidia-smi")
+    if nvidia_smi is None:
+        return [], None, "no NVIDIA driver found (nvidia-smi not available)"
+    result = subprocess.run(
+        [nvidia_smi, "--query-gpu=name,driver_version", "--format=csv,noheader"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        return (
+            [],
+            None,
+            f"nvidia-smi failed: {result.stderr.strip() or result.stdout.strip()}",
+        )
+    rows = [
+        [field.strip() for field in line.split(",")]
+        for line in result.stdout.splitlines()
+        if line.strip()
+    ]
+    if not rows:
+        return [], None, "nvidia-smi reported no GPUs"
+    return [row[0] for row in rows], rows[0][1], None
 
+
+def _parse_driver(version):
+    """(major, minor) from an NVIDIA driver version string such as '570.26' or '560.35.03'."""
+    parts = version.strip().split(".")
+    if len(parts) < 2:
+        raise ValueError(f"unrecognized driver version {version!r}")
+    return int(parts[0]), int(parts[1])
+
+
+@functools.lru_cache(maxsize=1)
+def get_cuda_requirements():
+    """(CUDA version, {OS: minimum driver (major, minor)}) for the bundled CUDA build.
+
+    Read from [tool.dipper.cuda] in ml_env/pyproject.toml, which keeps them next to
+    the torch pin and CUDA index they must match.
+    """
+    with open(os.path.join(get_ml_project_dir(), "pyproject.toml"), "rb") as f:
+        cuda = tomllib.load(f)["tool"]["dipper"]["cuda"]
+    min_driver = {
+        "Linux": _parse_driver(cuda["min_driver"]["linux"]),
+        "Windows": _parse_driver(cuda["min_driver"]["windows"]),
+    }
+    return cuda["version"], min_driver
+
+
+def _check_driver(driver):
+    """Whether an NVIDIA driver version supports the bundled CUDA build.
+
+    Returns (usable, problem); `problem` explains why not.
+    """
+    cuda_version, min_driver = get_cuda_requirements()
+    try:
+        version = _parse_driver(driver)
+    except ValueError:
+        return False, f"could not read the NVIDIA driver version ({driver!r})"
+    minimum = min_driver[platform.system()]
+    if version < minimum:
+        return False, (
+            f"NVIDIA driver {driver} is older than the minimum "
+            f"{'.'.join(map(str, minimum))} required for the CUDA {cuda_version} "
+            "build; update the driver to enable GPU support"
+        )
+    return True, None
+
+
+def detect_torch_variant():
+    """Choose the torch build for this machine.
+
+    Returns (variant, reason). 'cuda' only if an NVIDIA driver new enough for the
+    bundled CUDA build is present; otherwise 'cpu'. macOS always uses 'cpu' (the
+    standard PyTorch build, which includes Apple MPS support).
+    """
     system = platform.system()
-    platform_config = PYTORCH_ENV_ASSET.get(system)
-    if platform_config is None:
-        msg = f"Unsupported operating system: {system}"
-        logger.error(msg)
-        return {"status": "error", "error": msg}
+    if system == "Darwin":
+        return "cpu", "macOS uses the standard PyTorch build (CPU and Apple MPS)"
+    if system not in get_cuda_requirements()[1]:
+        raise RuntimeError(f"Unsupported operating system: {system}")
 
-    asset_name = platform_config["name"]
-    source = platform_config["source"]
-    archive_path = get_default_env_archive_path()
-    os.makedirs(os.path.dirname(archive_path), exist_ok=True)
+    gpus, driver, problem = query_nvidia_gpus()
+    if problem:
+        return "cpu", problem
+    usable, driver_problem = _check_driver(driver)
+    if not usable:
+        return "cpu", driver_problem
+    return "cuda", f"NVIDIA driver {driver} supports the CUDA build"
 
-    # Direct download from Hugging Face — URL is stable and predictable
-    url = f"https://huggingface.co/datasets/{HF_REPO}/resolve/main/{asset_name}"
-    logger.info(f"Downloading {asset_name} from Hugging Face to {archive_path}...")
+
+def resolve_torch_variant(requested, env_check=None):
+    """Resolve 'auto' / 'cpu' / 'cuda' to a concrete variant. Returns (variant, reason).
+
+    When updating an installed environment, 'auto' keeps the installed build instead
+    of re-detecting, so an update never silently switches between CPU and GPU.
+    """
+    if requested == "auto":
+        if (
+            env_check is not None
+            and env_check["status"] == "outdated"
+            and env_check.get("torch_variant")
+        ):
+            return env_check["torch_variant"], "keeping the installed build"
+        return detect_torch_variant()
+    if requested not in TORCH_VARIANTS:
+        raise ValueError(
+            f"Unknown torch variant {requested!r}; expected 'auto' or one of {TORCH_VARIANTS}"
+        )
+    return requested, "selected by user"
+
+
+TORCH_PROBE_SCRIPT = """
+import json, torch
+available = torch.cuda.is_available()
+arch_list = torch.cuda.get_arch_list() if available else []
+devices = []
+for i in range(torch.cuda.device_count() if available else 0):
+    major, minor = torch.cuda.get_device_capability(i)
+    arch = f"sm_{major}{minor}"
+    devices.append({
+        "name": torch.cuda.get_device_name(i),
+        "arch": arch,
+        # the build must contain kernels for this GPU's architecture
+        "arch_supported": arch in arch_list,
+    })
+print(json.dumps({
+    "torch_version": torch.__version__,
+    "cuda_build": torch.version.cuda,
+    "cuda_available": available,
+    "cuda_arch_list": arch_list,
+    "cuda_devices": devices,
+    "mps_available": torch.backends.mps.is_available(),
+}))
+"""
+
+
+def probe_torch_runtime(python_path):
+    """Ask the ML environment's torch which accelerators it can actually use."""
+    result = subprocess.run(
+        [python_path, "-c", TORCH_PROBE_SCRIPT],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        env=env_python_subprocess_env(),
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"torch probe failed: {result.stderr[-500:]}")
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def get_gpu_status():
+    """Describe this machine's GPU and whether the installed ML environment can use it.
+
+    Returns {"level": "ok" | "info" | "warning", "summary": str, "detail": str, ...}.
+    Once the environment is installed, torch itself is asked whether it can use the
+    GPU, so the answer reflects the real runtime and not just the hardware.
+    """
+    system = platform.system()
+    env_check = check_environment(get_default_env_path())
+    # an outdated environment is still installed and usable
+    installed = env_check["status"] in ("ready", "outdated")
+    installed_variant = env_check.get("torch_variant") if installed else None
+    probe = probe_torch_runtime(env_check["python_path"]) if installed else None
+
+    def status(level, summary, detail, **extra):
+        return {
+            "level": level,
+            "summary": summary,
+            "detail": detail,
+            "installed_variant": installed_variant,
+            **extra,
+        }
+
+    if system == "Darwin":
+        if probe is None:
+            return status(
+                "info",
+                "Apple GPU (Metal) is used if available",
+                "The ML environment is not installed yet. The standard PyTorch build "
+                "supports Apple Silicon GPUs (MPS).",
+            )
+        if probe["mps_available"]:
+            return status(
+                "ok",
+                "Apple GPU (MPS) available",
+                f"PyTorch {probe['torch_version']} can use the Apple GPU.",
+            )
+        return status(
+            "info",
+            "Apple GPU (MPS) not available",
+            "PyTorch cannot use the Apple GPU on this machine (MPS requires Apple "
+            "Silicon and a recent macOS). Tasks will run on the CPU.",
+        )
+
+    if system not in get_cuda_requirements()[1]:
+        raise RuntimeError(f"Unsupported operating system: {system}")
+    gpus, driver, problem = query_nvidia_gpus()
+    gpu_names = ", ".join(gpus)
+    hardware = {"gpus": gpus, "driver": driver}
+    if problem:
+        gpu_usable, hardware_problem = False, problem
+    else:
+        gpu_usable, hardware_problem = _check_driver(driver)
+
+    if probe is None:
+        if gpu_usable:
+            return status(
+                "ok",
+                f"NVIDIA GPU detected: {gpu_names}",
+                f"Driver {driver} supports GPU acceleration. The GPU build of the ML "
+                "environment will be installed when using Auto-detect.",
+                **hardware,
+            )
+        if gpus:
+            return status(
+                "warning",
+                "NVIDIA GPU found, but its driver can't be used",
+                hardware_problem,
+                **hardware,
+            )
+        return status(
+            "info",
+            "No NVIDIA GPU detected",
+            f"{hardware_problem}. Tasks will run on the CPU.",
+            **hardware,
+        )
+
+    if probe["cuda_available"]:
+        supported = [d for d in probe["cuda_devices"] if d["arch_supported"]]
+        unsupported = [d for d in probe["cuda_devices"] if not d["arch_supported"]]
+        if not supported:
+            names = ", ".join(f"{d['name']} ({d['arch']})" for d in unsupported)
+            return status(
+                "warning",
+                f"GPU not supported by the installed PyTorch build: {names}",
+                f"PyTorch {probe['torch_version']} (CUDA {probe['cuda_build']}) was "
+                f"built for GPU architectures {', '.join(probe['cuda_arch_list'])}, which "
+                "does not include this GPU's architecture, so GPU tasks would fail. "
+                "Tasks should be run on the CPU build.",
+                **hardware,
+            )
+        note = (
+            ""
+            if not unsupported
+            else " Not usable: "
+            + ", ".join(f"{d['name']} ({d['arch']})" for d in unsupported)
+            + "."
+        )
+        return status(
+            "ok",
+            f"GPU acceleration available: {', '.join(d['name'] for d in supported)}",
+            f"PyTorch {probe['torch_version']} (CUDA {probe['cuda_build']}) can use "
+            f"the GPU. NVIDIA driver {driver}.{note}",
+            **hardware,
+        )
+    if installed_variant == "cpu" and gpu_usable:
+        return status(
+            "warning",
+            f"GPU found ({gpu_names}), but the CPU-only PyTorch build is installed",
+            "Tasks will run on the CPU. To use the GPU, remove the ML environment and "
+            "install it again with the 'GPU (NVIDIA CUDA)' build.",
+            **hardware,
+        )
+    if installed_variant == "cuda" and not gpus:
+        return status(
+            "warning",
+            "GPU build installed, but no NVIDIA GPU was found",
+            f"{hardware_problem}. Tasks will run on the CPU.",
+            **hardware,
+        )
+    if not gpu_usable and gpus:
+        return status(
+            "warning",
+            f"GPU found ({gpu_names}), but it can't be used",
+            hardware_problem,
+            **hardware,
+        )
+    if installed_variant == "cuda":
+        return status(
+            "warning",
+            "GPU build installed, but PyTorch cannot use the GPU",
+            f"NVIDIA driver {driver} and GPU {gpu_names} were detected, but "
+            f"torch.cuda.is_available() is False (PyTorch {probe['torch_version']}, "
+            f"CUDA {probe['cuda_build']}). Check the backend log for details.",
+            **hardware,
+        )
+    return status(
+        "info",
+        "No NVIDIA GPU detected",
+        f"{hardware_problem}. Tasks will run on the CPU.",
+        **hardware,
+    )
+
+
+# Install state lives next to the environment directory, not inside it, because uv
+# manages the contents of the environment directory.
+def _install_status_path(env_path):
+    return env_path + ".install_status"
+
+
+def _torch_variant_path(env_path):
+    return env_path + ".torch_variant"
+
+
+def _lock_hash_path(env_path):
+    return env_path + ".lock_hash"
+
+
+def _lock_hash():
+    """Hash of the bundled uv.lock: identifies which packages this Dipper expects."""
+    with open(os.path.join(get_ml_project_dir(), "uv.lock"), "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def _read_text(path):
     try:
-        _download_url_to_file(url, archive_path)
-    except Exception as e:
-        return {"status": "error", "error": f"Hugging Face download failed: {e}"}
-
-    logger.info(f"Download complete: {archive_path}")
-    return {"status": "success", "archive_path": archive_path}
-
-
-EXTRACTION_STATUS_FILE = ".dipper_extraction_status"
-
-
-def _read_extraction_status(env_path):
-    """Read the extraction status file. Returns 'complete', 'in_progress', or None."""
-    status_file = os.path.join(env_path, EXTRACTION_STATUS_FILE)
-    try:
-        with open(status_file, "r") as f:
+        with open(path, "r") as f:
             return f.read().strip()
     except FileNotFoundError:
         return None
 
 
+def _write_text(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(text)
+
+
 # Python interpreter variables that redirect which stdlib/site-packages an
 # interpreter loads. Packaged launches (e.g. a Linux AppImage's AppRun) set these
 # to point at their own bundled Python, and children inherit them, which breaks the
-# conda env's Python ("No module named 'encodings'").
+# environment's Python ("No module named 'encodings'").
 _PYTHON_ENV_VARS = ("PYTHONHOME", "PYTHONPATH", "PYTHONUSERBASE", "PYTHONSTARTUP")
 
 
 def env_python_subprocess_env():
-    """Environment for subprocesses running the conda env's Python.
+    """Environment for subprocesses running the ML environment's Python.
 
-    Inherits the current environment minus variables that would point the env's
+    Inherits the current environment minus variables that would point the
     interpreter at a different Python installation.
     """
     return {k: v for k, v in os.environ.items() if k not in _PYTHON_ENV_VARS}
 
 
-def _write_extraction_status(env_path, status):
-    """Write extraction status: 'in_progress' or 'complete'."""
-    os.makedirs(env_path, exist_ok=True)
-    status_file = os.path.join(env_path, EXTRACTION_STATUS_FILE)
-    with open(status_file, "w") as f:
-        f.write(status)
+def _env_python_path(env_path):
+    """Path to the python executable of an environment directory.
+
+    Managed environments are venvs (bin/python, or Scripts/python.exe on Windows);
+    user-selected custom environments may also be Windows conda envs (python.exe).
+    """
+    if os.name != "nt":
+        return os.path.join(env_path, "bin", "python")
+    venv_python = os.path.join(env_path, "Scripts", "python.exe")
+    if os.path.exists(venv_python):
+        return venv_python
+    return os.path.join(env_path, "python.exe")
 
 
 def check_environment(env_path):
-    """Check if conda-pack environment exists and is fully extracted."""
+    """Check whether a Python environment exists and is usable.
+
+    The managed environment (the default path) must also have completed installation
+    and match the bundled uv.lock. Statuses: ready, outdated (usable, but the lockfile
+    changed since it was installed), installing, missing, broken, error.
+    """
     try:
-        extraction_status = _read_extraction_status(env_path)
-
-        if extraction_status == "in_progress":
-            return {"status": "extracting", "python_path": None}
-
-        if extraction_status != "complete":
-            # No status file at all — either never extracted, or an old env
-            # that predates status tracking. Check if python works as migration path.
-            python_path = os.path.join(env_path, "bin", "python")
-            if os.name == "nt":
-                python_path = os.path.join(env_path, "python.exe")
-            if not os.path.exists(python_path):
+        managed = os.path.abspath(env_path) == os.path.abspath(get_default_env_path())
+        if managed:
+            install_status = _read_text(_install_status_path(env_path))
+            if install_status == "in_progress":
+                return {"status": "installing", "python_path": None}
+            if install_status != "complete":
                 return {"status": "missing", "python_path": None}
-            result = subprocess.run(
-                [python_path, "--version"],
-                capture_output=True,
-                text=True,
-                env=env_python_subprocess_env(),
-            )
-            if result.returncode == 0:
-                # Old valid env — write status file so future checks are fast
-                _write_extraction_status(env_path, "complete")
+
+        python_path = _env_python_path(env_path)
+        if not os.path.exists(python_path):
+            if managed:
                 return {
-                    "status": "ready",
-                    "python_path": python_path,
-                    "version": result.stdout.strip(),
+                    "status": "broken",
+                    "error": "Python binary missing after install",
                 }
             return {"status": "missing", "python_path": None}
-
-        # Status is 'complete' — verify python binary is usable
-        python_path = os.path.join(env_path, "bin", "python")
-        if os.name == "nt":
-            python_path = os.path.join(env_path, "python.exe")
-
-        if not os.path.exists(python_path):
-            return {
-                "status": "broken",
-                "error": "Python binary missing after extraction",
-            }
 
         result = subprocess.run(
             [python_path, "--version"],
@@ -453,88 +764,267 @@ def check_environment(env_path):
             text=True,
             env=env_python_subprocess_env(),
         )
-        if result.returncode == 0:
+        if result.returncode != 0:
             return {
-                "status": "ready",
-                "python_path": python_path,
-                "version": result.stdout.strip(),
+                "status": "broken",
+                "error": f"Python check failed: {result.stderr}",
             }
-        return {"status": "broken", "error": f"Python check failed: {result.stderr}"}
+        info = {
+            "status": "ready",
+            "python_path": python_path,
+            "version": result.stdout.strip(),
+        }
+        if managed:
+            info["torch_variant"] = _read_text(_torch_variant_path(env_path))
+            # A new Dipper release may ship a different uv.lock; the installed
+            # packages are then out of date even though the install completed.
+            if _read_text(_lock_hash_path(env_path)) != _lock_hash():
+                info["status"] = "outdated"
+                info["message"] = (
+                    "This version of Dipper needs different packages than the "
+                    "installed ML environment. Update it from Settings."
+                )
+        return info
 
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
 
-def extract_environment(archive_path, extract_dir):
-    """Extract conda-pack environment from tar.gz archive"""
+def _uv_subprocess_env(env_dir, installer_env=None):
+    """Environment for running uv: isolated from the user's own uv/venv settings,
+    with uv's Python installs and package cache kept in Dipper's cache directory
+    (on the same filesystem as the environment so installs can use hard links).
+
+    installer_env: user-supplied overrides (proxy, mirrors, certificates), limited to
+    INSTALLER_ENV_ALLOWED.
+    """
+    env = env_python_subprocess_env()
+    for key in list(env):
+        if key.startswith("UV_") or key == "VIRTUAL_ENV":
+            del env[key]
+    cache_dir = get_default_env_cache_dir()
+    env["UV_PROJECT_ENVIRONMENT"] = env_dir
+    env["UV_CACHE_DIR"] = os.path.join(cache_dir, "uv-cache")
+    env["UV_PYTHON_INSTALL_DIR"] = os.path.join(cache_dir, "python")
+    env.update(installer_env or {})
+    return env
+
+
+def validate_installer_env(installer_env):
+    """Check user-supplied installer environment variables; returns them as a dict."""
+    if not isinstance(installer_env, dict):
+        raise ValueError("installer_env must be an object of NAME: value pairs")
+    unknown = sorted(set(installer_env) - set(INSTALLER_ENV_ALLOWED))
+    if unknown:
+        raise ValueError(
+            f"Not allowed as installer settings: {', '.join(unknown)}. "
+            f"Allowed: {', '.join(INSTALLER_ENV_ALLOWED)}"
+        )
+    return {k: str(v) for k, v in installer_env.items()}
+
+
+# (phrases in uv's output, explanation, whether it is a network/access problem)
+_INSTALL_ERROR_PATTERNS = (
+    (
+        (
+            "dns error",
+            "failed to lookup address",
+            "name or service not known",
+            "no such host",
+            "nodename nor servname",
+        ),
+        "Could not look up a download server's address (DNS error). Check your internet connection.",
+        True,
+    ),
+    (
+        (
+            "invalid peer certificate",
+            "unknownissuer",
+            "certificate verify failed",
+            "self-signed",
+            "invalid certificate",
+            "tls handshake",
+        ),
+        "A secure (TLS) connection could not be verified. This usually means a network "
+        "proxy or firewall is intercepting HTTPS traffic with its own certificate.",
+        True,
+    ),
+    (
+        ("403 forbidden", "status code 403", "407 proxy", "proxy authentication"),
+        "A download server refused the request (HTTP 403 or proxy authentication). "
+        "This is usually a firewall or proxy restriction.",
+        True,
+    ),
+    (
+        ("404 not found", "status code 404"),
+        "A package file is no longer available at its download address (HTTP 404). "
+        "This version of Dipper may need an update.",
+        False,
+    ),
+    (
+        ("timed out", "timeout"),
+        "A download timed out. Check your connection and try again.",
+        True,
+    ),
+    (
+        (
+            "connection refused",
+            "connection reset",
+            "connection closed",
+            "error sending request",
+        ),
+        "The connection to a download server failed.",
+        True,
+    ),
+    (
+        ("no space left on device", "os error 28", "not enough space", "disk full"),
+        "The disk is full. Free some space and try again.",
+        False,
+    ),
+    (
+        ("permission denied", "access is denied"),
+        "Permission was denied while writing files. Check that Dipper's cache "
+        "directory is writable and not blocked by security software.",
+        False,
+    ),
+)
+
+
+def explain_install_error(output_lines, returncode):
+    """Turn the tail of uv's output into a message a user can act on."""
+    text = "\n".join(output_lines).lower()
+    details = "\n".join(output_lines[-10:])
+    for phrases, explanation, is_network in _INSTALL_ERROR_PATTERNS:
+        if any(p in text for p in phrases):
+            message = explanation
+            if is_network:
+                hosts = "\n".join(f"  - {h}" for h in REQUIRED_HOSTS)
+                message += (
+                    f"\n\nThe installer needs to reach:\n{hosts}\n"
+                    "If your network blocks these or needs a proxy or mirror, ask your IT "
+                    "administrator, or enter proxy/mirror settings under Settings > "
+                    "ML Environment > Advanced network settings."
+                )
+            return f"{message}\n\nDetails:\n{details}"
+    return f"uv sync exited with code {returncode}:\n{details}"
+
+
+def _free_disk_gb(path):
+    """Free space (GB) on the filesystem that will hold `path`."""
+    probe = path
+    while not os.path.exists(probe):
+        probe = os.path.dirname(probe)
+    return shutil.disk_usage(probe).free / 1e9
+
+
+def plan_install(requested="auto"):
+    """What installing the ML environment would do, for showing before it starts.
+
+    Returns the torch variant, whether this is a fresh install, an update, or
+    nothing to do, the expected disk size, and whether enough disk space is free.
+    """
+    env_dir = get_default_env_path()
+    env_check = check_environment(env_dir)
+    variant, reason = resolve_torch_variant(requested, env_check)
+
+    if env_check["status"] == "ready" and env_check.get("torch_variant") == variant:
+        mode = "up_to_date"
+    elif env_check["status"] == "outdated" and env_check.get("torch_variant") == variant:
+        mode = "update"
+    else:
+        mode = "install"
+
+    size_gb = ENV_SIZE_GB[(platform.system(), variant)]
+    required_gb = UPDATE_MIN_FREE_GB if mode == "update" else size_gb * INSTALL_DISK_MARGIN
+    free_gb = _free_disk_gb(env_dir)
+    return {
+        "variant": variant,
+        "reason": reason,
+        "mode": mode,
+        "estimated_size_gb": size_gb,
+        "required_free_gb": round(required_gb, 1),
+        "free_gb": round(free_gb, 1),
+        "enough_space": mode == "up_to_date" or free_gb >= required_gb,
+        "env_path": env_dir,
+    }
+
+
+def install_environment(env_dir, torch_variant, on_progress=None, installer_env=None):
+    """Create or update the ML environment at env_dir from the bundled lockfile.
+
+    Args:
+        env_dir: environment directory (managed by uv)
+        torch_variant: 'cpu' or 'cuda' (a concrete variant, see resolve_torch_variant)
+        on_progress: optional callable receiving each line of uv's output
+        installer_env: optional validated environment overrides for uv (proxy, mirror)
+    """
     try:
-        logger.info(f"Extracting environment from {archive_path} to {extract_dir}")
+        if torch_variant not in TORCH_VARIANTS:
+            raise ValueError(f"Invalid torch variant {torch_variant!r}")
+        uv = get_uv_executable()
+        project_dir = get_ml_project_dir()
 
-        # Create extraction directory and mark extraction as in-progress immediately.
-        # If the process is interrupted mid-extraction, check_environment will see
-        # "in_progress" and refuse to use the partial env.
-        os.makedirs(extract_dir, exist_ok=True)
-        _write_extraction_status(extract_dir, "in_progress")
+        # If interrupted mid-install, check_environment sees "in_progress" and refuses
+        # to use the partial environment.
+        _write_text(_install_status_path(env_dir), "in_progress")
 
-        # Extract the tar.gz file
-        with tarfile.open(archive_path, "r:gz") as tar:
-            tar.extractall(path=extract_dir)
-
-        # Run conda-unpack via the canonical invocation from the conda-pack docs:
-        # source bin/activate && conda-unpack
-        # bin/activate is a plain shell script that sets PATH to point at this env's
-        # bin/, so conda-unpack finds the env's own Python without needing any
-        # pre-installed Python on the user's machine.
-        logger.info("Running conda-unpack to fix library paths...")
-        if os.name == "nt":
-            # Windows: Scripts\conda-unpack.exe is a native executable with no RPATH
-            # dependencies, so it runs correctly before conda-unpack has fixed the
-            # env's paths. No Python or PATH tricks needed.
-            conda_unpack_exe = os.path.join(extract_dir, "Scripts", "conda-unpack.exe")
-            result = subprocess.run(
-                [conda_unpack_exe],
-                capture_output=True,
-                text=True,
-                env=env_python_subprocess_env(),
-            )
-        else:
-            # macOS/Linux: bin/python is a Mach-O/ELF binary whose shared library
-            # RPATHs still point to the build machine prefix before unpack — it won't
-            # load. Source bin/activate under bash (bin/activate detects the shell via
-            # $BASH_VERSION; /bin/sh won't work). bin/activate prepends the env's bin/
-            # to PATH so `conda-unpack` resolves to bin/conda-unpack and
-            # `#!/usr/bin/env python` finds the env's own python.
-            activate = os.path.join(extract_dir, "bin", "activate")
-            result = subprocess.run(
-                ["bash", "-c", f'. "{activate}" && conda-unpack'],
-                capture_output=True,
-                text=True,
-                env=env_python_subprocess_env(),
-            )
-        if result.returncode != 0:
-            error_msg = (
-                f"conda-unpack exited with code {result.returncode}: {result.stderr}"
-            )
+        # --frozen: install exactly what uv.lock pins, with no resolution.
+        # --no-config: ignore any uv configuration files on the user's machine.
+        # --system-certs: trust the operating system's certificate store, so networks
+        #   that intercept HTTPS with a corporate or university certificate work.
+        cmd = [
+            uv, "--no-config", "--system-certs", "--color", "never",
+            "sync", "--frozen", "--no-progress",
+            "--project", project_dir,
+            "--python", ML_PYTHON_VERSION, "--managed-python",
+            "--extra", torch_variant,
+        ]  # fmt: skip
+        logger.info(f"Installing ML environment ({torch_variant}) to {env_dir}")
+        logger.info(f"Running: {' '.join(cmd)}")
+        output_tail = []
+        with subprocess.Popen(
+            cmd,
+            env=_uv_subprocess_env(env_dir, installer_env),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        ) as process:
+            for line in process.stdout:
+                line = line.rstrip()
+                if not line:
+                    continue
+                logger.info(f"[uv] {line}")
+                output_tail = (output_tail + [line])[-30:]
+                if on_progress:
+                    on_progress(line)
+        returncode = process.returncode
+        if returncode != 0:
+            _write_text(_install_status_path(env_dir), "failed")
+            error_msg = explain_install_error(output_tail, returncode)
             logger.error(error_msg)
             return {"status": "error", "error": error_msg}
-        logger.info("conda-unpack complete")
 
-        # Mark extraction complete only after tar + conda-unpack both succeed.
-        _write_extraction_status(extract_dir, "complete")
+        _write_text(_torch_variant_path(env_dir), torch_variant)
+        _write_text(_lock_hash_path(env_dir), _lock_hash())
+        _write_text(_install_status_path(env_dir), "complete")
 
-        # Verify python binary is usable
-        logger.info("Verifying extracted Python binary...")
-        env_check = check_environment(extract_dir)
+        env_check = check_environment(env_dir)
         logger.info(f"Environment check result: {env_check}")
-        if env_check["status"] == "ready":
-            return {"status": "success", "env_path": extract_dir}
-        else:
+        if env_check["status"] != "ready":
             return {
                 "status": "error",
-                "error": f"Environment extraction failed: {env_check.get('error', env_check.get('status', 'Unknown error'))}",
+                "error": f"Environment install failed: {env_check.get('error', env_check['status'])}",
             }
+        return {
+            "status": "success",
+            "env_path": env_dir,
+            "torch_variant": torch_variant,
+        }
 
     except Exception as e:
+        logger.error(f"Environment install failed: {e}")
         return {"status": "error", "error": str(e)}
 
 
@@ -551,13 +1041,27 @@ def resolve_path(path_str, base_dir=None):
             return os.path.abspath(path_str)
 
 
-def setup_environment(env_dir=None):
-    """Set up environment - download & extract if needed, check if ready
+async def optional_json_body(request):
+    """JSON body of a request, or {} if it has none (e.g. a bare `curl -X POST`)."""
+    return await request.json() if request.can_read_body else {}
+
+
+def env_not_ready_message(env_result):
+    """Message for a task request when the ML environment can't be used."""
+    if env_result["status"] == "outdated":
+        return "The ML environment is out of date for this version of Dipper. Please update it from the Settings tab."
+    return "ML environment is not installed. Please install it from the Settings tab."
+
+
+def setup_environment(env_dir=None, torch_variant="auto"):
+    """Set up environment - install if needed, check if ready
 
     Args:
         env_dir: Environment directory if using a custom Python environment
-            if None, will use the built-in Dipper environment in application cache directory
-            (downloading and/or extracting .tar.gz if needed)
+            if None, will use the built-in Dipper environment in application cache
+            directory, installing it first if needed
+        torch_variant: 'auto', 'cpu', or 'cuda'; only used when installing the
+            built-in environment
 
     Returns:
         dict: Status and details about the environment setup
@@ -565,35 +1069,25 @@ def setup_environment(env_dir=None):
     try:
         # If user provided custom environment path, use that environment
         if env_dir is not None:
-            # Resolve custom path
             env_dir = resolve_path(env_dir)
             logger.info(f"Using custom environment path: {env_dir}")
 
             env_check = check_environment(env_dir)
-
             if env_check["status"] == "ready":
                 return {
                     "status": "ready",
                     "python_path": env_check["python_path"],
                     "message": "Environment already ready",
                 }
-            else:
-                return {
-                    "status": "error",
-                    "error": f"User-specified custom environment {env_dir} could not be used: {env_check.get('error', 'Unknown error')}",
-                }
+            return {
+                "status": "error",
+                "error": f"User-specified custom environment {env_dir} could not be used: {env_check.get('error', env_check['status'])}",
+            }
 
-        # Use the built-in Dipper environment, downloading and/or extracting .tar.gz if needed
-
-        # first get the default environment path for this operating system
         env_dir = get_default_env_path()
         logger.info(f"Using default environment path: {env_dir}")
-
-        # check if environment already exists
-        logger.info(f"Checking if environment is ready...")
         env_check = check_environment(env_dir)
         logger.info(f"Environment check result: {env_check}")
-
         if env_check["status"] == "ready":
             return {
                 "status": "ready",
@@ -601,59 +1095,17 @@ def setup_environment(env_dir=None):
                 "message": "Environment already ready",
             }
 
-        # Environment is not yet ready
-        # we may need to download it then extract it
-        # or just extract it if we already have the archive file
-        # in the expected location
-        logger.info("Environment is not ready, proceeding with setup...")
-
-        # Check cache directory for archive
-        logger.info("Checking for cached environment archive...")
-        archive_path = get_default_env_archive_path()
-
-        if os.path.exists(archive_path):  # already downloaded
-            logger.info(f"Using cached archive: {archive_path}")
-        else:
-            # Download from Hugging Face
-            logger.info("Archive not found in cache, downloading...")
-            download_result = download_environment()
-
-            if download_result["status"] == "success":
-                logger.info(f"Downloaded archive to: {archive_path}")
-            else:
-                return {
-                    "status": "error",
-                    "error": f"Failed to download environment: {download_result.get('error', 'Unknown error')}",
-                }
-
-        # Extract environment
-        if not os.path.exists(archive_path):
-            return {
-                "status": "error",
-                "error": f"Archive not found at {archive_path}",
-            }
-
-        # Extract the environment from the cached archive file
-
-        extract_result = extract_environment(archive_path, env_dir)
-        logger.info(f"Extraction result: {extract_result}")
-
-        if extract_result["status"] == "success":
-            # Check again after extraction
-            final_check = check_environment(env_dir)
-            if final_check["status"] == "ready":
-                return {
-                    "status": "ready",
-                    "python_path": final_check["python_path"],
-                    "message": "Environment extracted and ready",
-                }
-            else:
-                return {
-                    "status": "error",
-                    "error": f"Environment setup failed: {final_check.get('error', 'Unknown error')}",
-                }
-        else:
-            return extract_result
+        variant, reason = resolve_torch_variant(torch_variant, env_check)
+        logger.info(f"Installing ML environment: torch variant {variant} ({reason})")
+        install_result = install_environment(env_dir, variant)
+        if install_result["status"] != "success":
+            return install_result
+        final_check = check_environment(env_dir)
+        return {
+            "status": "ready",
+            "python_path": final_check["python_path"],
+            "message": f"Environment installed ({variant})",
+        }
 
     except Exception as e:
         return {"status": "error", "error": str(e)}
@@ -1538,6 +1990,8 @@ class DipperServer:
         self.app.router.add_post("/env/install", self.install_env)
         self.app.router.add_get("/env/install/status", self.install_env_status)
         self.app.router.add_post("/env/remove", self.remove_env)
+        self.app.router.add_get("/env/gpu", self.env_gpu)
+        self.app.router.add_get("/env/plan", self.env_plan)
         self.app.router.add_post("/inference/run", self.run_inference)
         self.app.router.add_get("/inference/status/{job_id}", self.get_inference_status)
         self.app.router.add_post("/inference/cancel/{job_id}", self.cancel_inference)
@@ -2182,7 +2636,7 @@ class DipperServer:
             )
         except ImportError:
             return web.json_response(
-                {"error": "psutil not installed; run: pip install psutil"}, status=501
+                {"error": "psutil not installed; run: cd backend && uv sync"}, status=501
             )
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
@@ -2238,12 +2692,12 @@ class DipperServer:
 
     # Environment Management Routes
     async def check_env(self, request):
-        """Check conda-pack environment status
+        """Check ML environment status
 
         If env_path not provided or None, uses default system cache directory
         """
         try:
-            data = await request.json()
+            data = await optional_json_body(request)
             env_path = data.get("env_path")  # Could be None for default
 
             # Use default cache directory if not provided
@@ -2261,16 +2715,19 @@ class DipperServer:
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def setup_env(self, request):
-        """Setup conda-pack environment (extract if needed)
+        """Setup ML environment (install if needed)
 
-        If env_path not provided or None, uses default system cache directory and auto-downloads from Google Drive if needed.
-        If env_path is provided, uses that custom environment (must already exist).
+        If env_path not provided or None, uses the default environment in the system
+        cache directory, installing it if needed (optional torch_variant: 'auto',
+        'cpu' or 'cuda'). If env_path is provided, uses that custom environment
+        (must already exist).
         """
         try:
             data = await request.json()
             env_path = data.get("env_path")  # None = use default cache, or custom path
+            torch_variant = data.get("torch_variant", "auto")
 
-            result = setup_environment(env_path)
+            result = setup_environment(env_path, torch_variant)
             return web.json_response(result)
 
         except Exception as e:
@@ -2278,19 +2735,30 @@ class DipperServer:
             return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def install_env(self, request):
-        """Start a background download+extract of the ML environment.
+        """Start a background install (or update) of the ML environment.
+
+        Body (all optional): {"torch_variant": "auto" | "cpu" | "cuda",
+        "installer_env": {"HTTPS_PROXY": "...", ...}}. "auto" (default) picks CUDA if
+        a new enough NVIDIA driver is present, or keeps the installed build when
+        updating. installer_env is limited to INSTALLER_ENV_ALLOWED.
 
         Non-blocking: returns immediately with {"status": "started"} or
         {"status": "already_running"} if an install is already in progress.
         Poll /env/install/status for progress.
         """
         state = self._env_install_state
-        if state["stage"] in ("downloading", "extracting"):
+        if state["stage"] == "installing":
             return web.json_response({"status": "already_running", "state": state})
 
-        # Check if already ready
-        env_check = check_environment(get_default_env_path())
-        if env_check["status"] == "ready":
+        data = await optional_json_body(request)
+        try:
+            installer_env = validate_installer_env(data.get("installer_env", {}))
+            plan = plan_install(data.get("torch_variant", "auto"))
+        except ValueError as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=400)
+        variant, reason, env_dir = plan["variant"], plan["reason"], plan["env_path"]
+
+        if plan["mode"] == "up_to_date":
             self._env_install_state = {
                 "stage": "ready",
                 "message": "Environment already ready",
@@ -2299,61 +2767,45 @@ class DipperServer:
             return web.json_response(
                 {"status": "already_ready", "state": self._env_install_state}
             )
+        if not plan["enough_space"]:
+            return web.json_response(
+                {
+                    "status": "error",
+                    "error": f"Not enough free disk space: the {variant} build needs about "
+                    f"{plan['required_free_gb']} GB free in {env_dir}, but only "
+                    f"{plan['free_gb']} GB is available.",
+                },
+                status=400,
+            )
+
+        def _set_progress(line):
+            self._env_install_state = {
+                "stage": "installing",
+                "message": f"Installing ML environment ({variant}): {line}"[:300],
+                "error": None,
+            }
 
         def _run():
             try:
-                archive_path = get_default_env_archive_path()
-                if not os.path.exists(archive_path):
-                    self._env_install_state = {
-                        "stage": "downloading",
-                        "message": "Downloading ML environment...",
-                        "error": None,
-                    }
-                    logger.info("Starting background environment download...")
-                    result = download_environment()
-                    if result["status"] != "success":
-                        self._env_install_state = {
-                            "stage": "error",
-                            "message": result.get("error", "Download failed"),
-                            "error": result.get("error"),
-                        }
-                        return
-                else:
-                    logger.info("Archive already cached, skipping download")
-
-                env_dir = get_default_env_path()
-                self._env_install_state = {
-                    "stage": "extracting",
-                    "message": "Extracting ML environment (this may take a few minutes)...",
-                    "error": None,
-                }
-                logger.info("Starting background environment extraction...")
-                extract_result = extract_environment(archive_path, env_dir)
-                if extract_result["status"] != "success":
-                    self._env_install_state = {
-                        "stage": "error",
-                        "message": extract_result.get("error", "Extraction failed"),
-                        "error": extract_result.get("error"),
-                    }
-                    return
-
-                final = check_environment(env_dir)
-                if final["status"] == "ready":
+                logger.info(
+                    f"Starting background environment {plan['mode']}: {variant} ({reason})"
+                )
+                result = install_environment(
+                    env_dir, variant, on_progress=_set_progress, installer_env=installer_env
+                )
+                if result["status"] == "success":
                     self._env_install_state = {
                         "stage": "ready",
-                        "message": "ML environment ready",
+                        "message": f"ML environment ready ({variant}: {reason})",
                         "error": None,
                     }
                     logger.info("Background environment install complete")
                 else:
                     self._env_install_state = {
                         "stage": "error",
-                        "message": final.get(
-                            "error", "Environment not valid after extraction"
-                        ),
-                        "error": final.get("error"),
+                        "message": result["error"],
+                        "error": result["error"],
                     }
-
             except Exception as e:
                 logger.error(f"Background env install failed: {e}")
                 self._env_install_state = {
@@ -2362,27 +2814,47 @@ class DipperServer:
                     "error": str(e),
                 }
 
-        thread = threading.Thread(target=_run, daemon=True)
-        thread.start()
         self._env_install_state = {
-            "stage": "downloading",
-            "message": "Starting download...",
+            "stage": "installing",
+            "message": f"Starting {plan['mode']} ({variant}: {reason})...",
             "error": None,
         }
+        threading.Thread(target=_run, daemon=True).start()
         return web.json_response(
-            {"status": "started", "state": self._env_install_state}
+            {"status": "started", "state": self._env_install_state, "plan": plan}
         )
+
+    async def env_plan(self, request):
+        """What installing would do (variant, expected size, free disk space)."""
+        try:
+            plan = plan_install(request.query.get("torch_variant", "auto"))
+            return web.json_response(plan)
+        except ValueError as e:
+            return web.json_response({"status": "error", "error": str(e)}, status=400)
+        except Exception as e:
+            logger.error(f"Error planning environment install: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def install_env_status(self, request):
         """Return current state of background env install."""
         return web.json_response(self._env_install_state)
 
+    async def env_gpu(self, request):
+        """GPU detection and whether the installed ML environment can use it."""
+        try:
+            loop = asyncio.get_running_loop()
+            return web.json_response(await loop.run_in_executor(None, get_gpu_status))
+        except Exception as e:
+            logger.error(f"Error getting GPU status: {e}")
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
+
     async def remove_env(self, request):
         """Delete the default ML environment directory (POST /env/remove)."""
-        import shutil
-
         env_dir = get_default_env_path()
         try:
+            for path in (_install_status_path(env_dir), _torch_variant_path(env_dir)):
+                if os.path.exists(path):
+                    os.remove(path)
             if os.path.exists(env_dir):
                 shutil.rmtree(env_dir)
                 logger.info(f"Removed ML environment at {env_dir}")
@@ -2419,7 +2891,7 @@ class DipperServer:
                 return web.json_response(
                     {
                         "status": "error",
-                        "error": "ML environment is not installed. Please install it from the Settings tab.",
+                        "error": env_not_ready_message(env_result),
                         "env_status": env_result["status"],
                     },
                     status=503,
@@ -2673,7 +3145,7 @@ class DipperServer:
                 return web.json_response(
                     {
                         "status": "error",
-                        "error": "ML environment is not installed. Please install it from the Settings tab.",
+                        "error": env_not_ready_message(env_result),
                         "env_status": env_result["status"],
                     },
                     status=503,
@@ -2877,7 +3349,7 @@ class DipperServer:
                 return web.json_response(
                     {
                         "status": "error",
-                        "error": "ML environment is not installed. Please install it from the Settings tab.",
+                        "error": env_not_ready_message(env_result),
                         "env_status": env_result["status"],
                     },
                     status=503,

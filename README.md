@@ -1,173 +1,119 @@
-# Dipper - Bioacoustics ML Application
+# Dipper
 
-A cross-platform desktop application for bioacoustics machine learning with active learning capabilities. Built with Tauri and React for the frontend, and Python for the ML backend.
+Dipper is a desktop application for finding and labeling animal sounds in audio recordings. Run bioacoustic machine learning models over large audio collections, turn the detections into annotation tasks, and review the results, all without writing code.
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22801983.svg)](https://doi.org/10.5281/zenodo.22801983)
 
 Suggested citation:
 > Lapp, Sam, and Kitzes, Justin, 2026. Dipper version 0.2.3. DOI: 10.5281/zenodo.22801983
 
-## Features
+![Reviewing audio clips in Dipper](docs/img/grid_mode_screenshot.png)
 
-- **Species Detection Inference**: Run pre-trained models from the bioacoustics model zoo
-- **Model Training**: Train custom models with your own data
-- **Clip Extraction**: Create annotation tasks from detection results
-- **Data Exploration**: Visualize and explore detection results
-- **Review & Annotation**: Annotate audio clips with binary or multi-class labels
-- **Active Learning**: Iteratively improve models with human feedback
-- **Cross-Platform**: Works on macOS (ARM), Windows, and Linux
+## What you can do with Dipper
 
-## Project Structure
+- **Run species detection models** on folders of recordings. Choose a pre-trained model from the [bioacoustics model zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/) (Perch, BirdNET, HawkEars and others), or a signal-processing detector such as RIBBIT for pulsed calls. Dipper handles the audio, batching, and writing the results.
+- **Create annotation tasks from detections.** Select clips to review, for example the highest-scoring detections for each species, spread across folders or dates.
+- **Review and annotate clips** with spectrograms and audio playback. Label clips with presence/absence or multi-class labels, in a grid for quick review or a focused view with surrounding context.
+- **Queue long-running jobs.** Tasks run in the background and report progress in the Task Queue, so you can keep working.
+- **Use your own computer or a remote server.** Use the desktop app locally, or run Dipper on a GPU server and use it from a web browser ([Server Mode](#server-mode)).
 
-```
-dipper/
-├── frontend/              # Tauri + React desktop app
-│   ├── src/
-│   │   ├── components/    # React components (tabs, UI elements)
-│   │   └── utils/         # TaskManager, utilities
-│   ├── src-tauri/         # Tauri Rust backend
-│   ├── python-dist/       # PyInstaller backend executable
-│   └── package.json
-├── backend/               # Python ML processing
-│   ├── app.py  # HTTP server (aiohttp)
-│   ├── scripts/           # ML task scripts (inference, training, etc.)
-│   ├── build_pyinstaller.py   # Build standalone server
-│   └── requirements-backend.txt
-└── .github/workflows/     # CI/CD for releases
-```
+Model training is under development and is not yet enabled in releases.
 
-## Quick Start
+<p>
+  <img src="docs/img/inference_config_screenshot.png" alt="Setting up an inference task" width="49%">
+  <img src="docs/img/task_queue_screenshot.png" alt="The task queue" width="49%">
+</p>
+<p>
+  <img src="docs/img/extraction_screenshot.png" alt="Creating an annotation task from detections" width="49%">
+  <img src="docs/img/focus_mode_screenshot.png" alt="Focus mode, with surrounding audio context" width="49%">
+</p>
 
-### Prerequisites
+## Installation
 
-- **Node.js** (v18+)
-- **Python** (3.9+)
-- **Rust** (required for Tauri) - see [Developer Setup](#developer-setup)
+Download the installer for your computer from the **[Dipper download page](https://sammlapp.github.io/dipper/)** (or from the [GitHub releases](https://github.com/sammlapp/dipper/releases/latest)).
 
-### Running in Development
+| Computer | Download | Notes |
+|----------|----------|-------|
+| macOS (Apple Silicon) | `.dmg` | Open it and drag Dipper to Applications. Intel Macs are not supported |
+| Windows (64-bit) | `-setup.exe` | Run the installer |
+| Linux (64-bit) | `.AppImage` | Make it executable (`chmod +x Dipper-*.AppImage`), then run it |
 
-```bash
-# Install frontend dependencies
-cd frontend
-npm install
+There are two apps:
 
-# Run full dev mode (recommended)
-npm run tauri:dev:full
-```
+- **Dipper** is the full application: inference, clip extraction, and review. It is a 100-200 MB download, plus the machine learning environment described below.
+- **Dipper Review** is a small, review-only app for annotating clips that someone else prepared. It needs no machine learning environment.
 
-This starts the Python backend, React dev server with hot reload, and launches the Tauri desktop app.
+### First launch: install the machine learning environment (Dipper only)
 
-### Building for Production
+Running models needs PyTorch and related software, which is too large to include in the installer. Dipper installs it for you the first time you need it:
 
-```bash
-cd frontend
-npm run tauri:build:all
-```
+1. Open the **Settings** tab and find **ML Environment**.
+2. Check the **PyTorch build** (Auto-detect is usually right) and click **Download and Install**.
+3. Wait for the install to finish. This can take several minutes. Nothing else needs to be installed on your computer.
 
-Output: Platform-specific installers in `frontend/src-tauri/target/release/bundle/`
+Things to know:
 
-## Developer Setup
+- **Internet access is required for this step**, to download the software. The install needs to reach pypi.org, files.pythonhosted.org, download.pytorch.org, and github.com. If your network uses a proxy or blocks these sites, see the advanced network settings in Settings, or ask your IT administrator.
+- **Disk space:** about 2.5-4 GB for the CPU build, and roughly 6.5-9.5 GB for the GPU build on Windows and Linux. Dipper shows the expected size and your free space before installing.
+- **GPU support:** On Windows and Linux with an NVIDIA graphics card and a recent driver (version 570 or newer), Auto-detect installs the GPU build, which runs models much faster. On Apple Silicon Macs, the GPU is used automatically. Settings shows whether Dipper found a GPU and can use it, and explains why if it can't (hover over the warning icon for details). You can choose CPU only or GPU manually.
+- **After updating Dipper**, Settings may show "Update required" if the new version needs different packages. Click **Update**; it only downloads what changed.
 
-Briefly:
-1. Create a python env for the backend. For instance, with pixi:
-```
-pixi init
-pixi import --format=pypi-txt requirements-backend.txt --environment=default
-pixi add python=3.12
-```
+### Updating Dipper
 
-2. Install npm then run `npm-install`
+Download the newer installer from the download page and install it over the old one.
 
-3. Install rust
+## Getting started
 
-4. create placeholder sidecar
+A typical workflow:
 
-```
-cd frontend
-mkdir -p src-tauri/bin
-touch src-tauri/bin/dipper-backend-aarch64-apple-darwin
-chmod +x src-tauri/bin/dipper-backend-aarch64-apple-darwin
-```
+1. **Inference:** pick a folder of audio files and a model, and run it. Detection scores are saved in a results folder.
+2. **Task Queue:** watch progress and open results when jobs finish.
+3. **Extraction:** turn the detections into an annotation task, choosing which clips to review.
+4. **Review:** listen to and label the clips, then save your annotations.
 
-5. Launch backend and frontend from separate terminals:
+The **Help** tab inside the app explains each tab and its settings.
 
-**Backend:**
+## Models
 
-```sh
-cd backend
-pixi shell
-python app.py
-```
-(wait until you see that the backend has launched and is ready)
+Dipper integrates with the [bioacoustics model zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/) and includes:
 
-**Frontend:**
-
-```sh
-cd frontend
-npm install
-npm run tauri:dev
-```
-
-
-See [CLAUDE.md](CLAUDE.md) for comprehensive developer setup instructions including:
-- Platform-specific prerequisites (Windows, macOS, Linux)
-- Rust/Cargo installation
-- Backend Python environment setup
-- Development modes and commands
-- Troubleshooting common issues
+- **Perch and Perch V2:** global bird species (and more) classification
+- **BirdNET:** global bird species classification
+- **HawkEars:** Canadian bird classification CNN
+- **RIBBIT and CWT detectors:** signal-processing detectors for pulsed and accelerating-pulse calls
 
 ## Server Mode
 
-Run Dipper on a remote server and access via web browser. Useful for:
-- Running ML tasks on a remote GPU server
-- Accessing large datasets stored on remote machines
+Run Dipper on a remote server and use it from your web browser. This is useful for:
+- Running models on a remote GPU server
+- Working with large audio collections stored on another machine
 - Single-user remote access
 
 ```bash
-# Quick start
+# On the server
 ./scripts/launch-server.sh [config_file]
 
-# Access via SSH tunnel
+# On your computer: tunnel the ports, then open the app in your browser
 ssh -L 3000:localhost:3000 -L 8000:localhost:8000 user@remote-server
 open http://localhost:3000
 ```
 
-See [QUICKSTART_SERVER.md](QUICKSTART_SERVER.md) for detailed server mode instructions.
+See [QUICKSTART_SERVER.md](QUICKSTART_SERVER.md) for installation and details.
 
-## Documentation
+## Help and resources
 
-| Document | Description |
-|----------|-------------|
-| [CLAUDE.md](CLAUDE.md) | Primary developer reference - architecture, commands, patterns |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Detailed system architecture and API documentation |
-| [RELEASE.md](RELEASE.md) | Release process and versioning guide |
-| [QUICKSTART_SERVER.md](QUICKSTART_SERVER.md) | Server mode quick start guide |
+- **In the app:** the **Help** tab documents each feature.
+- **Downloads and release notes:** [download page](https://sammlapp.github.io/dipper/) and [GitHub releases](https://github.com/sammlapp/dipper/releases).
+- **Questions and bug reports:** [open an issue](https://github.com/sammlapp/dipper/issues). Please say which operating system and Dipper version you use, and attach the log file if something failed:
 
-## Models
+  | | Log file location |
+  |---|---|
+  | macOS | `~/Library/Logs/Dipper/dipper-backend.log` |
+  | Windows | `%LOCALAPPDATA%\Dipper\Dipper\Logs\dipper-backend.log` |
+  | Linux | `~/.local/state/Dipper/log/dipper-backend.log` |
 
-The application integrates with the [bioacoustics model zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/) and includes:
-
-- **Perch, Perch V2**: Global bird species (and more) classification
-- **BirdNET**: Global bird species classification
-- **HawkEars**: Canadian bird classification CNN
-
-## Dependencies
-
-**Frontend:**
-- React 18, Material-UI 5, Tauri 2.x
-
-**Backend:**
-- Python 3.12, aiohttp, PyTorch, OpenSoundscape, SoundFile, pandas
-
-**Build:**
-- Tauri CLI, PyInstaller, conda-pack
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+- **Related projects:** [OpenSoundscape](https://github.com/kitzeslab/opensoundscape) (the bioacoustics library behind Dipper's models) and the [bioacoustics model zoo](https://github.com/kitzeslab/bioacoustics-model-zoo/).
+- **Running Dipper from source or contributing:** see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## License
 

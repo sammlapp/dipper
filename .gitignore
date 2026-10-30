@@ -81,9 +81,10 @@ backend/_secrets.py
 build/
 dist/
 out/
-backend/pyinstaller-venv/
 frontend/python-dist/
 backend/test-venv/bin/python
+# legacy build venvs from before the uv migration (safe to delete locally)
+backend/pyinstaller-venv/
 backend/pyinstaller-venv-light/
 environments/
 runtime_envs/
@@ -94,3 +95,4 @@ frontend/src-tauri/bin
 server_config.yml
 frontend/public/server-launch-config.json
 frontend/build/server-launch-config.json
+backend/ml_env/.venv/

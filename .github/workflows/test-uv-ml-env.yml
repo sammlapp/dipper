@@ -1,0 +1,109 @@
+name: Test uv ML Environment
+
+on:
+  push:
+    branches: [uv-ml-env-test]
+    paths:
+      - 'backend/ml_env/**'
+      - '.github/workflows/test-uv-ml-env.yml'
+  workflow_dispatch:
+
+jobs:
+  test-uv-env:
+    name: uv sync - ${{ matrix.os }} - ${{ matrix.variant }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS ignores the extras (always PyPI torch with MPS), so only cpu runs there.
+        include:
+          - {os: macos-latest, variant: cpu}
+          - {os: windows-latest, variant: cpu}
+          - {os: windows-latest, variant: cuda}
+          - {os: ubuntu-22.04, variant: cpu}
+          - {os: ubuntu-22.04, variant: cuda}
+    defaults:
+      run:
+        shell: bash
+        working-directory: backend/ml_env
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # No setup-python: uv downloads its own managed Python, as the app would.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Check lockfile is up to date
+        run: uv lock --check
+
+      - name: Install environment from lockfile
+        run: |
+          start=$(date +%s)
+          uv sync --frozen --python 3.13 --managed-python --extra ${{ matrix.variant }}
+          echo "uv sync took $(( $(date +%s) - start ))s"
+
+      - name: Environment size
+        run: du -sh .venv
+
+      # CI runners have no GPU: this checks which torch build was installed, not
+      # that CUDA works.
+      - name: Verify torch build matches variant
+        run: |
+          if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=.venv/Scripts/python.exe; fi
+          VARIANT="${{ matrix.variant }}" "$PY" - <<'PYEOF'
+          import os, sys, tomllib, torch
+          variant = os.environ["VARIANT"]
+          # the expected CUDA build comes from [tool.dipper.cuda] in pyproject.toml
+          with open("pyproject.toml", "rb") as f:
+              cuda_version = tomllib.load(f)["tool"]["dipper"]["cuda"]["version"]
+          print("torch", torch.__version__, "| torch.version.cuda =", torch.version.cuda, "| expected CUDA", cuda_version)
+          if sys.platform == "darwin":
+              ok = "+" not in torch.__version__ and torch.version.cuda is None
+          elif variant == "cpu":
+              ok = torch.__version__.endswith("+cpu") and torch.version.cuda is None
+          else:
+              ok = torch.__version__.endswith("+cu" + cuda_version.replace(".", "")) and torch.version.cuda == cuda_version
+          raise SystemExit(0 if ok else f"unexpected torch build for variant {variant}")
+          PYEOF
+
+      # Each module is imported in its own process so a hard abort in one (e.g. an
+      # LLVM symbol clash between bundled native libraries) doesn't hide the rest.
+      - name: Import check (each module separately)
+        run: |
+          if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=.venv/Scripts/python.exe; fi
+          "$PY" --version
+          failed=0
+          for m in torch tensorflow opensoundscape bioacoustics_model_zoo timm cv2 \
+                   ai_edge_litert transformers kagglehub h5py yaml psutil aiohttp \
+                   aiohttp_cors pkg_resources; do
+            if env -u PYTHONHOME -u PYTHONPATH "$PY" -u -c "import $m; print('OK: $m', getattr($m, '__version__', ''))" 2>&1 | grep -v "^20"; then
+              [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "FAIL: $m"; failed=1; }
+            fi
+          done
+          exit $failed
+
+      # Native libraries can clash when loaded into one process (TensorFlow and
+      # numba/llvmlite each bundle LLVM). First: the order the app uses
+      # (scripts/load_model.py imports bmz, opensoundscape, torch; TensorFlow is
+      # loaded later when a Perch model loads).
+      - name: Import check (combined, app order)
+        run: |
+          if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=.venv/Scripts/python.exe; fi
+          env -u PYTHONHOME -u PYTHONPATH "$PY" -X faulthandler -u - <<'PYEOF'
+          import importlib
+          for m in ["bioacoustics_model_zoo", "opensoundscape", "torch", "timm", "cv2",
+                    "ai_edge_litert", "transformers", "kagglehub", "tensorflow"]:
+              print("importing", m, flush=True)
+              importlib.import_module(m)
+          print("all imported together")
+          PYEOF
+
+      # Reverse order (TensorFlow before opensoundscape): known to abort on Linux
+      # with an LLVM option clash. Informational; documents the hazard.
+      - name: Import check (combined, TensorFlow first)
+        continue-on-error: true
+        run: |
+          if [ -x .venv/bin/python ]; then PY=.venv/bin/python; else PY=.venv/Scripts/python.exe; fi
+          env -u PYTHONHOME -u PYTHONPATH "$PY" -X faulthandler -u -c "import tensorflow; import opensoundscape; print('ok')"

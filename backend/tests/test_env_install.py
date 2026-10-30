@@ -1,15 +1,16 @@
-"""Test that the ML environment downloads, extracts, and unpacks via app.py.
+"""Test that the ML environment installs via app.py's install_environment.
 
-Calls the same functions the backend uses (download_environment,
-extract_environment, check_environment), so launch-time problems in how
-conda-unpack is invoked are caught here rather than only on user machines.
+Calls the same functions the backend uses (detect_torch_variant,
+install_environment, check_environment), so launch-time problems in how uv or the
+environment's Python are invoked are caught here rather than only on user machines.
 
-Interpreter variables (PYTHONHOME/PYTHONPATH) pointing at a nonexistent
-directory are set for the whole test. Packaged apps such as the Linux AppImage
-set these, and they must not leak into the env's own Python.
+Interpreter variables (PYTHONHOME/PYTHONPATH) pointing at a nonexistent directory
+are set for the whole test. Packaged apps such as the Linux AppImage set these, and
+they must not leak into uv or the environment's own Python.
 
-Run from the backend/ directory:  python -m unittest tests.test_env_install -v
-Downloads the full archive for the current platform (several GB).
+Run from the backend/ directory:
+    TORCH_VARIANT=cpu python -m unittest tests.test_env_install -v
+Installs the full environment (several GB) into a temporary directory.
 """
 
 import os
@@ -24,21 +25,31 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import app  # noqa: E402
 
-IMPORT_CHECK = "import torch, opensoundscape, pandas, numpy"
+# Modules imported in the order the app uses (scripts/load_model.py); TensorFlow
+# last because it clashes with numba's LLVM on Linux if imported before opensoundscape.
+IMPORT_CHECK = (
+    "import bioacoustics_model_zoo, opensoundscape, torch, tensorflow, pandas, numpy; "
+    "print(torch.__version__, torch.version.cuda)"
+)
 
 
 class TestEnvInstall(unittest.TestCase):
-    def test_download_extract_unpack(self):
+    def test_detect_torch_variant(self):
+        variant, reason = app.detect_torch_variant()
+        self.assertIn(variant, app.TORCH_VARIANTS)
+        self.assertTrue(reason)
+
+    def test_install_and_check(self):
+        variant = os.environ["TORCH_VARIANT"]
+        self.assertIn(variant, app.TORCH_VARIANTS)
+
         with tempfile.TemporaryDirectory() as tmp:
             bogus = os.path.join(tmp, "nonexistent-python-home")
             poisoned = {"PYTHONHOME": bogus, "PYTHONPATH": bogus}
+            env_dir = os.path.join(tmp, "env")
             with mock.patch.dict(os.environ, poisoned):
-                download = app.download_environment()
-                self.assertEqual(download["status"], "success", download)
-
-                env_dir = os.path.join(tmp, "env")
-                extract = app.extract_environment(download["archive_path"], env_dir)
-                self.assertEqual(extract["status"], "success", extract)
+                install = app.install_environment(env_dir, variant)
+                self.assertEqual(install["status"], "success", install)
 
                 check = app.check_environment(env_dir)
                 self.assertEqual(check["status"], "ready", check)
@@ -50,6 +61,7 @@ class TestEnvInstall(unittest.TestCase):
                     env=app.env_python_subprocess_env(),
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
+                print(f"torch / CUDA: {result.stdout.strip()}")
 
 
 if __name__ == "__main__":

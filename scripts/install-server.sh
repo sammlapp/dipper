@@ -2,7 +2,8 @@
 #
 # Dipper Server Mode Installer
 #
-# Installs all dependencies needed to run Dipper in server mode
+# Installs all dependencies needed to run Dipper in server mode.
+# Requires uv (https://docs.astral.sh/uv/) and Node.js.
 #
 
 set -e
@@ -33,17 +34,15 @@ echo ""
 # Check for required commands
 echo -e "${BLUE}Checking prerequisites...${NC}"
 
-# Check Python
-if ! command -v python3 &> /dev/null && ! command -v python &> /dev/null; then
-    echo -e "${RED}✗ Python not found${NC}"
-    echo "  Please install Python 3.8 or later"
-    echo "  Visit: https://www.python.org/downloads/"
+# Check uv. It manages the backend's Python environment (and downloads the pinned
+# Python version, so no particular Python needs to be installed on this machine).
+if ! command -v uv &> /dev/null; then
+    echo -e "${RED}✗ uv not found${NC}"
+    echo "  Install uv: https://docs.astral.sh/uv/getting-started/installation/"
+    echo "  then make sure it is on PATH (open a new shell) and re-run this script."
     exit 1
 fi
-
-PYTHON_CMD=$(command -v python3 || command -v python)
-PYTHON_VERSION=$($PYTHON_CMD --version 2>&1 | awk '{print $2}')
-echo -e "${GREEN}✓ Python: $PYTHON_VERSION${NC}"
+echo -e "${GREEN}✓ uv: $(uv --version)${NC}"
 
 # Check Node.js
 if ! command -v node &> /dev/null; then
@@ -67,24 +66,16 @@ NPM_VERSION=$(npm --version)
 echo -e "${GREEN}✓ npm: $NPM_VERSION${NC}"
 echo ""
 
-# Install Python dependencies
-echo -e "${BLUE}[1/3] Installing Python dependencies...${NC}"
+# Install Python dependencies (locked versions from backend/uv.lock)
+echo -e "${BLUE}[1/4] Installing Python dependencies...${NC}"
 cd "$PROJECT_ROOT/backend"
 
-if [ ! -f "requirements-backend.txt" ]; then
-    echo -e "${RED}✗ requirements-backend.txt not found${NC}"
+if [ ! -f "uv.lock" ]; then
+    echo -e "${RED}✗ backend/uv.lock not found${NC}"
     exit 1
 fi
 
-echo "  Creating Python virtual environment..."
-$PYTHON_CMD -m venv venv
-
-echo "  Activating virtual environment..."
-source venv/bin/activate
-
-echo "  Installing packages from requirements-backend.txt..."
-pip install --upgrade pip
-pip install -r requirements-backend.txt
+uv sync --frozen --group build --managed-python
 
 echo -e "${GREEN}  ✓ Python dependencies installed${NC}"
 echo ""
@@ -93,14 +84,8 @@ echo ""
 echo -e "${BLUE}[2/4] Building Python backend executable...${NC}"
 cd "$PROJECT_ROOT/backend"
 
-# Check for PyInstaller
-if ! $PYTHON_CMD -m PyInstaller --version &> /dev/null; then
-    echo "  Installing PyInstaller..."
-    pip install pyinstaller
-fi
-
 echo "  Running PyInstaller (this may take a few minutes)..."
-$PYTHON_CMD build_pyinstaller.py
+uv run --isolated --no-project python build_pyinstaller.py
 
 if [ ! -f "$PROJECT_ROOT/frontend/python-dist/dipper-backend" ]; then
     echo -e "${RED}✗ PyInstaller build failed — dipper-backend not found${NC}"
@@ -121,10 +106,6 @@ fi
 
 echo "  Installing npm packages..."
 npm install
-
-# Install serve globally for static file serving
-echo "  Installing serve (static file server)..."
-npm install -g serve
 
 echo -e "${GREEN}  ✓ Node.js dependencies installed${NC}"
 echo ""

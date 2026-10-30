@@ -40,11 +40,20 @@ secrets_path = os.path.join(spec_root, '_secrets.py')
 if os.path.exists(secrets_path):
     secrets_datas = [(secrets_path, '.')]
 
+# The ML environment is installed on first use by the bundled uv executable, from
+# the lockfile in ml_env/ (see get_uv_executable / get_ml_project_dir in app.py).
+from uv import find_uv_bin
+uv_binaries = [(find_uv_bin(), 'uv')]
+ml_env_datas = [
+    (os.path.join(spec_root, 'ml_env', 'pyproject.toml'), 'ml_env'),
+    (os.path.join(spec_root, 'ml_env', 'uv.lock'), 'ml_env'),
+]
+
 a = Analysis(
     ['app.py'],
     pathex=[],
-    binaries=[],
-    datas=script_datas + birdnames_datas + certifi_datas + secrets_datas + class_names_datas,
+    binaries=uv_binaries,
+    datas=script_datas + birdnames_datas + certifi_datas + secrets_datas + class_names_datas + ml_env_datas,
     hiddenimports=[
         'aiohttp',
         'aiohttp_cors',
@@ -92,7 +101,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=[],
+    upx_exclude=['uv', 'uv.exe'],
     runtime_tmpdir=None,
     console=True,
     disable_windowed_traceback=False,

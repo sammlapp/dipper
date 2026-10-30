@@ -5,27 +5,34 @@ on:
 
 jobs:
   test-env-install:
-    name: Test env install - ${{ matrix.os }}
+    name: Test env install - ${{ matrix.os }} - ${{ matrix.variant }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-22.04]
+        # CI runners have no GPU: cuda checks that the CUDA build installs and imports.
+        include:
+          - {os: macos-latest, variant: cpu}
+          - {os: windows-latest, variant: cpu}
+          - {os: windows-latest, variant: cuda}
+          - {os: ubuntu-22.04, variant: cpu}
+          - {os: ubuntu-22.04, variant: cuda}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
 
       - name: Install backend dependencies
-        run: pip install -r backend/requirements-backend.txt
+        working-directory: backend
+        run: uv sync --frozen
 
-      # Runs app.py's download_environment / extract_environment / check_environment
-      # with PYTHONHOME/PYTHONPATH set to a nonexistent directory.
+      # Runs app.py's install_environment / check_environment with
+      # PYTHONHOME/PYTHONPATH set to a nonexistent directory.
       - name: Test environment install
         working-directory: backend
-        run: python -m unittest tests.test_env_install -v
+        env:
+          TORCH_VARIANT: ${{ matrix.variant }}
+        run: uv run --frozen python -m unittest tests.test_env_install -v

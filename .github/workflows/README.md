@@ -69,46 +69,11 @@ This directory contains automated build workflows for Dipper across multiple pla
 
 **Artifacts:**
 - Full app installers for each platform (~100-200MB)
-- ML environment is NOT included (built separately via `build-conda-env.yml`)
+- The ML environment is not included: the app installs it on first use from `backend/ml_env/uv.lock` (bundled with the backend, along with the `uv` executable)
 
 **Use this for:** Full production releases with ML capabilities
 
-**Note:** The ML environment (~700MB) is built separately and distributed via the conda environment workflow. The app will automatically download it on first use.
-
----
-
-### 4. Build Conda-Pack Environment (`build-conda-env.yml`)
-**Trigger:**
-- Manual workflow dispatch only
-- Select which platforms to build (macOS x64, macOS ARM, Windows, Linux, or all)
-
-**Purpose:** Build ML environment separately from app releases
-
-**What it builds:**
-- Conda-pack ML environment for selected platforms
-- PyTorch + OpenSoundscape + dependencies
-- ~700MB compressed archive per platform
-
-**Artifacts:**
-- Platform-specific `dipper_ml_env.tar.gz` files
-- Extraction scripts (`extract_and_test_env.sh`)
-- Test scripts (`test_environment.py`)
-- Creates a timestamped GitHub release (e.g., `conda-env-20250102-143022`)
-- Artifacts retained for 90 days
-
-**Use this for:** Building ML environments when dependencies change
-
-**When to run:**
-- After updating `backend/dipper_ml_env.yml`
-- Before major releases
-- When PyTorch or ML dependencies are updated
-
-**How to run:**
-1. Go to **Actions** tab → **Build Conda-Pack Environment**
-2. Click **Run workflow**
-3. Enter platforms to build (e.g., "all" or "macos-x64,linux")
-4. Wait 30-90 minutes for build to complete
-5. Environment will be available as a GitHub release
+**Note:** The app installs the ML environment on first use with `uv sync` from the bundled lockfile. Before a release, the `test-built-backend` job installs the environment through each freshly built backend executable (CPU on all platforms, CUDA on Windows/Linux) and fails the release if that does not work.
 
 ---
 
@@ -121,7 +86,7 @@ This directory contains automated build workflows for Dipper across multiple pla
 | Windows  | x64 | `windows-latest` | Supported |
 | Linux    | x64 | `ubuntu-latest` | Supported |
 
-**Note:** Builds are independent per platform. If PyInstaller or conda-pack build fails on one platform, the other platforms will continue building. Each Tauri build only requires its own platform's artifacts to succeed.
+**Note:** Builds are independent per platform. If the PyInstaller build fails on one platform, the other platforms will continue building. Each Tauri build only requires its own platform's artifacts to succeed.
 
 ---
 
@@ -148,14 +113,9 @@ This directory contains automated build workflows for Dipper across multiple pla
 
 ### Full App Release
 
-**IMPORTANT:** Full app releases require a separate conda environment build first!
-
-1. **Build conda environments** (if ML dependencies changed):
+1. **Update the ML environment lockfile** (only if ML dependencies changed):
    ```bash
-   # Go to Actions → Build Conda-Pack Environment → Run workflow
-   # Select "all" platforms
-   # Wait ~30-90 minutes
-   # This creates a timestamped conda-env release
+   cd backend/ml_env && uv lock   # then commit pyproject.toml and uv.lock
    ```
 
 2. **Tag the app release:**
@@ -173,13 +133,12 @@ This directory contains automated build workflows for Dipper across multiple pla
    - Builds PyInstaller backend for all platforms
    - Builds full Tauri apps
    - Creates draft GitHub release with installers
-   - Does NOT build conda environment (use pre-built one)
+   - Installs the ML environment through each built backend as a pre-release check
 
 4. **Edit and publish:**
    - Go to GitHub Releases
    - Edit the draft release
    - Add release notes
-   - Note which conda-env release to use
    - Publish the release
 
 ### Tag Naming Convention
@@ -228,13 +187,6 @@ artifacts/
 ├── dipper-backend-macos-arm64/
 ├── dipper-backend-windows-x64/
 ├── dipper-backend-linux-x64/
-├── conda-env-macos-x64/
-│   ├── dipper_ml_env.tar.gz
-│   ├── extract_and_test_env.sh
-│   └── test_environment.py
-├── conda-env-macos-arm64/
-├── conda-env-windows-x64/
-├── conda-env-linux-x64/
 ├── dipper-full-macos-arm64/
 ├── dipper-full-windows-x64/
 └── dipper-full-linux-x64/
@@ -249,10 +201,9 @@ Approximate build times on GitHub-hosted runners:
 | Step | Time |
 |------|------|
 | PyInstaller build | 5-10 minutes |
-| Conda-pack build | 30-60 minutes |
 | Tauri build | 10-20 minutes |
 | **Total (Review)** | **~20-30 minutes** |
-| **Total (Full)** | **~50-90 minutes** |
+| **Total (Full)** | **~40-70 minutes** |
 
 ---
 
@@ -263,10 +214,10 @@ Approximate build times on GitHub-hosted runners:
 **Problem:** Code signing issues
 **Solution:** The workflow uses ad-hoc signing (`-`). For distribution, you'll need to add proper signing certificates to GitHub Secrets.
 
-### Conda-pack Build Fails
+### ML Environment Install Fails in `test-built-backend`
 
-**Problem:** Environment creation timeout
-**Solution:** Check `backend/dipper_ml_env.yml` for package conflicts. Consider using mamba instead of conda for faster resolution.
+**Problem:** `uv sync --frozen` fails or the installed environment is not usable
+**Solution:** Run `cd backend/ml_env && uv lock --check` to verify the lockfile matches `pyproject.toml`, and see the `test-uv-ml-env.yml` workflow for per-platform import checks.
 
 ### Tauri Build Can't Find PyInstaller Executable
 
@@ -321,13 +272,7 @@ Currently, workflows use ad-hoc signing for development builds.
 
 ### Change Python Version
 
-Edit all workflow files:
-```yaml
-- name: Setup Python
-  uses: actions/setup-python@v5
-  with:
-    python-version: '3.11'  # Change this
-```
+The workflows use [uv](https://docs.astral.sh/uv/) (`astral-sh/setup-uv`), which installs the Python version the project asks for, so there is no `python-version` to edit in the workflows. Change `requires-python` in `backend/pyproject.toml` and `backend/ml_env/pyproject.toml` (and `ML_PYTHON_VERSION` in `backend/app.py`), then re-run `uv lock` in both directories. See DEVELOPMENT.md.
 
 ### Change Node Version
 
