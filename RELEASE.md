@@ -141,4 +141,4 @@ chmod +x Dipper_*.AppImage && ./Dipper_*.AppImage
 ```
 
 **Linux: AppImage window stays blank** (log shows `Could not create default EGL display: EGL_BAD_PARAMETER`)
-- Seen on Ubuntu 26.04: the AppImage's bundled `libwayland-*` (from Ubuntu 22.04, where it is built) is too old for the system's Mesa. Use the `.deb` or `.rpm`.
+- Happened on Ubuntu 26.04 with AppImages up to v0.3.0rc1: the bundled `libwayland-*` (from Ubuntu 22.04, where it is built) is too old for the system's Mesa. The build now removes them with `scripts/strip-appimage-libs.sh` so the host's copy is used. If a new distribution shows the same symptom with a different library, add it to `STRIP_GLOBS` there and check the AppImage still runs on 22.04 (the `debug/appimage-ubuntu-2604` branch has a workflow that launches an AppImage on several Ubuntu versions).

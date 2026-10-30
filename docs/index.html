@@ -734,9 +734,9 @@
             <code>sudo dnf install ./Dipper-*.rpm</code> (openSUSE: <code>sudo zypper install ./Dipper-*.rpm</code>)</p>
           <p><strong>Other distributions, or no admin rights:</strong> download the AppImage, run
             <code>chmod +x Dipper_*.AppImage</code>, then run it.</p>
-          <p>The .deb and .rpm use your system's own libraries and are the most reliable choice. The AppImage bundles
-            its own, and on very new distributions (such as Ubuntu 26.04) its window can stay blank; use the .deb or
-            .rpm there.</p>
+          <p>The .deb and .rpm use your system's own libraries, add Dipper to your app menu, and are the most
+            reliable choice. If the AppImage reports that FUSE is missing (Ubuntu 24.04 and later), install it with
+            <code>sudo apt install libfuse2t64</code>.</p>
         </div>
 
       </div>

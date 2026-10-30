@@ -38,9 +38,9 @@ Download the installer for your computer from the **[Dipper download page](https
 | Windows (64-bit) | `-setup.exe` | Run the installer |
 | Linux: Ubuntu, Debian, Mint, Pop!_OS | `.deb` | `sudo apt install ./Dipper_*.deb` |
 | Linux: Fedora, RHEL, openSUSE | `.rpm` | `sudo dnf install ./Dipper-*.rpm` (openSUSE: `sudo zypper install ./Dipper-*.rpm`) |
-| Linux: other distributions, or no admin rights | `.AppImage` | Make it executable (`chmod +x Dipper_*.AppImage`), then run it. If the window stays blank (seen on Ubuntu 26.04), use the `.deb` or `.rpm` |
+| Linux: other distributions, or no admin rights | `.AppImage` | Make it executable (`chmod +x Dipper_*.AppImage`), then run it. If it reports that FUSE is missing (Ubuntu 24.04 and later), install it with `sudo apt install libfuse2t64` |
 
-On Linux, prefer the `.deb` or `.rpm`: they use the system's WebKitGTK and graphics libraries. The AppImage bundles its own copies from an older Ubuntu, which can clash with very new distributions.
+On Linux, prefer the `.deb` or `.rpm`: they use the system's WebKitGTK and graphics libraries, get an app-menu entry, and don't need FUSE. The AppImage bundles its own WebKitGTK/GTK/GLib from an older Ubuntu.
 
 Dipper is a 100-200 MB download, plus the machine learning environment described below.
 

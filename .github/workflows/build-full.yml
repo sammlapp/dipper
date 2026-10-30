@@ -320,7 +320,7 @@ jobs:
             **Linux:** choose one package
             - Ubuntu, Debian, Linux Mint, Pop!_OS: download `*.deb`, then `sudo apt install ./Dipper_*.deb`
             - Fedora, RHEL, openSUSE: download `*.rpm`, then `sudo dnf install ./Dipper-*.rpm` (openSUSE: `sudo zypper install ./Dipper-*.rpm`)
-            - Other distributions, or no admin rights: download `*.AppImage`, run `chmod +x Dipper_*.AppImage`, then run it. If the window stays blank (seen on Ubuntu 26.04), use the `.deb` or `.rpm` instead
+            - Other distributions, or no admin rights: download `*.AppImage`, run `chmod +x Dipper_*.AppImage`, then run it. If it reports that FUSE is missing (Ubuntu 24.04 and later), install it with `sudo apt install libfuse2t64`
             - The ML environment will be automatically downloaded on first use
 
             ### ML Environment
