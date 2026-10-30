@@ -34,7 +34,7 @@ async fn select_files(app: tauri::AppHandle) -> Result<Vec<String>, String> {
     match rx.recv() {
         Ok(Some(paths)) => Ok(paths.iter().map(|p| p.to_string()).collect()),
         Ok(None) => Err("No files selected".to_string()),
-        Err(_) => Err("Failed to receive selection".to_string())
+        Err(_) => Err("Failed to receive selection".to_string()),
     }
 }
 
@@ -43,16 +43,14 @@ async fn select_files(app: tauri::AppHandle) -> Result<Vec<String>, String> {
 async fn select_folder(app: tauri::AppHandle) -> Result<String, String> {
     let (tx, rx) = std::sync::mpsc::channel();
 
-    app.dialog()
-        .file()
-        .pick_folder(move |folder| {
-            tx.send(folder).ok();
-        });
+    app.dialog().file().pick_folder(move |folder| {
+        tx.send(folder).ok();
+    });
 
     match rx.recv() {
         Ok(Some(path)) => Ok(path.to_string()),
         Ok(None) => Err("No folder selected".to_string()),
-        Err(_) => Err("Failed to receive selection".to_string())
+        Err(_) => Err("Failed to receive selection".to_string()),
     }
 }
 
@@ -74,7 +72,7 @@ async fn select_csv_files(app: tauri::AppHandle) -> Result<Vec<String>, String> 
     match rx.recv() {
         Ok(Some(paths)) => Ok(paths.iter().map(|p| p.to_string()).collect()),
         Ok(None) => Err("No files selected".to_string()),
-        Err(_) => Err("Failed to receive selection".to_string())
+        Err(_) => Err("Failed to receive selection".to_string()),
     }
 }
 
@@ -94,7 +92,7 @@ async fn select_text_files(app: tauri::AppHandle) -> Result<Vec<String>, String>
     match rx.recv() {
         Ok(Some(paths)) => Ok(paths.iter().map(|p| p.to_string()).collect()),
         Ok(None) => Err("No files selected".to_string()),
-        Err(_) => Err("Failed to receive selection".to_string())
+        Err(_) => Err("Failed to receive selection".to_string()),
     }
 }
 
@@ -114,7 +112,7 @@ async fn select_json_files(app: tauri::AppHandle) -> Result<Vec<String>, String>
     match rx.recv() {
         Ok(Some(paths)) => Ok(paths.iter().map(|p| p.to_string()).collect()),
         Ok(None) => Err("No files selected".to_string()),
-        Err(_) => Err("Failed to receive selection".to_string())
+        Err(_) => Err("Failed to receive selection".to_string()),
     }
 }
 
@@ -134,7 +132,7 @@ async fn select_model_files(app: tauri::AppHandle) -> Result<Vec<String>, String
     match rx.recv() {
         Ok(Some(paths)) => Ok(paths.iter().map(|p| p.to_string()).collect()),
         Ok(None) => Err("No files selected".to_string()),
-        Err(_) => Err("Failed to receive selection".to_string())
+        Err(_) => Err("Failed to receive selection".to_string()),
     }
 }
 
@@ -146,9 +144,7 @@ async fn save_file(app: tauri::AppHandle, default_name: String) -> Result<String
     // Determine file type from extension
     let is_json = default_name.to_lowercase().contains(".json");
 
-    let mut dialog = app.dialog()
-        .file()
-        .set_file_name(&default_name);
+    let mut dialog = app.dialog().file().set_file_name(&default_name);
 
     let is_txt = default_name.to_lowercase().contains(".txt");
     if is_json {
@@ -167,15 +163,14 @@ async fn save_file(app: tauri::AppHandle, default_name: String) -> Result<String
     match rx.recv() {
         Ok(Some(p)) => Ok(p.to_string()),
         Ok(None) => Err("Save cancelled".to_string()),
-        Err(_) => Err("Failed to receive selection".to_string())
+        Err(_) => Err("Failed to receive selection".to_string()),
     }
 }
 
 /// Write content to a file
 #[tauri::command]
 async fn write_file(file_path: String, content: String) -> Result<(), String> {
-    fs::write(&file_path, content)
-        .map_err(|e| format!("Failed to write file: {}", e))
+    fs::write(&file_path, content).map_err(|e| format!("Failed to write file: {}", e))
 }
 
 /// Open a file with the system default application
@@ -215,13 +210,15 @@ async fn copy_file(src: String, dest: String) -> Result<(), String> {
 /// Read text content from a file
 #[tauri::command]
 async fn read_text_file(file_path: String) -> Result<String, String> {
-    fs::read_to_string(&file_path)
-        .map_err(|e| format!("Failed to read file: {}", e))
+    fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))
 }
 
 /// Generate a unique folder name by appending numeric suffix if needed
 #[tauri::command]
-async fn generate_unique_folder_name(base_path: String, folder_name: String) -> Result<String, String> {
+async fn generate_unique_folder_name(
+    base_path: String,
+    folder_name: String,
+) -> Result<String, String> {
     let base = PathBuf::from(&base_path);
 
     // Check if base path exists
@@ -246,13 +243,11 @@ async fn generate_unique_folder_name(base_path: String, folder_name: String) -> 
 fn get_free_port() -> Option<u16> {
     // Bind to port 0 to let the OS assign a free port
     match TcpListener::bind(("127.0.0.1", 0)) {
-        Ok(listener) => {
-            match listener.local_addr() {
-                Ok(addr) => Some(addr.port()),
-                Err(_) => None
-            }
-        }
-        Err(_) => None
+        Ok(listener) => match listener.local_addr() {
+            Ok(addr) => Some(addr.port()),
+            Err(_) => None,
+        },
+        Err(_) => None,
     }
 }
 
@@ -279,7 +274,10 @@ fn check_dipper_backend_running(port: u16) -> bool {
                                 let status = json.get("status").and_then(|v| v.as_str());
                                 let server_type = json.get("server_type").and_then(|v| v.as_str());
 
-                                println!("  Parsed: status={:?}, server_type={:?}", status, server_type);
+                                println!(
+                                    "  Parsed: status={:?}, server_type={:?}",
+                                    status, server_type
+                                );
 
                                 if status == Some("ok") && server_type == Some("lightweight") {
                                     println!("  ✓ Valid Dipper backend detected!");
@@ -318,23 +316,37 @@ fn wait_for_server(port: u16, max_retries: u32) -> bool {
         }
         if i < 3 || i % 5 == 0 {
             // Only print every 5th attempt after the first 3 to reduce spam
-            println!("⏳ Checking backend health on port {}... (attempt {}/{})", port, i + 1, max_retries);
+            println!(
+                "⏳ Checking backend health on port {}... (attempt {}/{})",
+                port,
+                i + 1,
+                max_retries
+            );
         }
         thread::sleep(Duration::from_secs(2));
     }
-    eprintln!("✗ Backend health check timed out after {} attempts", max_retries);
+    eprintln!(
+        "✗ Backend health check timed out after {} attempts",
+        max_retries
+    );
     false
 }
 
 /// Tauri command to get the backend port
 #[tauri::command]
 async fn get_backend_port(state: tauri::State<'_, BackendState>) -> Result<u16, String> {
-    state.port.lock().unwrap()
+    state
+        .port
+        .lock()
+        .unwrap()
         .ok_or_else(|| "Backend port not initialized".to_string())
 }
 
 /// Start the backend HTTP server using Tauri's sidecar mechanism (non-blocking)
-fn start_backend_server(app: &tauri::AppHandle, port: u16) -> Option<tauri_plugin_shell::process::CommandChild> {
+fn start_backend_server(
+    app: &tauri::AppHandle,
+    port: u16,
+) -> Option<tauri_plugin_shell::process::CommandChild> {
     println!("Starting Dipper backend sidecar on port {}...", port);
 
     // Use Tauri's sidecar API to spawn the bundled executable
@@ -352,10 +364,18 @@ fn start_backend_server(app: &tauri::AppHandle, port: u16) -> Option<tauri_plugi
 
     // Get current process PID to pass to backend for heartbeat monitoring
     let parent_pid = std::process::id();
-    println!("  Spawning with args: --port {} --parent-pid {}", port, parent_pid);
+    println!(
+        "  Spawning with args: --port {} --parent-pid {}",
+        port, parent_pid
+    );
 
     match sidecar
-        .args(["--port", &port.to_string(), "--parent-pid", &parent_pid.to_string()])
+        .args([
+            "--port",
+            &port.to_string(),
+            "--parent-pid",
+            &parent_pid.to_string(),
+        ])
         .spawn()
     {
         Ok((mut rx, child)) => {
@@ -366,24 +386,22 @@ fn start_backend_server(app: &tauri::AppHandle, port: u16) -> Option<tauri_plugi
                 use tauri_plugin_shell::process::CommandEvent;
                 loop {
                     match rx.blocking_recv() {
-                        Some(event) => {
-                            match event {
-                                CommandEvent::Stdout(line) => {
-                                    println!("  [Backend stdout] {}", String::from_utf8_lossy(&line));
-                                }
-                                CommandEvent::Stderr(line) => {
-                                    eprintln!("  [Backend stderr] {}", String::from_utf8_lossy(&line));
-                                }
-                                CommandEvent::Error(err) => {
-                                    eprintln!("  [Backend error] {}", err);
-                                }
-                                CommandEvent::Terminated(payload) => {
-                                    println!("  [Backend terminated] code: {:?}", payload.code);
-                                    break;
-                                }
-                                _ => {}
+                        Some(event) => match event {
+                            CommandEvent::Stdout(line) => {
+                                println!("  [Backend stdout] {}", String::from_utf8_lossy(&line));
                             }
-                        }
+                            CommandEvent::Stderr(line) => {
+                                eprintln!("  [Backend stderr] {}", String::from_utf8_lossy(&line));
+                            }
+                            CommandEvent::Error(err) => {
+                                eprintln!("  [Backend error] {}", err);
+                            }
+                            CommandEvent::Terminated(payload) => {
+                                println!("  [Backend terminated] code: {:?}", payload.code);
+                                break;
+                            }
+                            _ => {}
+                        },
                         None => {
                             println!("  [Backend output stream closed]");
                             break;
@@ -416,8 +434,12 @@ fn main() {
         })
         .setup(|app| {
             // Get window handles
-            let splash_window = app.get_webview_window("splash").expect("Splash window not found");
-            let main_window = app.get_webview_window("main").expect("Main window not found");
+            let splash_window = app
+                .get_webview_window("splash")
+                .expect("Splash window not found");
+            let main_window = app
+                .get_webview_window("main")
+                .expect("Main window not found");
 
             // Load splash HTML content
             let splash_html = r#"
@@ -502,7 +524,11 @@ fn main() {
 
 </html>
 "#;
-            splash_window.eval(&format!("document.documentElement.innerHTML = `{}`;", splash_html.replace("`", "\\`")))
+            splash_window
+                .eval(&format!(
+                    "document.documentElement.innerHTML = `{}`;",
+                    splash_html.replace("`", "\\`")
+                ))
                 .expect("Failed to load splash HTML");
 
             // Show splash screen immediately
@@ -515,7 +541,10 @@ fn main() {
             } else {
                 // Get a free port from the OS
                 let free_port = get_free_port().expect("Failed to get free port");
-                println!("→ No backend found on port 8000, starting on port {}", free_port);
+                println!(
+                    "→ No backend found on port 8000, starting on port {}",
+                    free_port
+                );
 
                 // Start our own backend
                 let child = start_backend_server(&app.handle(), free_port);
@@ -546,13 +575,23 @@ fn main() {
                 if wait_for_server(port, 30) {
                     println!("✓ Backend server is ready!");
                     // Show main window and close splash
-                    main_window_clone.show().expect("Failed to show main window");
-                    splash_window_clone.close().expect("Failed to close splash window");
+                    main_window_clone
+                        .show()
+                        .expect("Failed to show main window");
+                    splash_window_clone
+                        .close()
+                        .expect("Failed to close splash window");
                 } else {
-                    eprintln!("✗ Backend server health check timed out - showing main window anyway");
+                    eprintln!(
+                        "✗ Backend server health check timed out - showing main window anyway"
+                    );
                     eprintln!("  (Backend may still be starting up and will work shortly)");
-                    main_window_clone.show().expect("Failed to show main window");
-                    splash_window_clone.close().expect("Failed to close splash window");
+                    main_window_clone
+                        .show()
+                        .expect("Failed to show main window");
+                    splash_window_clone
+                        .close()
+                        .expect("Failed to close splash window");
                 }
             });
 
