@@ -284,7 +284,29 @@ uv run --isolated --no-project python build_pyinstaller.py     # installs the lo
 
 The PyInstaller build bundles the `uv` executable and `backend/ml_env/{pyproject.toml,uv.lock}` (see `backend/http_server.spec`). The ML environment itself is not part of the installer. Because it is not bundled, testing a built app requires installing the environment from Settings on first launch.
 
-Full builds can be run in CI without tagging a release: Actions → "Build Full App" → Run workflow, on any branch. Artifacts (`.dmg`, `.exe`, `.AppImage`, `.deb`, `.rpm`) are attached to the run. Releases are only created for version tags.
+Full builds can be run in CI without tagging a release: Actions → "Build Full App" → Run workflow, on any branch. Artifacts (`.dmg`, `.exe`, `.AppImage`, `.deb`, `.rpm`) are attached to the run. Releases are only created for version tags. Only the app installers are attached to releases; the `dipper-backend-*` artifacts are build inputs.
+
+### Linux packages
+
+The Linux build runs on Ubuntu 22.04 (the oldest supported release: glibc is only forward compatible, so building on a newer Ubuntu would break older ones) and produces three packages:
+
+- **`.deb` / `.rpm`** use the distribution's own WebKitGTK, GTK, GLib and graphics stack, declared as package dependencies. GStreamer `plugins-base`/`plugins-good` are added in `bundle.linux.deb/rpm.depends` in `tauri.conf.json`, because WebKitGTK plays the app's WAV audio through GStreamer. These are the recommended Linux downloads.
+- **AppImage** bundles WebKitGTK, GTK, GLib, libepoxy and (before the fix below) libwayland from 22.04, but takes glibc and the graphics drivers (libEGL/Mesa) from the host. linuxdeploy's GTK hook also forces `GDK_BACKEND=x11`, so on Wayland desktops it always runs through XWayland. It needs FUSE (`libfuse2t64`, not installed by default on Ubuntu 24.04+).
+
+**AppImage blank window on Ubuntu 26.04 (fixed in the build).** The AppImage built for v0.3.0rc1 opened a blank window on Ubuntu 26.04, logging `Could not create default EGL display: EGL_BAD_PARAMETER. Aborting...` (the backend started normally). The same AppImage rendered on 22.04 and 24.04. Reproduced in CI by launching the extracted AppImage under Xvfb on `ubuntu-22.04`, `ubuntu-24.04` and `ubuntu-26.04` runners and counting unique colours in a screenshot (about 1,400 when the UI renders, 2 when blank). Results:
+
+| Variant | 22.04 / 24.04 | 26.04 |
+|---|---|---|
+| As built | renders | blank, EGL error |
+| `WEBKIT_DISABLE_DMABUF_RENDERER=1` or `WEBKIT_DISABLE_COMPOSITING_MODE=1` | renders | blank, EGL error |
+| Bundled `libepoxy` removed | renders | blank, EGL error |
+| Bundled `libwayland-*` removed | renders | **renders** |
+
+Cause: the bundled libwayland 1.20 (from 22.04) is loaded by the host's Mesa 26 libEGL, which needs a newer libwayland even when the app runs on X11. libwayland is backward compatible, so the host's copy works with the bundled GTK/WebKit. `scripts/strip-appimage-libs.sh` runs after `tauri build` in `build-full.yml` and `build-linux.yml`: it extracts the AppImage, deletes the bundled `libwayland-*`, and repacks it with a pinned, checksummed appimagetool. It fails the build if the libraries are no longer bundled, so a change in Tauri's bundling gets noticed.
+
+The unrelated `libgvfscommon.so: undefined symbol: g_task_set_static_name` / `Failed to load module` warnings on newer distributions are harmless: the bundled GLib 2.72 cannot load the host's GIO modules (gvfs, dconf), which are built for a newer GLib.
+
+If a future distribution shows a similar AppImage-only failure, compare the host's versions of the libraries the AppImage bundles (`./Dipper_*.AppImage --appimage-extract`, then look in `squashfs-root/usr/lib`), try removing candidates from an extracted copy and launching `squashfs-root/AppRun`, and add the culprit to `STRIP_GLOBS` only after checking that the result still renders on 22.04.
 
 ## Versions and releases
 
