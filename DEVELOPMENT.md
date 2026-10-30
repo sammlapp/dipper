@@ -95,7 +95,15 @@ cargo --version         # verify Rust is available
 mkdir -p src-tauri/bin
 touch src-tauri/bin/dipper-backend-aarch64-apple-darwin
 chmod +x src-tauri/bin/dipper-backend-aarch64-apple-darwin
+
+# 4. Git hooks: pre-commit runs `cargo fmt --check` and `cargo clippy -D warnings`
+#    (the same checks as CI) when a commit touches frontend/src-tauri
+cd ..
+./scripts/install-git-hooks.sh
 ```
+
+For format-on-save of Rust files in VS Code, install the rust-analyzer extension and set
+`"[rust]": { "editor.defaultFormatter": "rust-lang.rust-analyzer", "editor.formatOnSave": true }`.
 
 ## Running in development
 

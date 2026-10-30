@@ -1,0 +1,19 @@
+#!/bin/sh
+# Runs the same Rust checks as CI (.github/workflows/ci.yml) when a commit touches
+# frontend/src-tauri. Install with: ./scripts/install-git-hooks.sh
+
+if ! git diff --cached --name-only --diff-filter=ACMR | grep -q '^frontend/src-tauri/'; then
+    exit 0
+fi
+
+cd "$(git rev-parse --show-toplevel)/frontend/src-tauri" || exit 1
+
+if ! cargo fmt -- --check >/dev/null 2>&1; then
+    echo "pre-commit: Rust code is not formatted. Run 'cargo fmt' in frontend/src-tauri, then re-stage." >&2
+    exit 1
+fi
+
+if ! cargo clippy --quiet -- -D warnings; then
+    echo "pre-commit: clippy reported problems (see above)." >&2
+    exit 1
+fi

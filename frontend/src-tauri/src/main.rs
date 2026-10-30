@@ -525,7 +525,7 @@ fn main() {
 </html>
 "#;
             splash_window
-                .eval(&format!(
+                .eval(format!(
                     "document.documentElement.innerHTML = `{}`;",
                     splash_html.replace("`", "\\`")
                 ))
@@ -547,7 +547,7 @@ fn main() {
                 );
 
                 // Start our own backend
-                let child = start_backend_server(&app.handle(), free_port);
+                let child = start_backend_server(app.handle(), free_port);
 
                 if child.is_none() {
                     eprintln!("✗ Failed to start backend on port {}", free_port);

@@ -59,6 +59,18 @@ jobs:
         working-directory: frontend/src-tauri
         run: cargo fmt -- --check
 
+      # tauri-build requires every externalBin to exist at compile time. This job only
+      # compiles/lints the Rust code, so an empty sidecar stands in for the PyInstaller backend.
+      - name: Create placeholder backend sidecar
+        working-directory: frontend/src-tauri
+        shell: bash
+        run: |
+          TARGET_TRIPLE=$(rustc -vV | sed -n 's/^host: //p')
+          EXT=""
+          if [ "$RUNNER_OS" = "Windows" ]; then EXT=".exe"; fi
+          mkdir -p bin
+          touch "bin/dipper-backend-${TARGET_TRIPLE}${EXT}"
+
       - name: Clippy
         working-directory: frontend/src-tauri
         run: cargo clippy -- -D warnings
