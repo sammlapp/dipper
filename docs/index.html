@@ -125,10 +125,14 @@
 
     .header-actions {
       display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: center;
       gap: 10px;
       margin-top: 4px;
+    }
+
+    [hidden] {
+      display: none !important;
     }
 
     .download-label {
@@ -317,6 +321,43 @@
 
     .download-bar .dl-btn .platform-detail {
       display: inline;
+    }
+
+    .dl-btn.recommended {
+      border-color: var(--accent);
+    }
+
+    .dl-btn.recommended .platform-detail::after {
+      content: ' · recommended';
+      color: var(--accent);
+    }
+
+    .dl-toggle {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 4px;
+    }
+
+    .dl-toggle:hover {
+      color: var(--accent);
+    }
+
+    .linux-guide {
+      max-width: 640px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    .linux-guide code,
+    .info-card code {
+      color: var(--accent);
+      font-size: 0.8rem;
     }
 
     /* ── Releases table ── */
@@ -614,22 +655,43 @@
     <div class="download-label">Downloads</div>
     <div class="header-actions">
 
-      <div class="download-bar" id="full-downloads">
-        <a class="dl-btn" id="full-macos" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
-          <span class="platform-icon"></span>
+      <!-- The script moves the buttons for the visitor's OS into #primary-downloads and hides the rest
+           behind "Show all downloads". Without the script (or for an unrecognised OS) all are shown. -->
+      <div class="download-bar" id="primary-downloads" hidden></div>
+      <p class="linux-guide" id="linux-guide" hidden>
+        <strong>Which Linux package?</strong> Ubuntu, Debian, Linux Mint, Pop!_OS: <strong>.deb</strong>.
+        Fedora, RHEL, openSUSE: <strong>.rpm</strong>. Other distributions, or no admin rights:
+        <strong>AppImage</strong>. See <a href="#linux-install">Linux installation</a>.
+      </p>
+      <div class="download-bar" id="all-downloads">
+        <a class="dl-btn" id="full-macos" data-os="macos" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+          <span class="platform-icon"></span>
           <span class="platform-name">macOS</span>
           <span class="platform-detail">Apple Silicon · DMG</span>
         </a>
-        <a class="dl-btn" id="full-windows" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+        <a class="dl-btn" id="full-windows" data-os="windows" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
           <span class="platform-icon">⊞</span>
           <span class="platform-name">Windows</span>
-          <span class="platform-detail">x64 · NSIS Installer</span>
+          <span class="platform-detail">x64 · Installer</span>
         </a>
-        <a class="dl-btn" id="full-linux" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+        <a class="dl-btn" id="full-linux-deb" data-os="linux" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
           <span class="platform-icon">🐧</span>
-          <span class="platform-name">Linux</span>
-          <span class="platform-detail">x64 · AppImage</span>
+          <span class="platform-name">Linux .deb</span>
+          <span class="platform-detail">Ubuntu · Debian</span>
         </a>
+        <a class="dl-btn" id="full-linux-rpm" data-os="linux" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+          <span class="platform-icon">🐧</span>
+          <span class="platform-name">Linux .rpm</span>
+          <span class="platform-detail">Fedora · openSUSE</span>
+        </a>
+        <a class="dl-btn" id="full-linux-appimage" data-os="linux" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
+          <span class="platform-icon">🐧</span>
+          <span class="platform-name">Linux AppImage</span>
+          <span class="platform-detail">Other distributions</span>
+        </a>
+      </div>
+      <button class="dl-toggle" id="toggle-all-downloads" type="button" hidden>Show all downloads</button>
+      <div class="download-bar">
         <a class="dl-btn" href="https://github.com/sammlapp/dipper" target="_blank">
           <svg height="18" viewBox="0 0 16 16" fill="currentColor"><path
             d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
@@ -679,7 +741,7 @@
               <span class="platform-name">Windows</span>
               <span class="platform-detail">x64 · NSIS Installer</span>
             </a>
-            <a class="dl-btn" id="review-linux" href="https://github.com/sammlapp/dipper/releases/latest"
+            <a class="dl-btn" id="review-linux-appimage" href="https://github.com/sammlapp/dipper/releases/latest"
               target="_blank">
               <span class="platform-icon">🐧</span>
               <span class="platform-name">Linux</span>
@@ -731,10 +793,17 @@
             <img src="img/logos/hawkears.jpg" alt="HawkEars" title="HawkEars" />
           </div>
         </div>
-        <div class="info-card">
+        <div class="info-card" id="linux-install">
           <h3>Linux installation</h3>
-          <p>Make the AppImage executable: <code
-              style="color:var(--accent);font-size:0.8rem">chmod +x Dipper*.AppImage</code>, then run it.</p>
+          <p><strong>Ubuntu, Debian, Linux Mint, Pop!_OS:</strong> download the .deb, then
+            <code>sudo apt install ./Dipper_*.deb</code></p>
+          <p><strong>Fedora, RHEL, openSUSE:</strong> download the .rpm, then
+            <code>sudo dnf install ./Dipper-*.rpm</code> (openSUSE: <code>sudo zypper install ./Dipper-*.rpm</code>)</p>
+          <p><strong>Other distributions, or no admin rights:</strong> download the AppImage, run
+            <code>chmod +x Dipper_*.AppImage</code>, then run it.</p>
+          <p>The .deb and .rpm use your system's own libraries and are the most reliable choice. The AppImage bundles
+            its own, and on very new distributions (such as Ubuntu 26.04) its window can stay blank; use the .deb or
+            .rpm there.</p>
         </div>
 
       </div>
@@ -865,30 +934,62 @@
     const REPO = 'sammlapp/dipper';
     const API = `https://api.github.com/repos/${REPO}/releases`;
 
-    const PLATFORM_ICONS = { dmg: '', exe: '⊞', AppImage: '🐧' };
-    const PLATFORM_NAMES = { dmg: 'macOS', exe: 'Windows', AppImage: 'Linux' };
+    // Installable asset kinds. `id` matches the button ids (full-<id> / review-<id>).
+    // Windows matches only the NSIS installer, not other .exe assets such as dipper-backend.exe.
+    const ASSET_KINDS = [
+      { id: 'macos', icon: '', label: 'macOS', matches: n => n.endsWith('.dmg') },
+      { id: 'windows', icon: '⊞', label: 'Windows', matches: n => n.endsWith('-setup.exe') },
+      { id: 'linux-deb', icon: '🐧', label: 'Linux .deb', matches: n => n.endsWith('.deb') },
+      { id: 'linux-rpm', icon: '🐧', label: 'Linux .rpm', matches: n => n.endsWith('.rpm') },
+      { id: 'linux-appimage', icon: '🐧', label: 'Linux AppImage', matches: n => n.endsWith('.AppImage') },
+    ];
 
-    function assetPlatform(name) {
-      if (name.endsWith('.dmg')) return 'macos';
-      if (name.endsWith('.exe')) return 'windows';
-      if (name.endsWith('.AppImage')) return 'linux';
-      return null;
+    function assetKind(name) {
+      return ASSET_KINDS.find(k => k.matches(name)) || null;
     }
 
     function isReviewAsset(name) {
       return name.toLowerCase().includes('review');
     }
 
-    function isFullAsset(name) {
-      return !name.toLowerCase().includes('review') &&
-        (name.endsWith('.dmg') || name.endsWith('.exe') || name.endsWith('.AppImage'));
+    // 'macos' | 'windows' | 'linux', or null when unknown (mobile, other)
+    function detectOS() {
+      const ua = navigator.userAgent;
+      if (/Android|iPhone|iPad|iPod/i.test(ua)) return null;
+      const platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+      if (/mac/i.test(platform) || /Macintosh/.test(ua)) return 'macos';
+      if (/win/i.test(platform) || /Windows/.test(ua)) return 'windows';
+      if (/linux/i.test(platform) || /Linux|X11/.test(ua)) return 'linux';
+      return null;
     }
 
-    function assetExt(name) {
-      if (name.endsWith('.dmg')) return 'dmg';
-      if (name.endsWith('.exe')) return 'exe';
-      if (name.endsWith('.AppImage')) return 'AppImage';
+    // Some browsers name the distribution in the user agent; most don't.
+    function detectLinuxPackage() {
+      const ua = navigator.userAgent;
+      if (/Ubuntu|Debian|Mint/i.test(ua)) return 'linux-deb';
+      if (/Fedora|Red Hat|SUSE/i.test(ua)) return 'linux-rpm';
       return null;
+    }
+
+    function arrangeDownloads() {
+      const os = detectOS();
+      if (!os) return;
+      const primary = document.getElementById('primary-downloads');
+      const all = document.getElementById('all-downloads');
+      const toggle = document.getElementById('toggle-all-downloads');
+      all.querySelectorAll(`[data-os="${os}"]`).forEach(btn => primary.appendChild(btn));
+      primary.hidden = false;
+      all.hidden = true;
+      toggle.hidden = false;
+      toggle.addEventListener('click', () => {
+        all.hidden = !all.hidden;
+        toggle.textContent = all.hidden ? 'Show all downloads' : 'Hide other downloads';
+      });
+      if (os === 'linux') {
+        document.getElementById('linux-guide').hidden = false;
+        const pkg = detectLinuxPackage();
+        if (pkg) document.getElementById(`full-${pkg}`).classList.add('recommended');
+      }
     }
 
     function formatDate(iso) {
@@ -912,16 +1013,12 @@
       // ── Wire up "latest" download buttons ──
       const latest = published[0];
       if (latest) {
-        const reviewAssets = latest.assets.filter(a => isReviewAsset(a.name));
-        const fullAssets = latest.assets.filter(a => isFullAsset(a.name));
+        ASSET_KINDS.forEach(kind => {
+          const rv = latest.assets.find(a => isReviewAsset(a.name) && kind.matches(a.name));
+          const fv = latest.assets.find(a => !isReviewAsset(a.name) && kind.matches(a.name));
 
-        ['macos', 'windows', 'linux'].forEach(plat => {
-          const ext = { macos: 'dmg', windows: 'exe', linux: 'AppImage' }[plat];
-          const rv = reviewAssets.find(a => a.name.endsWith('.' + ext));
-          const fv = fullAssets.find(a => a.name.endsWith('.' + ext));
-
-          const rb = document.getElementById(`review-${plat}`);
-          const fb = document.getElementById(`full-${plat}`);
+          const rb = document.getElementById(`review-${kind.id}`);
+          const fb = document.getElementById(`full-${kind.id}`);
 
           if (rv && rb) { rb.href = rv.browser_download_url; rb.title = rv.name; }
           else if (rb) { rb.classList.add('unavailable'); }
@@ -940,7 +1037,7 @@
 
       const html = published.map(r => {
         const hasReview = r.assets.some(a => isReviewAsset(a.name));
-        const hasFull = r.assets.some(a => isFullAsset(a.name));
+        const hasFull = r.assets.some(a => !isReviewAsset(a.name) && assetKind(a.name));
         const pills = [
           r.prerelease ? '<span class="release-pill pill-pre">Pre-release</span>' : '',
           hasFull ? '<span class="release-pill pill-full">Full</span>' : '',
@@ -948,15 +1045,13 @@
         ].filter(Boolean).join('');
 
         const assets = r.assets
-          .filter(a => a.name.endsWith('.dmg') || a.name.endsWith('.exe') || a.name.endsWith('.AppImage'))
+          .filter(a => assetKind(a.name))
           .map(a => {
-            const ext = assetExt(a.name);
-            const icon = PLATFORM_ICONS[ext] || '📦';
-            const plat = PLATFORM_NAMES[ext] || '';
+            const kind = assetKind(a.name);
             const type = isReviewAsset(a.name) ? 'Review' : 'Full';
             const mb = (a.size / 1048576).toFixed(0);
             return `<a class="asset-btn" href="${a.browser_download_url}" title="${a.name}">
-          <span>${icon}</span> ${plat} ${type} <span style="color:var(--muted);font-size:0.76rem">${mb} MB</span>
+          <span>${kind.icon}</span> ${kind.label} ${type} <span style="color:var(--muted);font-size:0.76rem">${mb} MB</span>
         </a>`;
           }).join('');
 
@@ -976,6 +1071,7 @@
       document.getElementById('releases-container').innerHTML = html;
     }
 
+    arrangeDownloads();
     loadReleases();
   </script>
 </body>

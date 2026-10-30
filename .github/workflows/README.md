@@ -65,7 +65,7 @@ This directory contains automated build workflows for Dipper across multiple pla
 2. **Tauri Full App** (all platforms)
    - DMG for macOS
    - NSIS installer for Windows
-   - AppImage for Linux
+   - AppImage, .deb and .rpm for Linux
 
 **Artifacts:**
 - Full app installers for each platform (~100-200MB)

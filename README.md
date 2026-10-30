@@ -36,7 +36,11 @@ Download the installer for your computer from the **[Dipper download page](https
 |----------|----------|-------|
 | macOS (Apple Silicon) | `.dmg` | Open it and drag Dipper to Applications. Intel Macs are not supported |
 | Windows (64-bit) | `-setup.exe` | Run the installer |
-| Linux (64-bit) | `.AppImage` | Make it executable (`chmod +x Dipper-*.AppImage`), then run it |
+| Linux: Ubuntu, Debian, Mint, Pop!_OS | `.deb` | `sudo apt install ./Dipper_*.deb` |
+| Linux: Fedora, RHEL, openSUSE | `.rpm` | `sudo dnf install ./Dipper-*.rpm` (openSUSE: `sudo zypper install ./Dipper-*.rpm`) |
+| Linux: other distributions, or no admin rights | `.AppImage` | Make it executable (`chmod +x Dipper_*.AppImage`), then run it. If the window stays blank (seen on Ubuntu 26.04), use the `.deb` or `.rpm` |
+
+On Linux, prefer the `.deb` or `.rpm`: they use the system's WebKitGTK and graphics libraries. The AppImage bundles its own copies from an older Ubuntu, which can clash with very new distributions.
 
 There are two apps:
 

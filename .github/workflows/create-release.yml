@@ -51,10 +51,10 @@ jobs:
 
       - name: Fail if no installable files found
         run: |
-          count=$(find artifacts/ -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" \) | wc -l)
+          count=$(find artifacts/ -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) | wc -l)
           echo "Found $count installable files"
           if [ "$count" -eq 0 ]; then
-            echo "::error::No .dmg / .exe / .AppImage files found in run ${{ inputs.run_id }}."
+            echo "::error::No .dmg / .exe / .AppImage / .deb / .rpm files found in run ${{ inputs.run_id }}."
             echo "::error::Check that the run ID is correct and artifacts have not expired."
             exit 1
           fi
@@ -70,6 +70,8 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.exe
             artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

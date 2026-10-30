@@ -214,3 +214,19 @@ jobs:
           name: dipper-full-${{ matrix.platform }}-appimage
           path: frontend/src-tauri/target/release/bundle/appimage/*.AppImage
           retention-days: 30
+
+      - name: Upload Linux deb package
+        if: matrix.platform == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dipper-full-${{ matrix.platform }}-deb
+          path: frontend/src-tauri/target/release/bundle/deb/*.deb
+          retention-days: 30
+
+      - name: Upload Linux rpm package
+        if: matrix.platform == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dipper-full-${{ matrix.platform }}-rpm
+          path: frontend/src-tauri/target/release/bundle/rpm/*.rpm
+          retention-days: 30

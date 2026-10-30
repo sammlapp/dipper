@@ -67,7 +67,9 @@ Both build workflows create a **draft GitHub Release** with assets attached when
 ### Dipper Full
 - `Dipper-X.Y.Z-arm64.dmg` — macOS Apple Silicon
 - `Dipper-X.Y.Z-x64-setup.exe` — Windows x64
-- `Dipper-X.Y.Z-x64.AppImage` — Linux x64
+- `Dipper-X.Y.Z-x64.AppImage` — Linux x64 (portable)
+- `Dipper_X.Y.Z_amd64.deb` — Linux x64 (Debian/Ubuntu)
+- `Dipper-X.Y.Z-1.x86_64.rpm` — Linux x64 (Fedora/RHEL/openSUSE)
 - Size: ~100–200 MB app. The ML environment (about 2.5–4 GB for CPU, 6.5–9.5 GB with GPU support) is installed by the app on first use
 
 ---
@@ -78,7 +80,7 @@ Both build workflows create a **draft GitHub Release** with assets attached when
 |---|---|---|
 | macOS | Apple Silicon (arm64) | DMG |
 | Windows | x64 | NSIS Installer (EXE) |
-| Linux | x64 | AppImage |
+| Linux | x64 | deb, rpm, AppImage |
 
 ---
 
@@ -147,3 +149,6 @@ cd frontend && npm run tauri:build:review   # reproduce locally
 ```bash
 chmod +x Dipper-Review-*.AppImage && ./Dipper-Review-*.AppImage
 ```
+
+**Linux: AppImage window stays blank** (log shows `Could not create default EGL display: EGL_BAD_PARAMETER`)
+- Seen on Ubuntu 26.04: the AppImage's bundled `libwayland-*` (from Ubuntu 22.04, where it is built) is too old for the system's Mesa. Use the `.deb` or `.rpm`.

@@ -286,7 +286,7 @@ uv run --isolated --no-project python build_pyinstaller.py     # installs the lo
 
 The PyInstaller build bundles the `uv` executable and `backend/ml_env/{pyproject.toml,uv.lock}` (see `backend/http_server.spec`). The ML environment itself is not part of the installer. Because it is not bundled, testing a built app requires installing the environment from Settings on first launch.
 
-Full builds can be run in CI without tagging a release: Actions → "Build Full App" → Run workflow, on any branch. Artifacts (`.dmg`, `.exe`, `.AppImage`) are attached to the run. Releases are only created for version tags.
+Full builds can be run in CI without tagging a release: Actions → "Build Full App" → Run workflow, on any branch. Artifacts (`.dmg`, `.exe`, `.AppImage`, `.deb`, `.rpm`) are attached to the run. Releases are only created for version tags.
 
 ## Versions and releases
 

@@ -249,6 +249,22 @@ jobs:
           path: frontend/src-tauri/target/release/bundle/appimage/*.AppImage
           retention-days: 30
 
+      - name: Upload Linux deb package
+        if: matrix.platform == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dipper-full-${{ matrix.platform }}-deb
+          path: frontend/src-tauri/target/release/bundle/deb/*.deb
+          retention-days: 30
+
+      - name: Upload Linux rpm package
+        if: matrix.platform == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dipper-full-${{ matrix.platform }}-rpm
+          path: frontend/src-tauri/target/release/bundle/rpm/*.rpm
+          retention-days: 30
+
   create-release:
     name: Create GitHub Release
     needs: [build-tauri-full, test-built-backend]
@@ -275,6 +291,8 @@ jobs:
             artifacts/dipper-full-*/*.dmg
             artifacts/dipper-full-*/*.exe
             artifacts/dipper-full-*/*.AppImage
+            artifacts/dipper-full-*/*.deb
+            artifacts/dipper-full-*/*.rpm
           draft: false
           prerelease: contains(github.ref, 'alpha') || contains(github.ref, 'beta')
           body: |
@@ -294,11 +312,11 @@ jobs:
             2. Run the installer
             3. The ML environment will be automatically downloaded on first use
 
-            **Linux:**
-            1. Download `*.AppImage`
-            2. Make the AppImage executable: `chmod +x *.AppImage`
-            3. Run the AppImage
-            4. The ML environment will be automatically downloaded on first use
+            **Linux:** choose one package
+            - Ubuntu, Debian, Linux Mint, Pop!_OS: download `*.deb`, then `sudo apt install ./Dipper_*.deb`
+            - Fedora, RHEL, openSUSE: download `*.rpm`, then `sudo dnf install ./Dipper-*.rpm` (openSUSE: `sudo zypper install ./Dipper-*.rpm`)
+            - Other distributions, or no admin rights: download `*.AppImage`, run `chmod +x Dipper_*.AppImage`, then run it. If the window stays blank (seen on Ubuntu 26.04), use the `.deb` or `.rpm` instead
+            - The ML environment will be automatically downloaded on first use
 
             ### ML Environment
 
