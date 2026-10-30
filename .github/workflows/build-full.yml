@@ -310,18 +310,18 @@ jobs:
             **macOS:**
             1. Download `*.dmg` (Note: older Intel macs are not supported)
             2. Open the DMG and drag Dipper to Applications
-            3. The ML environment will be automatically downloaded on first use
+            3. Before running models, install the ML environment from the Settings tab (one-time download)
 
             **Windows:**
             1. Download `*.exe` installer
-            2. Run the installer
-            3. The ML environment will be automatically downloaded on first use
+            2. Double-click it and follow the installer. If Windows warns about an unrecognized app, click **More info → Run anyway**
+            3. Before running models, install the ML environment from the Settings tab (one-time download)
 
             **Linux:** choose one package
             - Ubuntu, Debian, Linux Mint, Pop!_OS: download `*.deb`, then `sudo apt install ./Dipper_*.deb`
             - Fedora, RHEL, openSUSE: download `*.rpm`, then `sudo dnf install ./Dipper-*.rpm` (openSUSE: `sudo zypper install ./Dipper-*.rpm`)
             - Other distributions, or no admin rights: download `*.AppImage`, run `chmod +x Dipper_*.AppImage`, then run it. If it reports that FUSE is missing (Ubuntu 24.04 and later), install it with `sudo apt install libfuse2t64`
-            - The ML environment will be automatically downloaded on first use
+            - Before running models, install the ML environment from the Settings tab (one-time download)
 
             ### ML Environment
 

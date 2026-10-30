@@ -32,13 +32,13 @@ Model training is under development and is not yet enabled in releases.
 
 Download the installer for your computer from the **[Dipper download page](https://sammlapp.github.io/dipper/)** (or from the [GitHub releases](https://github.com/sammlapp/dipper/releases/latest)).
 
-| Computer | Download | Notes |
-|----------|----------|-------|
-| macOS (Apple Silicon) | `.dmg` | Open it and drag Dipper to Applications. Intel Macs are not supported |
-| Windows (64-bit) | `-setup.exe` | Run the installer |
+| Computer | Download | How to install |
+|----------|----------|----------------|
+| macOS (Apple Silicon) | `.dmg` | Open it and drag Dipper into Applications. Intel Macs are not supported |
+| Windows (64-bit) | `-setup.exe` | Double-click it and follow the installer. If Windows warns about an unrecognized app, click **More info → Run anyway** |
 | Linux: Ubuntu, Debian, Mint, Pop!_OS | `.deb` | `sudo apt install ./Dipper_*.deb` |
 | Linux: Fedora, RHEL, openSUSE | `.rpm` | `sudo dnf install ./Dipper-*.rpm` (openSUSE: `sudo zypper install ./Dipper-*.rpm`) |
-| Linux: other distributions, or no admin rights | `.AppImage` | Make it executable (`chmod +x Dipper_*.AppImage`), then run it. If it reports that FUSE is missing (Ubuntu 24.04 and later), install it with `sudo apt install libfuse2t64` |
+| Linux: other distributions, or no admin rights | `.AppImage` | `chmod +x Dipper_*.AppImage`, then run it. If it reports that FUSE is missing (Ubuntu 24.04 and later): `sudo apt install libfuse2t64` |
 
 On Linux, prefer the `.deb` or `.rpm`: they use the system's WebKitGTK and graphics libraries, get an app-menu entry, and don't need FUSE. The AppImage bundles its own WebKitGTK/GTK/GLib from an older Ubuntu.
 

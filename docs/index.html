@@ -333,7 +333,15 @@
       color: var(--accent);
     }
 
-    .linux-guide {
+    .info-card.wide {
+      grid-column: 1 / -1;
+    }
+
+    .info-card.wide p + p {
+      margin-top: 8px;
+    }
+
+    .install-hint {
       max-width: 640px;
       color: var(--muted);
       font-size: 0.84rem;
@@ -341,7 +349,7 @@
       text-align: center;
     }
 
-    .linux-guide code,
+    .install-hint code,
     .info-card code {
       color: var(--accent);
       font-size: 0.8rem;
@@ -633,10 +641,18 @@
       <!-- The script moves the buttons for the visitor's OS into #primary-downloads and hides the rest
            behind "Show all downloads". Without the script (or for an unrecognised OS) all are shown. -->
       <div class="download-bar" id="primary-downloads" hidden></div>
-      <p class="linux-guide" id="linux-guide" hidden>
+      <!-- One of these is shown under the visitor's downloads -->
+      <p class="install-hint" id="install-hint-macos" hidden>
+        Open the .dmg and drag Dipper into Applications. <a href="#install">Installation help</a>
+      </p>
+      <p class="install-hint" id="install-hint-windows" hidden>
+        Double-click the installer and follow its steps. If Windows warns about an unrecognized app, click
+        <strong>More info → Run anyway</strong>. <a href="#install">Installation help</a>
+      </p>
+      <p class="install-hint" id="install-hint-linux" hidden>
         <strong>Which Linux package?</strong> Ubuntu, Debian, Linux Mint, Pop!_OS: <strong>.deb</strong>.
         Fedora, RHEL, openSUSE: <strong>.rpm</strong>. Other distributions, or no admin rights:
-        <strong>AppImage</strong>. See <a href="#linux-install">Linux installation</a>.
+        <strong>AppImage</strong>. See <a href="#install">Installation</a>.
       </p>
       <div class="download-bar" id="all-downloads">
         <a class="dl-btn" id="full-macos" data-os="macos" href="https://github.com/sammlapp/dipper/releases/latest" target="_blank">
@@ -707,16 +723,30 @@
       
 
       <div class="info-grid">
+        <div class="info-card wide" id="install">
+          <h3>Installation</h3>
+          <p><strong>macOS (Apple Silicon):</strong> open the .dmg and drag Dipper into Applications. Intel Macs are
+            not supported.</p>
+          <p><strong>Windows:</strong> double-click the installer and follow its steps. If Windows warns about an
+            unrecognized app, click <strong>More info → Run anyway</strong>.</p>
+          <p><strong>Linux, Ubuntu / Debian / Mint / Pop!_OS:</strong> download the .deb, then
+            <code>sudo apt install ./Dipper_*.deb</code></p>
+          <p><strong>Linux, Fedora / RHEL / openSUSE:</strong> download the .rpm, then
+            <code>sudo dnf install ./Dipper-*.rpm</code> (openSUSE: <code>sudo zypper install ./Dipper-*.rpm</code>)</p>
+          <p><strong>Linux, other distributions or no admin rights:</strong> download the AppImage, run
+            <code>chmod +x Dipper_*.AppImage</code>, then run it. If it reports that FUSE is missing (Ubuntu 24.04 and
+            later), install it with <code>sudo apt install libfuse2t64</code>. The .deb and .rpm are the more reliable
+            choice where they apply: they use your system's own libraries and add Dipper to your app menu.</p>
+          <p><strong>First use:</strong> to run models, install the machine learning environment from the
+            <strong>Settings</strong> tab (a one-time 2.5–9.5 GB download). See the
+            <a href="https://github.com/sammlapp/dipper#first-launch-install-the-machine-learning-environment">README</a>.</p>
+        </div>
         <div class="info-card">
           <h3>Server Mode + Remote Access </h3>
           <p>To run Dipper on a server and access via a remote browser, see <a
               href="https://github.com/sammlapp/dipper?tab=readme-ov-file#server-mode">Server Mode instructions</a>
           </p>
         </div>
-        <!-- <div class="info-card">
-          <h3>macOS note</h3>
-          <p>On first launch, right-click → Open to bypass Gatekeeper if the app is unsigned.</p>
-        </div> -->
         <div class="info-card">
           <h3>ML Model Support</h3>
           <p>The app includes all major foundation models for bioacoustics, including BirdNET, Perch V2, and HawkEars</p>
@@ -725,18 +755,6 @@
             <img src="img/logos/perch.png" alt="Perch V2" title="Perch V2" />
             <img src="img/logos/hawkears.jpg" alt="HawkEars" title="HawkEars" />
           </div>
-        </div>
-        <div class="info-card" id="linux-install">
-          <h3>Linux installation</h3>
-          <p><strong>Ubuntu, Debian, Linux Mint, Pop!_OS:</strong> download the .deb, then
-            <code>sudo apt install ./Dipper_*.deb</code></p>
-          <p><strong>Fedora, RHEL, openSUSE:</strong> download the .rpm, then
-            <code>sudo dnf install ./Dipper-*.rpm</code> (openSUSE: <code>sudo zypper install ./Dipper-*.rpm</code>)</p>
-          <p><strong>Other distributions, or no admin rights:</strong> download the AppImage, run
-            <code>chmod +x Dipper_*.AppImage</code>, then run it.</p>
-          <p>The .deb and .rpm use your system's own libraries, add Dipper to your app menu, and are the most
-            reliable choice. If the AppImage reports that FUSE is missing (Ubuntu 24.04 and later), install it with
-            <code>sudo apt install libfuse2t64</code>.</p>
         </div>
 
       </div>
@@ -919,8 +937,8 @@
         all.hidden = !all.hidden;
         toggle.textContent = all.hidden ? 'Show all downloads' : 'Hide other downloads';
       });
+      document.getElementById(`install-hint-${os}`).hidden = false;
       if (os === 'linux') {
-        document.getElementById('linux-guide').hidden = false;
         const pkg = detectLinuxPackage();
         if (pkg) document.getElementById(`full-${pkg}`).classList.add('recommended');
       }
