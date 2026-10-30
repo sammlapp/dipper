@@ -213,6 +213,13 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
+      - name: Remove host-provided libraries from AppImage
+        if: matrix.platform == 'linux-x64'
+        run: |
+          for f in frontend/src-tauri/target/release/bundle/appimage/*.AppImage; do
+            scripts/strip-appimage-libs.sh "$f"
+          done
+
       - name: List build artifacts
         shell: bash
         run: |
