@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code ([claude.ai/code](http://claude.ai/code)) when working with code in this repository.
 
-When starting fresh: Take a look at [README.md](http://readme.md) [CLAUDE.md](http://claude.md) and [DEVELOPMENT.md](./DEVELOPMENT.md). We're going to work from [plan.md](http://plan.md) but first I want you to have a good sense for how the code base works and what is currently implemented. If needed, carefully read the main implementation files: src/App.js, src/AppReviewOnly.js, [app.py](http://app.py), scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
+When starting fresh: Take a look at [README.md](http://readme.md) [CLAUDE.md](http://claude.md) and [DEVELOPMENT.md](./DEVELOPMENT.md). We're going to work from [plan.md](http://plan.md) but first I want you to have a good sense for how the code base works and what is currently implemented. If needed, carefully read the main implementation files: src/App.js, [app.py](http://app.py), scripts/train_model.py, scripts/inference.py, scripts/clip_extraction.py
 
 **Note:** When making significant changes to the project (new features, architecture changes, setup requirements), also update [README.md](http://readme.md) [CLAUDE.md](http://claude.md) and [DEVELOPMENT.md](./DEVELOPMENT.md) to keep them from getting stale.
 
@@ -228,13 +228,6 @@ Builds include:
 - PyInstaller backend executable
 - Does NOT include the ML environment (installed on first use by the bundled uv)
 
-### Review-Only Desktop Application
-```bash
-npm run tauri:build:review
-```
-
-Smaller app with only ReviewTab functionality. Uses `REACT_APP_REVIEW_ONLY=true` environment variable.
-
 ## Common Development Tasks
 
 ### Modifying Backend API
@@ -257,7 +250,7 @@ Smaller app with only ReviewTab functionality. Uses `REACT_APP_REVIEW_ONLY=true`
 ### Adding New Tab/Component
 1. Create component in `frontend/src/components/`
 2. Import in `App.js`
-3. Add to tab list (if not review-only)
+3. Add to tab list
 4. Add Material-UI tab panel
 
 ## Testing
@@ -295,13 +288,12 @@ Managed through Settings tab, saved/loaded via HTTP endpoints.
 2. **Two Python environments**: PyInstaller for backend, uv-managed venv for ML tasks
 3. **Status polling**: Frontend polls every 2 seconds for job updates
 4. **Subprocess isolation**: Each job runs in separate Python process
-5. **Review-only build**: Conditional rendering based on REACT_APP_REVIEW_ONLY
-6. **Desktop vs Server mode**: Desktop uses Tauri wrapper, server mode runs React + backend without Tauri
-7. **Python version must match**: PyInstaller backend and the ML env must both use **Python 3.13**. A mismatch (e.g. PyInstaller built with 3.11, ML env on 3.13) causes `python311.dll conflicts` when multiprocessing spawns DataLoader workers on Windows. CI workflow (`build-full.yml`) must use `python-version: '3.13'`.
-8. **Class name CSVs must be git-tracked**: `backend/data/class_names/*.csv` are required for classifier label lookup (geomodel filtering etc.). The `*.csv` gitignore pattern must not apply to this directory.
-9. **Testing PyInstaller backend standalone is insufficient for Windows DLL issues**: Some multiprocessing/DLL conflicts only manifest in the full built app, not when running `dipper-backend.exe` directly.
-10. **num_workers defaults to 0**: DataLoader `num_workers > 0` spawns subprocesses on Windows which is fragile. Default is 0 (main-process loading).
-11. **soundfile handles mp3/ogg natively** (as of 2026) — no ffmpeg conversion needed for XC audio clips.
+5. **Desktop vs Server mode**: Desktop uses Tauri wrapper, server mode runs React + backend without Tauri
+6. **Python version must match**: PyInstaller backend and the ML env must both use **Python 3.13**. A mismatch (e.g. PyInstaller built with 3.11, ML env on 3.13) causes `python311.dll conflicts` when multiprocessing spawns DataLoader workers on Windows. CI workflow (`build-full.yml`) must use `python-version: '3.13'`.
+7. **Class name CSVs must be git-tracked**: `backend/data/class_names/*.csv` are required for classifier label lookup (geomodel filtering etc.). The `*.csv` gitignore pattern must not apply to this directory.
+8. **Testing PyInstaller backend standalone is insufficient for Windows DLL issues**: Some multiprocessing/DLL conflicts only manifest in the full built app, not when running `dipper-backend.exe` directly.
+9. **num_workers defaults to 0**: DataLoader `num_workers > 0` spawns subprocesses on Windows which is fragile. Default is 0 (main-process loading).
+10. **soundfile handles mp3/ogg natively** (as of 2026) — no ffmpeg conversion needed for XC audio clips.
 
 ## Dependencies
 

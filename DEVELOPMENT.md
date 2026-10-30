@@ -127,7 +127,6 @@ Backend changes need a restart of the backend only; no PyInstaller rebuild is ne
 |---------|--------------|
 | `npm run tauri:dev:full` | Starts the backend (`uv run --project ../backend python ../backend/app.py`), waits for `/health`, then launches Tauri |
 | `npm run tauri:dev` | Frontend only; HTTP calls fail without a backend |
-| `npm run tauri:dev:review` / `tauri:dev:review:full` | Same, for the review-only app (`REACT_APP_REVIEW_ONLY=true`) |
 | `npm start` | React dev server in a browser, no Tauri |
 
 Server mode (React in a browser, backend on a remote machine) has its own launchers: `./scripts/launch-server-dev.sh [config_file]` runs from source with hot reload, and `./scripts/launch-server.sh [config_file]` uses the built PyInstaller backend. Do not use `npm start` for server mode work. See [QUICKSTART_SERVER.md](QUICKSTART_SERVER.md).
@@ -229,7 +228,7 @@ Edit the script in `backend/scripts/`. Scripts run in the ML environment, so cha
 
 ### Add a tab or component
 
-Create the component in `frontend/src/components/`, import it in `App.js`, and add it to the tab list (conditionally for the review-only build, which is controlled by `REACT_APP_REVIEW_ONLY`). Follow the UI conventions in [DESIGN.md](DESIGN.md).
+Create the component in `frontend/src/components/`, import it in `App.js`, and add it to the tab list. Follow the UI conventions in [DESIGN.md](DESIGN.md).
 
 ## Practices
 
@@ -271,8 +270,7 @@ CI runners have no GPU, so GPU behavior needs a manual test on a machine with an
 All commands run from `frontend/`.
 
 ```bash
-npm run tauri:build:all      # React app + PyInstaller backend + Tauri installer (full app)
-npm run tauri:build:review   # Review-only app (smaller; REACT_APP_REVIEW_ONLY=true)
+npm run tauri:build:all      # React app + PyInstaller backend + Tauri installer
 ```
 
 Output is in `frontend/src-tauri/target/release/bundle/`. See [frontend/BUILD_INSTRUCTIONS.md](frontend/BUILD_INSTRUCTIONS.md) for step-by-step builds and troubleshooting.

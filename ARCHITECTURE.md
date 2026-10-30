@@ -317,16 +317,9 @@ The `/clip` endpoint supports arbitrary `start_time`/`end_time` ranges. Focus mo
 
 ### Desktop Application
 
-**Full App:**
 ```bash
 cd frontend
 npm run tauri:build:all
-```
-
-**Review-Only App:**
-```bash
-cd frontend
-npm run tauri:build:review
 ```
 
 **Build Process:**
@@ -436,7 +429,6 @@ npm run tauri:dev
 **Environment Variables:**
 - `REACT_APP_MODE=server` - Enable server mode (no native file dialogs)
 - `REACT_APP_BACKEND_PORT=8001` - Backend port (defaults to 8000)
-- `REACT_APP_REVIEW_ONLY=true` - Build review-only version
 
 ### Backend (Python)
 

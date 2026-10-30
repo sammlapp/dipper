@@ -51,7 +51,7 @@ jobs:
 
       - name: Fail if no installable files found
         run: |
-          count=$(find artifacts/ -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) | wc -l)
+          count=$(find artifacts/dipper-full-* -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) | wc -l)
           echo "Found $count installable files"
           if [ "$count" -eq 0 ]; then
             echo "::error::No .dmg / .exe / .AppImage / .deb / .rpm files found in run ${{ inputs.run_id }}."
@@ -66,12 +66,13 @@ jobs:
           name: ${{ inputs.tag }}
           draft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}
+          # Only the app installers; the run's dipper-backend-* artifacts are build inputs
           files: |
-            artifacts/**/*.dmg
-            artifacts/**/*.exe
-            artifacts/**/*.AppImage
-            artifacts/**/*.deb
-            artifacts/**/*.rpm
+            artifacts/dipper-full-*/*.dmg
+            artifacts/dipper-full-*/*.exe
+            artifacts/dipper-full-*/*.AppImage
+            artifacts/dipper-full-*/*.deb
+            artifacts/dipper-full-*/*.rpm
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

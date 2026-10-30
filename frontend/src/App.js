@@ -103,10 +103,7 @@ function App() {
   const [hoverOpen, setHoverOpen] = useState(false);
   useDarkMode(); // applies body.dark-mode class from persisted preference
 
-  // Check if running in review-only mode
-  const isReviewOnly = process.env.REACT_APP_REVIEW_ONLY === 'true';
-
-  const [activeTab, setActiveTab] = useState(isReviewOnly ? 'review' : 'inference');
+  const [activeTab, setActiveTab] = useState('inference');
   const [currentTask, setCurrentTask] = useState(null);
   const [runningTasks, setRunningTasks] = useState([]);
   const [taskHistory, setTaskHistory] = useState([]);
@@ -187,12 +184,12 @@ function App() {
 
   // ML environment: check on launch so task forms know whether env is ready
   useEffect(() => {
-    if (isReviewOnly || !backendUrl) return;
+    if (!backendUrl) return;
     fetch(`${backendUrl}/env/check`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ env_path: null }) })
       .then(r => r.json())
       .then(result => setEnvReady(result.status === 'ready'))
       .catch(() => { });
-  }, [backendUrl, isReviewOnly]);
+  }, [backendUrl]);
 
   // Task handlers
   const handleTaskCreate = (taskConfig, taskName) => {
@@ -211,18 +208,6 @@ function App() {
     setExtractionPredictionsFolder({ folder: jobFolder, ts: Date.now() });
     setActiveTab('extraction');
   };
-
-  // If review-only mode, render only the ReviewTab without drawer
-  if (isReviewOnly) {
-    return (
-      <Box sx={{ display: 'flex', width: '100%' }}>
-        <CssBaseline />
-        <Box component="main" sx={{ flexGrow: 1, p: 0 }}>
-          <ReviewTab isReviewOnly={true} />
-        </Box>
-      </Box>
-    );
-  }
 
   return (
     <Box sx={{ display: 'flex' }}>

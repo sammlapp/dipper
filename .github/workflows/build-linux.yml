@@ -176,10 +176,6 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Set product name
-        working-directory: frontend
-        run: node ../scripts/set-product-name.js full
-
       - name: Build React app (full)
         working-directory: frontend
         run: npm run build

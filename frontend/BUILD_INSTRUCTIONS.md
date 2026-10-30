@@ -28,15 +28,6 @@ npm run tauri:build:all
 This builds the React app, PyInstaller backend, and Tauri desktop app in one step.
 Output: `frontend/src-tauri/target/release/bundle/`
 
-### Review-Only Application (Dipper Review)
-
-```bash
-cd frontend
-npm run tauri:build:review
-```
-
-Smaller build with only the ReviewTab. Uses `REACT_APP_REVIEW_ONLY=true`.
-
 ### Manual step-by-step (if needed)
 
 ```bash
@@ -56,7 +47,7 @@ npx tauri build --verbose
 
 - **macOS**: `.dmg` installer in `src-tauri/target/release/bundle/dmg/`
 - **Windows**: `.msi` / `.exe` installer in `src-tauri/target/release/bundle/msi/` or `nsis/`
-- **Linux**: `.AppImage` / `.deb` in `src-tauri/target/release/bundle/`
+- **Linux**: `.AppImage` / `.deb` / `.rpm` in `src-tauri/target/release/bundle/`
 
 ## Architecture Support
 
@@ -73,8 +64,7 @@ npx tauri build --verbose
 ## CI Builds
 
 GitHub Actions workflows in `.github/workflows/` automate builds:
-- `build-full.yml` — full Dipper app for all platforms
-- `build-review.yml` — review-only app
+- `build-full.yml` — Dipper app for all platforms
 
 CI uses Python 3.13 for the PyInstaller backend. **The backend Python version must match the ML environment Python version** (`ML_PYTHON_VERSION` in `backend/app.py` and `requires-python` in `backend/ml_env/pyproject.toml`; also 3.13) to avoid DLL conflicts on Windows when multiprocessing spawns DataLoader workers.
 

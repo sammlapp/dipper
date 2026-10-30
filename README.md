@@ -42,12 +42,9 @@ Download the installer for your computer from the **[Dipper download page](https
 
 On Linux, prefer the `.deb` or `.rpm`: they use the system's WebKitGTK and graphics libraries. The AppImage bundles its own copies from an older Ubuntu, which can clash with very new distributions.
 
-There are two apps:
+Dipper is a 100-200 MB download, plus the machine learning environment described below.
 
-- **Dipper** is the full application: inference, clip extraction, and review. It is a 100-200 MB download, plus the machine learning environment described below.
-- **Dipper Review** is a small, review-only app for annotating clips that someone else prepared. It needs no machine learning environment.
-
-### First launch: install the machine learning environment (Dipper only)
+### First launch: install the machine learning environment
 
 Running models needs PyTorch and related software, which is too large to include in the installer. Dipper installs it for you the first time you need it:
 

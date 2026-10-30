@@ -311,7 +311,7 @@ function MultiSelectBar({ selectedCount, availableClasses, selectedClipIndices, 
   );
 }
 
-function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }) {
+function ReviewTab({ drawerOpen = false, isActive = true }) {
   const backendUrl = useBackendUrl();
   const { darkMode, toggle: toggleDarkMode } = useDarkMode();
 
@@ -4393,8 +4393,8 @@ function ReviewTab({ drawerOpen = false, isReviewOnly = false, isActive = true }
           <div
             className="review-status-bar"
             style={{
-              bottom: isReviewOnly ? '0' : '30px',
-              left: isReviewOnly ? '0' : (drawerOpen ? '240px' : '65px')
+              bottom: '30px',
+              left: drawerOpen ? '240px' : '65px'
             }}
           >
             <div className="status-section">

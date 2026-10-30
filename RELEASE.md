@@ -27,12 +27,9 @@ git push origin main
 ### Step 2 — Tag and push
 
 ```bash
-# Dipper Review build only (lightweight, ~20-30 min)
+# Triggers build-full.yml (~50-90 min) — tag format: vX.Y.Z (no suffix)
 git tag -a v0.0.13 -m "Release v0.0.13"
 git push origin v0.0.13
-
-# Full app build (includes ML environment, ~50-90 min)
-# Uses the build-full.yml workflow — tag format: vX.Y.Z (no suffix)
 ```
 
 ### Step 3 — Publish the draft release
@@ -48,23 +45,16 @@ git push origin v0.0.13
 
 | Workflow | Trigger | Builds |
 |---|---|---|
-| `build-review.yml` | Any `v*` tag or push to `main`/`develop` | Dipper Review (PyInstaller + Tauri review-only) |
-| `build-full.yml` | Tags matching `vX.Y.Z` (no suffix) | Dipper Full (PyInstaller + Tauri full app) |
+| `build-full.yml` | Tags matching `vX.Y.Z` (no suffix), or manual | Dipper (PyInstaller backend + Tauri app) |
+| `create-release.yml` | Manual | Release from an existing build run's artifacts |
 | `deploy-pages.yml` | Release published, push to `docs/`, or manual | GitHub Pages download site |
 
-Both build workflows create a **draft GitHub Release** with assets attached when triggered by a tag.
+The build workflow creates a **GitHub Release** with the app installers attached when triggered by a tag. The PyInstaller backend executables are build inputs and are not attached.
 
 ---
 
 ## Build Outputs
 
-### Dipper Review
-- `Dipper-Review-X.Y.Z-arm64.dmg` — macOS Apple Silicon
-- `Dipper-Review-X.Y.Z-x64-setup.exe` — Windows x64
-- `Dipper-Review-X.Y.Z-x64.AppImage` — Linux x64
-- Size: ~100–200 MB per platform
-
-### Dipper Full
 - `Dipper-X.Y.Z-arm64.dmg` — macOS Apple Silicon
 - `Dipper-X.Y.Z-x64-setup.exe` — Windows x64
 - `Dipper-X.Y.Z-x64.AppImage` — Linux x64 (portable)
@@ -131,7 +121,7 @@ cd backend && uv run --isolated --no-project python build_pyinstaller.py   # rep
 - Check that PyInstaller artifact was produced in the prior job
 - Check `frontend/src-tauri/tauri.conf.json` for syntax errors
 ```bash
-cd frontend && npm run tauri:build:review   # reproduce locally
+cd frontend && npm run tauri:build:all   # reproduce locally
 ```
 
 **Release draft not created**
@@ -147,7 +137,7 @@ cd frontend && npm run tauri:build:review   # reproduce locally
 
 **Linux: AppImage won't launch**
 ```bash
-chmod +x Dipper-Review-*.AppImage && ./Dipper-Review-*.AppImage
+chmod +x Dipper_*.AppImage && ./Dipper_*.AppImage
 ```
 
 **Linux: AppImage window stays blank** (log shows `Could not create default EGL display: EGL_BAD_PARAMETER`)

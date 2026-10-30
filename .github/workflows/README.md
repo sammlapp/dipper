@@ -19,13 +19,15 @@ This directory contains automated build workflows for Dipper across multiple pla
 
 ---
 
-### 2. Build Review-Only App (`build-review.yml`)
+### 2. Build Full App (`build-full.yml`)
 **Trigger:**
 - Push to `main` or `develop`
-- Tags matching `v*-review` (e.g., `v0.0.6-review`)
+- Tags matching version patterns:
+  - `v0.0.6` (release)
+  - `v0.0.6-alpha`, `v0.0.6-beta`, `v0.0.6-rc1` (pre-releases)
 - Manual workflow dispatch
 
-**Purpose:** Build lightweight review-only version of the app
+**Purpose:** Build complete app with ML training capabilities
 
 **What it builds:**
 1. **PyInstaller Backend** (all platforms)
@@ -33,42 +35,13 @@ This directory contains automated build workflows for Dipper across multiple pla
    - Windows (x64)
    - Linux (x64)
 
-2. **Tauri Review App** (all platforms)
-   - DMG for macOS
-   - NSIS installer for Windows
-   - AppImage for Linux
-
-**Artifacts:**
-- Review app installers for each platform
-- Smaller download size (~100-200MB)
-- No ML training capabilities, only annotation review
-
-**Use this for:** Distributing lightweight review tools to annotators
-
----
-
-### 3. Build Full App (`build-full.yml`)
-**Trigger:**
-- Push to `main` or `develop`
-- Tags matching version patterns:
-  - `v0.0.6` (release)
-  - `v0.0.6-alpha`, `v0.0.6-beta`, `v0.0.6-rc1` (pre-releases)
-  - **Does NOT trigger on** `v*-review` tags
-- Manual workflow dispatch
-
-**Purpose:** Build complete app with ML training capabilities
-
-**What it builds:**
-1. **PyInstaller Backend** (all platforms)
-   - Same as review build
-
 2. **Tauri Full App** (all platforms)
    - DMG for macOS
    - NSIS installer for Windows
    - AppImage, .deb and .rpm for Linux
 
 **Artifacts:**
-- Full app installers for each platform (~100-200MB)
+- App installers for each platform (~100-200MB); only these are attached to the release (the PyInstaller backend artifacts are build inputs)
 - The ML environment is not included: the app installs it on first use from `backend/ml_env/uv.lock` (bundled with the backend, along with the `uv` executable)
 
 **Use this for:** Full production releases with ML capabilities
@@ -92,26 +65,7 @@ This directory contains automated build workflows for Dipper across multiple pla
 
 ## Release Process
 
-### Review-Only Release
-
-1. **Tag the release:**
-   ```bash
-   git tag v0.0.6-review
-   git push origin v0.0.6-review
-   ```
-
-2. **Workflow runs automatically:**
-   - Builds PyInstaller backend for all platforms
-   - Builds review-only Tauri apps
-   - Creates draft GitHub release with installers
-
-3. **Edit and publish:**
-   - Go to GitHub Releases
-   - Edit the draft release
-   - Add release notes
-   - Publish the release
-
-### Full App Release
+### App Release
 
 1. **Update the ML environment lockfile** (only if ML dependencies changed):
    ```bash
@@ -143,16 +97,11 @@ This directory contains automated build workflows for Dipper across multiple pla
 
 ### Tag Naming Convention
 
-**Review-only:** `v*-review`
-- `v0.0.6-review` ✓ Triggers review build
-- `v0.0.6-release` ✗ Does NOT trigger review build
-
-**Full app:** `v[0-9]+.[0-9]+.[0-9]+` with optional suffix
+`v[0-9]+.[0-9]+.[0-9]+` with optional suffix
 - `v0.0.6` ✓ Stable release
 - `v0.0.6-alpha` ✓ Alpha pre-release
 - `v0.0.6-beta` ✓ Beta pre-release
 - `v0.0.6-rc1` ✓ Release candidate
-- `v0.0.6-review` ✗ Does NOT trigger full build (triggers review)
 
 ---
 
@@ -161,7 +110,7 @@ This directory contains automated build workflows for Dipper across multiple pla
 You can manually trigger builds from the GitHub Actions tab:
 
 1. Go to **Actions** tab in GitHub
-2. Select the workflow (`Build Review-Only App` or `Build Full App`)
+2. Select the workflow (`Build Full App`)
 3. Click **Run workflow**
 4. Select the branch
 5. Click **Run workflow** button
@@ -170,26 +119,16 @@ You can manually trigger builds from the GitHub Actions tab:
 
 ## Build Artifacts
 
-### Review-Only Build
 ```
 artifacts/
-├── dipper-backend-macos-arm64/
-├── dipper-backend-windows-x64/
-├── dipper-backend-linux-x64/
-├── dipper-review-macos-arm64-dmg/
-├── dipper-review-windows-x64-installer/
-└── dipper-review-linux-x64-appimage/
-```
-
-### Full App Build
-```
-artifacts/
-├── dipper-backend-macos-arm64/
-├── dipper-backend-windows-x64/
-├── dipper-backend-linux-x64/
-├── dipper-full-macos-arm64/
-├── dipper-full-windows-x64/
-└── dipper-full-linux-x64/
+├── dipper-backend-macos-arm64/          # build input, not released
+├── dipper-backend-windows-x64/          # build input, not released
+├── dipper-backend-linux-x64/            # build input, not released
+├── dipper-full-macos-arm64-dmg/
+├── dipper-full-windows-x64-installer/
+├── dipper-full-linux-x64-appimage/
+├── dipper-full-linux-x64-deb/
+└── dipper-full-linux-x64-rpm/
 ```
 
 ---
@@ -202,8 +141,7 @@ Approximate build times on GitHub-hosted runners:
 |------|------|
 | PyInstaller build | 5-10 minutes |
 | Tauri build | 10-20 minutes |
-| **Total (Review)** | **~20-30 minutes** |
-| **Total (Full)** | **~40-70 minutes** |
+| **Total** | **~40-70 minutes** |
 
 ---
 
@@ -244,8 +182,8 @@ choco install act  # Windows
 # Test CI workflow
 act pull_request -W .github/workflows/ci.yml
 
-# Test review build (jobs only, won't complete)
-act push -W .github/workflows/build-review.yml -j build-pyinstaller
+# Test the full build (jobs only, won't complete)
+act push -W .github/workflows/build-full.yml -j build-pyinstaller
 ```
 
 **Note:** Full builds won't work locally due to runner requirements and artifact dependencies.

@@ -192,10 +192,6 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Set product name
-        working-directory: frontend
-        run: node ../scripts/set-product-name.js full
-
       - name: Build React app (full)
         working-directory: frontend
         run: npm run build
@@ -274,9 +270,11 @@ jobs:
       contents: write
 
     steps:
-      - name: Download all artifacts
+      # Only the app installers are released; the PyInstaller backend artifacts are build inputs
+      - name: Download app installer artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: dipper-full-*
           path: artifacts/
 
       - name: Display artifact structure
